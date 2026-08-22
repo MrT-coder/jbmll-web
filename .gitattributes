@@ -1,0 +1,12 @@
+# Todo el texto se guarda y se entrega con finales de línea LF.
+#
+# Sin esto, Git convierte a CRLF en Windows y el banner se rompe: el \r queda
+# pegado al final de cada línea y el relleno al ancho máximo cuenta un carácter
+# de más. Además el build de Cloudflare corre en Linux, así que fijarlo evita
+# que el sitio se comporte distinto según dónde se compile.
+* text=auto eol=lf
+
+*.woff2 binary
+*.png    binary
+*.jpg    binary
+*.ico    binary

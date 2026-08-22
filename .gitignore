@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.astro/
+.wrangler/
+
+# Variables de entorno. El token que lee D1 durante el build vivirá acá cuando
+# llegue el momento, y no puede entrar nunca al repositorio.
+.env
+.env.*
+!.env.example
+
+# Herramientas del entorno de trabajo, no del proyecto.
+.atl/
+.DS_Store
+Thumbs.db
