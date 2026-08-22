@@ -1,94 +1,121 @@
 # jbmll.dev
 
-Web personal de Josue Bladimir Morales Llanganate (JBMLL): proyectos, publicaciones y notas, en una terminal
-que se navega a comandos o a clic.
+Web personal de **Josue Bladimir Morales Llanganate** (JBMLL): proyectos,
+publicaciones y notas, en una terminal que se navega con comandos o con clic.
 
 Hoy publica una pantalla de «próximamente». El sitio completo se construye
-encima de esta misma base.
+sobre esta misma base.
 
 ## Empezar
 
 ```sh
 npm install
-npm run dev      # http://localhost:4321
+npm run dev
 ```
 
+Disponible en `http://localhost:4321`.
+
 | Comando | Qué hace |
-|---|---|
+| --- | --- |
 | `npm run dev` | servidor de desarrollo con recarga en caliente |
 | `npm run build` | genera `dist/` |
 | `npm run verify` | revisa el `dist/` ya generado |
-| `npm run ship` | build + verify, lo que corre antes de desplegar |
+| `npm run ship` | build + verify; lo que se ejecuta antes de desplegar |
 
-## Cómo está armado
+Requiere Node 22 (ver `.nvmrc`).
 
-Astro en modo estático. Cada página se genera en el build y se sirve como HTML
-desde el CDN: **en una visita no corre código en ningún servidor**.
+## Arquitectura
+
+Astro en modo estático. Cada página se genera durante la compilación y se sirve
+como HTML desde el CDN: **en una visita no se ejecuta código en ningún
+servidor**.
 
 ```
-public/fonts/        FiraCode recortada, servida como archivo
-src/data/banner.txt  el banner JBMLL, 6 × 43
-src/styles/tokens.css paleta y tipografía
-src/layouts/Base.astro cabecera del documento y metadatos
-src/components/       la terminal (única isla interactiva)
-src/pages/            una página = una URL
-scripts/verify.mjs    verificaciones sobre el sitio compilado
+public/fonts/           Fira Code recortada, servida como archivo
+src/data/banner.txt     el banner JBMLL, 6 × 43
+src/styles/tokens.css   paleta y tipografía
+src/styles/terminal.css estilos de los elementos que crea el script
+src/layouts/            cabecera del documento y metadatos
+src/components/         la terminal, única isla interactiva
+src/pages/              un archivo aquí es una URL
+scripts/verify.mjs      verificaciones sobre el sitio compilado
 ```
 
-No hay framework de interfaz. La terminal es un script suelto de unos pocos KB;
-traer React para pintar texto en un `div` costaría cien veces eso.
+No se usa framework de interfaz. La terminal es un script suelto de unos pocos
+kilobytes; incorporar una biblioteca de componentes para escribir texto en un
+`div` costaría un orden de magnitud más.
 
-Página completa: **9,9 KB de HTML, 6,8 KB de CSS y 40,5 KB de fuentes.**
+Peso de la página completa: **10 KB de HTML, 6 KB de CSS y 41 KB de fuentes.**
 
-## Lo que viene
+### Identidad visual
 
-El sitio real necesita contenido editable sin tocar código. El plan:
+Nada de la apariencia se eligió para este sitio: todo proviene de la
+configuración de terminal que el autor ya usaba.
 
-- **En el build** — Astro lee el contenido de D1 y genera cada página estática.
-- **En cada visita** — no corre nada, salvo `/admin`, la única ruta con
-  `export const prerender = false`.
-- **Al publicar** — el admin escribe en D1 y dispara una reconstrucción.
+- La paleta es el esquema `GENTLEMAN` de Windows Terminal, valor por valor.
+- El prompt de dos líneas replica la configuración de `starship`.
+- El glifo del prompt cambia de verde a rojo según el resultado del último
+  comando, igual que `success_symbol` y `error_symbol` en esa configuración.
 
-Ahí entra `@astrojs/cloudflare`. Hoy no está: el adaptador sirve para renderizar
-por petición, y todavía no hay nada que renderizar por petición. Configurar lo
-que no se puede probar es adivinar.
+Ese glifo vive en el Área de Uso Privado de Unicode: existe solo porque hay una
+Nerd Font instalada. De ahí que el sitio empaquete su propia fuente recortada;
+sin ella sería un cuadrado vacío en cualquier equipo ajeno.
 
-### El detalle que hay que saber desde el día uno
+## Hoja de ruta
 
-**Las conexiones a D1 no existen durante el build.** Cloudflare las conecta solo
-cuando tu código corre en producción. En el build hay que leer la base por su
-API HTTP con un token; en `/admin`, por la conexión directa. Dos caminos a la
-misma base, uno por momento.
+El sitio necesita contenido editable sin tocar código. El plan:
 
-Descubrirlo a mitad de camino obliga a reescribir cómo se generan todas las
-páginas.
+- **Durante la compilación** — Astro lee el contenido de D1 y genera cada
+  página como HTML estático.
+- **En cada visita** — no se ejecuta nada, salvo en `/admin`, la única ruta
+  marcada con `export const prerender = false`.
+- **Al publicar** — el panel escribe en D1 y dispara una reconstrucción.
 
-### Autenticación
+Ahí entra `@astrojs/cloudflare`. Todavía no está instalado: el adaptador sirve
+para renderizar por petición y aún no hay ninguna ruta que lo necesite.
 
-Cloudflare Access delante de `/admin`. Cero código de login propio — y por lo
-tanto, cero posibilidad de escribirlo mal.
+La autenticación de `/admin` será Cloudflare Access. Sin código de inicio de
+sesión propio y, por lo tanto, sin posibilidad de escribirlo mal.
 
-## Por qué `verify` existe
+### Un detalle a tener presente
 
-Cada comprobación de `scripts/verify.mjs` está ahí porque algo falló de verdad
-durante el prototipo, y todas fallan **en silencio**:
+**Las conexiones a D1 no existen durante la compilación.** Cloudflare las provee
+solo cuando el código corre en producción. Durante el build hay que consultar la
+base por su API HTTP con un token; en `/admin`, por la conexión directa. Dos
+caminos a la misma base, uno para cada momento.
 
-- Sin `viewport`, un navegador móvil finge 980 px de ancho y encoge todo. El
-  prototipo lo tuvo roto porque dependía del envoltorio de la plataforma donde
-  se publicaba; al pasarlo a archivo local, esa muleta desapareció.
-- El glifo del prompt vive en el Área de Uso Privado de Unicode: sin la fuente
-  empaquetada es un cuadrado vacío en cualquier máquina sin Nerd Font.
-- Los espacios al final de línea son parte del banner, y cualquier editor con
-  «trim trailing whitespace» los borra.
-- CSS no avisa de una variable inexistente: hereda en silencio. Así estuvo roto
-  `--peach` durante días sin que nada se rompiera a la vista.
+## Por qué existe `verify`
+
+Cada comprobación de `scripts/verify.mjs` está ahí por un fallo real, y todos
+tenían algo en común: **fallaban en silencio**. La página se veía casi bien y
+nada avisaba.
+
+- **Sin `viewport`**, un navegador móvil supone un ancho de 980 px y reduce todo
+  a escala. Ninguna consulta de medios ve el ancho real.
+- **Los estilos de un archivo `.astro` tienen alcance de componente.** Astro
+  marca los elementos de la plantilla y limita el CSS a esa marca; los elementos
+  que crea el script en tiempo de ejecución nunca la reciben. Por eso los
+  estilos de la salida de la terminal viven en un `.css` aparte.
+- **Una variable CSS inexistente no produce error**: se hereda en silencio y el
+  color queda mal sin que nada se rompa.
+- **Astro recorta el espacio al final de línea** en las plantillas: un salto de
+  línea junto a una etiqueta une las palabras.
+- **Los espacios al final de línea son parte del banner** y cualquier editor con
+  «recortar espacios finales» los borra.
 
 ## Referencia
 
-`prototipo/` guarda el prototipo original en un solo HTML, con el lector de
-artículos, los paneles TUI y la navegación completa. No forma parte del build;
-es de donde se porta cada pieza.
+`prototipo/` conserva el prototipo original en un solo archivo HTML, con el
+lector de artículos, los paneles de estilo TUI y la navegación completa. No
+forma parte de la compilación: es la referencia de la que se porta cada pieza.
 
 ## Licencias
 
-FiraCode Nerd Font Mono y Cascadia Mono, bajo SIL Open Font License 1.1.
+El **código** está bajo licencia MIT. Ver [`LICENSE`](LICENSE).
+
+El **contenido editorial y la identidad personal** —textos, artículos,
+publicaciones, el banner y el nombre del autor— son © 2026 Josue Bladimir
+Morales Llanganate, con todos los derechos reservados.
+
+Las **fuentes** incluidas están bajo SIL Open Font License 1.1. Ver
+[`public/fonts/LICENSE.md`](public/fonts/LICENSE.md).
