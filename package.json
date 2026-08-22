@@ -12,6 +12,7 @@
     "ship": "astro build && node scripts/verify.mjs"
   },
   "devDependencies": {
+    "@astrojs/sitemap": "^3.7.3",
     "astro": "^7.2.4"
   }
 }

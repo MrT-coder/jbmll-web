@@ -45,6 +45,24 @@ check(
 );
 check('theme-color', /name="theme-color"/.test(html));
 
+console.log('\nDominio');
+// Un solo dominio en canónica, robots y sitemap. Si no coinciden, el buscador
+// le acredita el contenido a otro sitio y la vista previa al compartir apunta
+// donde no debe. Falla en silencio: la página se ve perfecta.
+const dominio = (t) => (t.match(/https:\/\/[a-z0-9.-]+/i) || [''])[0];
+const canon = dominio(html.match(/rel="canonical"[^>]*href="([^"]+)"/)?.[1] || '');
+const robots = existsSync(join(DIST, 'robots.txt'))
+  ? dominio(readFileSync(join(DIST, 'robots.txt'), 'utf8').match(/Sitemap:\s*(\S+)/)?.[1] || '')
+  : '';
+const sitemapPath = join(DIST, 'sitemap-index.xml');
+check('sitemap generado', existsSync(sitemapPath), 'robots.txt lo anuncia; tiene que existir');
+const mapa = existsSync(sitemapPath) ? dominio(readFileSync(sitemapPath, 'utf8')) : '';
+check('canónica, robots y sitemap en el mismo dominio', canon && canon === robots && canon === mapa, [
+  'canónica ' + (canon || '—'),
+  'robots ' + (robots || '—'),
+  'sitemap ' + (mapa || '—'),
+].join(' · '));
+
 console.log('\nTipografía');
 // Área de Uso Privado: sin la fuente empaquetada es un cuadrado vacío.
 check('cerebro U+EE9C presente', html.includes(''));

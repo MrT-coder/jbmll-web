@@ -42,6 +42,9 @@ src/pages/              un archivo aquí es una URL
 scripts/verify.mjs      verificaciones sobre el sitio compilado
 ```
 
+El sitio vive en **jbmllnube.com**. Ese dominio está en `astro.config.mjs` y de
+ahí salen la etiqueta canónica, las etiquetas para compartir y el sitemap.
+
 No uso framework de interfaz. La terminal es un script suelto de unos pocos
 kilobytes; traer una biblioteca de componentes para escribir texto en un `div`
 me costaría un orden de magnitud más.
