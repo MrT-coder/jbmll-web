@@ -1,19 +1,7 @@
-/* Vocabulario de la salida de la terminal.
- *
- * Vive aparte y NO dentro del <style> del componente por una razón concreta:
- * los estilos de un .astro tienen alcance de componente. Astro le pone una
- * marca a cada elemento de la plantilla y limita el CSS a esa marca — pero
- * estas clases las crea JavaScript en tiempo de ejecución, así que esos
- * elementos nunca reciben la marca y las reglas no los alcanzan.
- *
- * El síntoma es traicionero: la página se ve casi bien. La pista táctil aparece
- * en el escritorio, el cursor no parpadea, los colores no se aplican, y nada
- * indica que el CSS simplemente no está llegando.
- *
- * Regla: si un elemento lo crea el script, su estilo va acá.
- */
-
-/* ── Líneas de salida ─────────────────────────────────────────────────────── */
+/* Estas clases las crea el script, no la plantilla. Por eso viven acá y no en
+ * el <style> del componente: los estilos de un .astro llevan alcance y no
+ * alcanzan a los elementos creados en tiempo de ejecución. Verificado en
+ * scripts/verify.mjs. */
 .out {
   white-space: pre-wrap;
   word-break: break-word;
@@ -37,7 +25,6 @@
   color: var(--dim);
 }
 
-/* ── Tablas de salida (`help`) ────────────────────────────────────────────── */
 .list {
   border-collapse: collapse;
   margin: 0.2rem 0;
@@ -53,8 +40,6 @@
   color: var(--muted);
 }
 
-/* ── Prompt ───────────────────────────────────────────────────────────────
-   Dos líneas, como lo arma starship: la ruta arriba, el glifo abajo. */
 .inputline {
   display: flex;
   align-items: baseline;
@@ -64,8 +49,7 @@
   flex: 0 0 auto;
   margin-right: 0.55rem;
 }
-/* El cerebro es el indicador de estado: verde si el último comando salió bien,
-   rojo si falló. Sale tal cual de success_symbol / error_symbol en starship. */
+/* success_symbol / error_symbol de starship. */
 .brain.ok {
   color: var(--green);
 }
@@ -89,16 +73,14 @@
   }
 }
 
-/* La pista solo existe en táctil: en escritorio el prompt ya tiene el foco y el
-   cursor parpadeando dice todo lo que hay que decir. */
 .tap-hint {
   display: none;
   color: var(--dim);
   font-size: 0.86em;
 }
 
-/* El campo real vive fuera de la vista: el cursor y el texto se dibujan a mano
-   para que el prompt sea el de starship y no una caja del navegador. */
+/* El campo real queda fuera de la vista: el cursor y el texto se dibujan a
+   mano para que el prompt sea el de starship y no una caja del navegador. */
 .entry {
   position: absolute;
   left: -9999px;
@@ -113,8 +95,8 @@
   }
 }
 
-/* En táctil no hay hover y el teclado tapa media pantalla: el prompt lleva su
-   propia invitación, y tocar ahí — y solo ahí — lo levanta. */
+/* En táctil el teclado tapa media pantalla, así que no sube solo: el prompt
+   lleva su propia invitación y solo tocarlo a él lo levanta. */
 @media (hover: none) and (pointer: coarse) {
   .caret {
     display: none;

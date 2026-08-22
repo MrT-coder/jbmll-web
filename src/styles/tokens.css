@@ -1,13 +1,6 @@
-/* ── Fuentes ────────────────────────────────────────────────────────────────
-   FiraCode Nerd Font Mono recortada a los glifos que usa el sitio: 2,6 MB → 20 KB.
-   Conserva U+EE9C (el cerebro del prompt), el bloque U+2588 y el box-drawing
-   doble del banner, más las ligaduras — el `-> ` de starship depende de ellas.
-   Licencia SIL Open Font License 1.1.
-
-   `font-display: block` y no `swap`: el banner y los bordes se dibujan con
-   caracteres que ninguna fuente de sistema tiene. Con `swap` el primer cuadro
-   sería una pared de cuadraditos vacíos antes de acomodarse. Pesan 20 KB y son
-   locales: el bloqueo dura milisegundos. */
+/* FiraCode Nerd Font Mono, recortada. Licencia en public/fonts/LICENSE.md.
+   `block` y no `swap`: el banner usa caracteres que ninguna fuente de sistema
+   tiene, y con `swap` el primer cuadro sería una pared de cuadros vacíos. */
 @font-face {
   font-family: 'JBMono';
   src: url('/fonts/jb-Regular.woff2') format('woff2');
@@ -23,9 +16,7 @@
   font-display: block;
 }
 
-/* ── Paleta ─────────────────────────────────────────────────────────────────
-   Esquema GENTLEMAN de Windows Terminal, verbatim. Los mismos valores están en
-   ~/.config/starship.toml: dos fuentes independientes que coinciden. */
+/* Esquema GENTLEMAN de Windows Terminal, verbatim. */
 :root {
   --bg: #06080f;
   --panel: #191e28;
@@ -44,18 +35,15 @@
   --gold: #e0c15a;
   --sel: #263356;
 
-  /* 78 % de --fg sobre 22 % de --muted. Para prosa larga el blanco pleno del
-     terminal cansa; bajarlo un punto deja lugar a que la negrita resalte sin
-     sumar otro color. */
+  /* 78 % de --fg sobre 22 % de --muted: deja que la negrita resalte subiendo
+     a --fg, sin sumar otro color. */
   --prose: #dcdfe6;
 
-  /* Piso de 13 px: a 12 px la prosa monoespaciada se lee con esfuerzo en un
-     teléfono, y la terminal no puede pedir esfuerzo antes que contenido. */
   --fs: clamp(13px, 1.55vw, 14.5px);
   --lh: 1.65;
 
-  /* Alto real de la ventana. En móvil lo pisa visualViewport cuando sube el
-     teclado: dvh no siempre lo refleja y la statusline queda tapada. */
+  /* Lo pisa visualViewport cuando sube el teclado: dvh no siempre lo refleja
+     y la statusline queda tapada. Ver Terminal.astro. */
   --vh: 100dvh;
 
   color-scheme: dark;
@@ -88,8 +76,6 @@ body {
   overflow: hidden;
 }
 
-/* Columna central compartida por cabecera, cuerpo y statusline: mismo ancho y
-   mismo eje, así la página se lee como una pieza y no como capas apiladas. */
 .wrap {
   width: 100%;
   max-width: 96ch;

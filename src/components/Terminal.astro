@@ -1,13 +1,9 @@
 ---
-// El banner vive en un .txt aparte y no dentro de este archivo por una razón
-// concreta: los espacios al final de cada línea son parte del dibujo, y un
-// editor con "trim trailing whitespace" los borra sin avisar. Aislado en su
-// archivo y rellenado acá abajo, sobrevive a esa edición.
 import '../styles/terminal.css';
 import bannerRaw from '../data/banner.txt?raw';
 
-// Se limpia el \r por si el archivo llega con finales de línea de Windows: sin
-// esto el relleno cuenta un carácter de más y el dibujo se desalinea.
+// Los espacios finales son parte del dibujo y los editores los borran, así que
+// el ancho se restituye acá. El \r se limpia por finales de línea de Windows.
 const rows = bannerRaw
   .replace(/\r/g, '')
   .replace(/\n+$/, '')
@@ -15,10 +11,8 @@ const rows = bannerRaw
 const width = Math.max(...rows.map((r) => r.length));
 const banner = rows.map((r) => r.padEnd(width)).join('\n');
 
-// U+EE9C: el glifo del prompt de starship — verde si el último comando salió
-// bien, rojo si falló. Vive en el Área de Uso Privado de Unicode, así que solo
-// existe gracias a la fuente que empaquetamos. Se escribe como escape porque
-// crudo es invisible en cualquier editor que no la cargue.
+// Área de Uso Privado de Unicode: solo existe gracias a la fuente empaquetada.
+// Como escape y no crudo, porque crudo es invisible en el editor.
 const BRAIN = '';
 
 const BOOT = [
@@ -71,8 +65,8 @@ const INFO = [
       </div>
 
       <h1 class="out lead">
-        <!-- El "de " va pegado a la etiqueta a propósito: Astro recorta el
-             espacio del final de línea y las palabras quedarían unidas. -->
+        <!-- En una sola línea: Astro recorta el espacio del final de línea y un
+             salto junto a una etiqueta pega las palabras. -->
         Próximamente, la página oficial de <strong>Josue Bladimir Morales Llanganate</strong> (<span class="sig">JBMLL</span>).
       </h1>
       <p class="out note">
@@ -103,8 +97,6 @@ const INFO = [
 </footer>
 
 <script define:vars={{ BRAIN }}>
-  // Isla única de la página. Sin framework: es un script suelto de unos pocos
-  // KB, y meter React para pintar texto en un div sería mandar cien veces eso.
   const scroll = document.getElementById('scroll');
   const term = document.getElementById('term');
 
@@ -232,8 +224,7 @@ const INFO = [
     setTimeout(() => l.scrollIntoView({ block: 'end', behavior: 'smooth' }), 320);
   });
 
-  // El teclado virtual encoge el viewport visual, pero no siempre el dvh. El
-  // ajuste va SOLO cuando achica de verdad: aplicado siempre rompe el layout,
+  // Solo cuando el teclado achica de verdad: aplicado siempre rompe el layout,
   // porque fuera de ese caso el alto reportado no es el del marco.
   if (window.visualViewport) {
     const fit = () => {
@@ -292,9 +283,8 @@ const INFO = [
     color: var(--green);
   }
 
-  /* `flex-wrap` y no `overflow-x`: con scroll horizontal el panel se recorta en
-     pantallas medianas y el último valor queda fuera de la vista sin ningún
-     indicio. Envolviendo, cuando no entra al lado se va abajo entero. */
+  /* flex-wrap y no overflow-x: con scroll el panel se recorta y el último
+     valor queda fuera de la vista sin ningún indicio. */
   .fetch {
     display: flex;
     flex-wrap: wrap;
@@ -310,8 +300,7 @@ const INFO = [
     font-size: clamp(7.5px, 1.28vw, 12px);
     color: var(--green);
   }
-  /* El min-width importa tanto como la base: sin él el panel se aprieta hasta
-     ser ilegible en vez de bajar a su propia línea. */
+  /* Sin min-width el panel se aprieta hasta ser ilegible en vez de bajar. */
   .info {
     flex: 1 1 26ch;
     min-width: min(26ch, 100%);
@@ -405,8 +394,7 @@ const INFO = [
     flex: 1 1 auto;
   }
 
-  /* El footer va debajo de la statusline, no dentro: lo legal y el copyright
-     tienen que ser rastreables, y la statusline es un indicador de estado. */
+  /* Debajo de la statusline y no dentro: lo legal tiene que ser rastreable. */
   .foot {
     flex: 0 0 auto;
     background: var(--bg);
@@ -448,8 +436,6 @@ const INFO = [
     }
   }
 
-  /* En táctil no hay hover y el teclado tapa media pantalla: el prompt lleva su
-     propia invitación, y tocar ahí — y solo ahí — lo levanta. */
   @media (hover: none) and (pointer: coarse) {
     .term {
       cursor: default;
