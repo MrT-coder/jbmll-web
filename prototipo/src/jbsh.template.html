@@ -1,0 +1,1539 @@
+<!doctype html>
+<html lang="es">
+<head>
+<!-- charset primero: el banner y los bordes de los paneles son caracteres
+     Unicode, y sin declararlo el navegador adivina la codificacion. -->
+<meta charset="utf-8">
+<!-- SIN esto, un navegador movil finge una pantalla de 980px y encoge todo:
+     el texto queda ilegible y ninguna media query ve el ancho real. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<!-- Pinta la barra del navegador en el movil del color del fondo. -->
+<meta name="theme-color" content="#06080F">
+<title>jbmll.dev — terminal personal</title>
+<meta name="description" content="Proyectos, publicaciones y notas de Juan (jbmll), en una terminal que se navega a comandos o a clic.">
+<style>
+/* ── Fuentes recortadas desde las que el usuario ya tiene instaladas ──────────
+   FiraCode Nerd Font Mono: 2,6 MB → 20 KB. Conserva U+EE9C (el cerebro) y las
+   ligaduras (+calt,+liga), porque el `-> ` del prompt de starship depende de
+   ellas. Licencia SIL OFL 1.1.
+   El banner JBMLL usa bloques (U+2588) y box-drawing doble (U+2550..255D), que
+   FiraCode sí trae — verificado sobre el recorte, no asumido. */
+@font-face{
+  font-family:'JBMono';
+  src:url(data:font/woff2;base64,__FONT_REGULAR__) format('woff2');
+  font-weight:400; font-style:normal; font-display:block;
+}
+@font-face{
+  font-family:'JBMono';
+  src:url(data:font/woff2;base64,__FONT_BOLD__) format('woff2');
+  font-weight:700; font-style:normal; font-display:block;
+}
+/* ── Tokens: esquema GENTLEMAN de Windows Terminal, verbatim ───────────────── */
+:root{
+  --bg:#06080F;
+  --panel:#191E28;
+  --line:#232A40;
+  --fg:#F3F6F9;
+  --muted:#8A8FA3;
+  --dim:#5C6170;
+  --green:#B7CC85;
+  --red:#CB7C94;
+  --yellow:#FFE066;
+  --blue:#7FB4CA;
+  --cyan:#7AA89F;
+  --peach:#DEBA87;
+  --pink:#FF8DD7;
+  --gold:#E0C15A;
+  --sel:#263356;
+  --line2:#2B3350;   /* borde un punto mas visible, para tactil sin hover */
+  /* Derivado: 78% de --fg sobre 22% de --muted. Para prosa larga, el blanco
+     pleno del terminal cansa; bajarlo un punto deja lugar a que la negrita
+     resalte sin sumar un color más. */
+  --prose:#DCDFE6;
+
+  /* Piso de 13px y no 12: en un teléfono la prosa a 12px monoespaciada se lee
+     con esfuerzo, y la terminal no puede pedir esfuerzo antes que contenido. */
+  --fs:clamp(13px,1.55vw,14.5px);
+  --lh:1.65;
+  /* Alto real de la ventana. En móvil lo pisa visualViewport cuando sube el
+     teclado: dvh no siempre lo refleja y la statusline queda tapada. */
+  --vh:100dvh;
+}
+
+*{box-sizing:border-box;}
+html{height:100%;}
+body{
+  /* 100dvh y no 100%: el artifact se sirve dentro de un contenedor propio y en
+     móvil la barra del navegador se mueve. dvh sigue esa altura real. */
+  margin:0; padding:0; height:var(--vh); min-height:100%;
+  background:var(--bg);
+  color:var(--fg);
+  font-family:'JBMono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+  font-size:var(--fs);
+  line-height:var(--lh);
+  font-variant-ligatures:contextual common-ligatures;
+  -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+
+/* Columna central compartida: cabecera y terminal comparten el mismo ancho y
+   el mismo eje, así la página se lee como una sola pieza y no como capas
+   pegadas una encima de otra. */
+.wrap{width:100%;max-width:96ch;margin:0 auto;padding:0 clamp(.8rem,3vw,1.6rem);}
+
+.head{flex:0 0 auto;border-bottom:1px solid var(--line);}
+
+.brand{display:flex;align-items:baseline;gap:.65rem;padding:1.15rem 0 .75rem;}
+.brand .name{
+  font-size:1.5em;font-weight:700;color:var(--fg);letter-spacing:-.02em;
+  text-decoration:none;
+}
+.brand .name:hover,.brand .name:focus-visible{color:var(--green);}
+.brand .name:focus-visible{outline:1px solid var(--blue);outline-offset:3px;}
+.brand .name .dot{color:var(--green);}
+.brand .tag{color:var(--dim);font-size:.86em;}
+
+/* Barra de ventanas al estilo tmux: numerada, la activa resaltada. Es la
+   convención del multiplexor que ya usa, no una navbar de sitio web. */
+.tabs{display:flex;gap:.3rem;flex-wrap:wrap;padding-bottom:.55rem;}
+.tabs a{
+  display:inline-flex;align-items:baseline;gap:.4rem;
+  padding:.28rem .7rem;color:var(--muted);text-decoration:none;
+  border:1px solid transparent;
+  transition:color .12s ease,background .12s ease,border-color .12s ease;
+}
+.tabs a .num{color:var(--dim);font-size:.86em;}
+.tabs a:hover,.tabs a:focus-visible{color:var(--fg);background:var(--panel);}
+.tabs a:focus-visible{outline:1px solid var(--blue);outline-offset:1px;}
+.tabs a[aria-current="page"]{
+  background:var(--green);color:#06080F;font-weight:700;
+}
+.tabs a[aria-current="page"] .num{color:#06080F;opacity:.6;}
+
+/* ── Cuerpo de la terminal ────────────────────────────────────────────────── */
+.term{
+  flex:1 1 auto; min-height:0;
+  overflow-y:auto; overflow-x:hidden;
+  padding:1.35rem 0 .5rem;
+  cursor:text;
+  scrollbar-width:thin; scrollbar-color:var(--line) transparent;
+}
+.term::-webkit-scrollbar{width:9px;}
+.term::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px;}
+
+.out{white-space:pre-wrap;word-break:break-word;}
+.b{font-weight:700;}
+.fg-green{color:var(--green);} .fg-red{color:var(--red);}
+.fg-blue{color:var(--blue);}   .fg-yellow{color:var(--yellow);}
+.fg-cyan{color:var(--cyan);}   .fg-pink{color:var(--pink);}
+.fg-muted{color:var(--muted);} .fg-dim{color:var(--dim);}
+.fg-gold{color:var(--gold);}
+
+/* ── Boot ─────────────────────────────────────────────────────────────────── */
+.boot{color:var(--dim);font-size:.9em;}
+.boot .t{color:var(--muted);}
+.boot .ok{color:var(--green);}
+
+/* ── Banner + panel, disposición de fastfetch ─────────────────────────────── */
+/* El banner se centra contra el panel, que es más alto. Alineado arriba
+   quedaba flotando con un hueco debajo.
+
+   `flex-wrap` y no `overflow-x`: con scroll horizontal el panel se recortaba
+   en tablet y la última tecnología del stack quedaba fuera de la vista sin
+   ningún indicio. Envolviendo, cuando no entra al lado se va abajo entero. */
+.fetch{
+  display:flex; flex-wrap:wrap; align-items:center;
+  gap:1.3rem clamp(1rem,3vw,2.6rem);
+  margin:1.3rem 0 1.4rem;
+}
+.fetch .logo{flex:0 0 auto;}
+/* 26ch es el mínimo con el que el panel se lee sin partir los valores en
+   pedazos. Por debajo de eso prefiere bajar a su propia línea. */
+/* El min-width importa tanto como la base: sin él, `.info{min-width:0}` deja
+   que el panel se apriete hasta ser ilegible en vez de bajar a su línea.
+   Con `min()` sigue sin desbordar en pantallas más angostas que 26ch. */
+.fetch .info{flex:1 1 26ch;min-width:min(26ch,100%);}
+@media (max-width:660px){
+  .fetch{gap:1.3rem;}
+  .fetch .logo{align-self:center;}
+}
+.logo{
+  white-space:pre; line-height:1.05; letter-spacing:0;
+  font-size:clamp(6.4px,1.28vw,12px);
+  color:var(--green); flex:0 0 auto;
+  /* Es un dibujo, no texto: un lector de pantalla no debe deletrear bloques.
+     El nombre real va en el panel de al lado, en texto de verdad. */
+}
+.info{flex:1 1 auto;min-width:0;}
+.info .title{margin-bottom:.15rem;}
+.info .rule{color:var(--line);margin-bottom:.35rem;}
+.info dl{display:grid;grid-template-columns:auto 1fr;gap:0 1.1rem;margin:0;}
+.info dt{color:var(--blue);}
+.info dd{margin:0;color:var(--fg);}
+.info .swatches{display:flex;gap:.3rem;margin-top:.7rem;}
+.info .swatches i{width:.62rem;height:.62rem;border-radius:50%;display:block;}
+
+/* ── Prompt de dos líneas, exactamente como starship lo arma ───────────────── */
+.pline{display:flex;align-items:baseline;gap:1rem;}
+.pline .left{white-space:nowrap;}
+.pline .fill{flex:1 1 auto;min-width:.5rem;}
+.pline .right{white-space:nowrap;color:var(--dim);text-align:right;}
+.brain{font-family:'JBMono',monospace;}
+.brain.ok{color:var(--green);}
+.brain.err{color:var(--red);}
+
+.inputline{display:flex;align-items:baseline;gap:0;}
+.inputline .brain{flex:0 0 auto;margin-right:.55rem;}
+.typed{white-space:pre;}
+.caret{
+  display:inline-block;width:.58em;height:1.05em;
+  background:var(--gold);vertical-align:text-bottom;
+  animation:blink 1.06s steps(1) infinite;
+}
+@keyframes blink{50%{opacity:0;}}
+
+#entry{
+  position:absolute;opacity:0;pointer-events:none;
+  width:1px;height:1px;left:-9999px;
+}
+
+/* ── ListView de PSReadLine: la respuesta al "no sé qué escribir" ──────────── */
+.listview{
+  margin:.35rem 0 0 1.7rem;
+  border:1px solid var(--line);
+  background:var(--panel);
+  max-width:min(56ch,100%);
+}
+.listview .row{
+  display:flex;gap:1rem;justify-content:space-between;
+  padding:.06rem .6rem;color:var(--muted);
+}
+.listview .row .cmd{color:var(--fg);white-space:pre;}
+.listview .row .hint{color:var(--dim);font-size:.9em;white-space:nowrap;}
+.listview .row[aria-selected="true"]{background:var(--sel);}
+.listview .row[aria-selected="true"] .cmd{color:var(--gold);}
+.listview .cap{
+  padding:.06rem .6rem;color:var(--dim);font-size:.86em;
+  border-top:1px solid var(--line);
+}
+
+/* ── Statusline: tmux, no footer corporativo ──────────────────────────────── */
+.status{
+  flex:0 0 auto;
+  background:var(--panel);border-top:1px solid var(--line);
+  font-size:.82em;white-space:nowrap;overflow:hidden;
+}
+.status .wrap{display:flex;align-items:center;gap:0;padding:0;}
+@media (min-width:calc(96ch + 3.2rem)){ .status .wrap{padding:0;} }
+.status .mode{
+  background:var(--gold);color:#06080F;font-weight:700;
+  padding:.2rem .7rem;letter-spacing:.06em;
+}
+/* El modo cambia de color como en vim: se ve de reojo dónde estás parado. */
+body.reading .status .mode{background:var(--blue);}
+.status .seg{padding:.2rem .7rem;color:var(--muted);}
+.status .seg.path{color:var(--blue);}
+.status .spacer{flex:1 1 auto;}
+.status .seg.right{color:var(--dim);}
+@media (max-width:660px){ .status .hide-sm{display:none;} }
+
+/* ── Footer ────────────────────────────────────────────────────────────────
+   Va debajo de la statusline, no dentro: lo legal y el copyright tienen que
+   estar en todas las páginas y ser rastreables, y la statusline es un
+   indicador de estado, no un lugar donde enterrar enlaces. Fino y apagado
+   para que no compita con la terminal. */
+.foot{
+  flex:0 0 auto;background:var(--bg);border-top:1px solid var(--line);
+  font-size:.78em;color:var(--dim);
+}
+.foot .wrap{
+  display:flex;flex-wrap:wrap;align-items:baseline;gap:.2rem 1.1rem;
+  padding-top:.4rem;padding-bottom:.4rem;
+}
+.foot .spacer{flex:1 1 auto;}
+.foot a{color:var(--dim);text-decoration:none;border-bottom:1px solid transparent;}
+.foot a:hover,.foot a:focus-visible{color:var(--blue);border-bottom-color:var(--blue);}
+.foot a:focus-visible{outline:none;}
+@media (max-width:660px){ .foot .hide-sm{display:none;} }
+
+table.list{border-collapse:collapse;margin:.15rem 0;}
+table.list td{padding:0 1.6rem 0 0;vertical-align:top;}
+table.list td.n{color:var(--blue);}
+table.list td.c{color:var(--dim);text-align:right;padding-right:1.1rem;
+  font-variant-numeric:tabular-nums;}
+table.list td.d{color:var(--muted);}
+
+.note{color:var(--dim);}
+.tag{color:var(--cyan);}
+.bar{color:var(--green);letter-spacing:-1px;}
+
+/* ── Paneles TUI ───────────────────────────────────────────────────────────
+   El título va encajado en la línea superior del borde, como los paneles de
+   lazygit o btop. Se dibuja con borde CSS y un fondo del color de la página
+   que "corta" la línea, en vez de con caracteres ┌─┐: así el panel se adapta
+   a cualquier ancho sin que el dibujo se desalinee nunca. */
+.cards{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(32ch,1fr));
+  gap:1.6rem 1.2rem;margin:1.3rem 0 .4rem;
+}
+.tui{
+  position:relative;display:flex;flex-direction:column;gap:.75rem;
+  border:1px solid var(--line);padding:1.15rem 1.15rem 1.05rem;
+  color:inherit;text-decoration:none;
+  transition:border-color .13s ease,background .13s ease;
+}
+.tui .legend,.tui .meta{
+  position:absolute;top:0;transform:translateY(-50%);
+  background:var(--bg);padding:0 .5rem;white-space:nowrap;
+}
+.tui .legend{left:.9rem;color:var(--fg);font-weight:700;}
+.tui .meta{right:.9rem;color:var(--dim);font-size:.85em;}
+.tui .desc{margin:0;color:var(--muted);line-height:1.72;}
+.tui .tags{display:flex;flex-wrap:wrap;gap:.25rem .8rem;margin-top:auto;padding-top:.2rem;}
+.tui .tags span{font-size:.85em;}
+/* El stack va entre corchetes; las palabras clave con almohadilla. Distintos
+   porque son datos distintos: solo el stack alimenta el Tech Stack calculado. */
+.tui .tags .st{color:var(--cyan);}
+.tui .tags .st::before{content:"[";color:var(--dim);}
+.tui .tags .st::after{content:"]";color:var(--dim);}
+.tui .tags .kw{color:var(--dim);}
+.tui .tags .kw::before{content:"#";}
+
+a.tui:hover,a.tui:focus-visible{border-color:var(--green);background:var(--panel);}
+a.tui:hover .legend,a.tui:focus-visible .legend{color:var(--green);}
+a.tui:hover .legend,a.tui:hover .meta,
+a.tui:focus-visible .legend,a.tui:focus-visible .meta{background:var(--panel);}
+a.tui:focus-visible{outline:1px solid var(--blue);outline-offset:2px;}
+.tui.ph{border-style:dashed;}
+.tui.ph .legend{color:var(--dim);font-weight:400;}
+.tui.ph .desc{color:var(--dim);}
+
+/* ── Todo lo que es un destino, es un enlace ───────────────────────────────
+   No hay "modo clic" separado: la salida de la terminal ES la navegación.
+   Anclas de verdad con href, así funcionan el clic del medio, "abrir en pestaña
+   nueva", el teclado y los rastreadores. */
+a.go{
+  color:inherit;text-decoration:none;display:inline-block;
+  border-bottom:1px solid transparent;
+  transition:color .12s ease,border-color .12s ease;
+}
+a.go:hover,a.go:focus-visible{color:var(--gold);border-bottom-color:var(--gold);}
+a.go:focus-visible{outline:none;}
+tr.row-go{cursor:pointer;}
+tr.row-go:hover td{background:var(--panel);}
+tr.row-go:hover td.n{color:var(--gold);}
+tr.row-go:focus-within td{background:var(--panel);}
+
+/* ── Lector ────────────────────────────────────────────────────────────────
+   Un artículo largo no se lee con `cat`, se lee con un pager. La referencia es
+   glow: márgenes, jerarquía y una medida acotada. Ese límite de ~68ch es lo que
+   hace legible la prosa monoespaciada — el problema nunca fue la fuente, fue el
+   largo de renglón. */
+.reader{display:none;flex-direction:column;flex:1 1 auto;min-height:0;position:relative;}
+
+/* ── Fin de artículo ───────────────────────────────────────────────────────
+   `less` cierra el búfer con (END). Acá ese marcador además ofrece las dos
+   salidas, y cada botón lleva escrita su tecla: se usa con el ratón y de paso
+   se aprende el atajo. */
+.eof{margin-top:5rem;padding-top:1.6rem;border-top:1px solid var(--line);}
+.eof .mark{color:var(--dim);font-size:.86em;}
+.eof .acts{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:1.1rem;}
+.eof button{
+  font:inherit;font-size:.9em;cursor:pointer;
+  display:inline-flex;align-items:baseline;gap:.55rem;
+  background:none;border:1px solid var(--line);color:var(--muted);
+  padding:.4rem .85rem;
+  transition:color .12s ease,border-color .12s ease,background .12s ease;
+}
+.eof button kbd{
+  font:inherit;color:var(--dim);border:1px solid var(--line);
+  padding:0 .3em;line-height:1.4;
+}
+.eof button:hover,.eof button:focus-visible{
+  color:var(--fg);border-color:var(--green);background:var(--panel);
+}
+.eof button:hover kbd,.eof button:focus-visible kbd{color:var(--green);border-color:var(--green);}
+.eof button:focus-visible{outline:1px solid var(--blue);outline-offset:2px;}
+
+/* Botón flotante: rectángulo con la tecla escrita, no un círculo con flecha.
+   Aparece recién pasada la mitad, cuando volver arriba empieza a costar. */
+.totop{
+  position:absolute;right:clamp(.8rem,3vw,1.6rem);bottom:1.3rem;
+  font:inherit;font-size:.85em;cursor:pointer;
+  display:flex;align-items:baseline;gap:.5rem;
+  background:var(--panel);border:1px solid var(--line);color:var(--muted);
+  padding:.4rem .8rem;
+  opacity:0;pointer-events:none;transform:translateY(.4rem);
+  transition:opacity .18s ease,transform .18s ease,color .12s ease,border-color .12s ease;
+}
+.totop.on{opacity:1;pointer-events:auto;transform:none;}
+.totop:hover,.totop:focus-visible{color:var(--fg);border-color:var(--green);}
+.totop:focus-visible{outline:1px solid var(--blue);outline-offset:2px;}
+.totop .k{color:var(--dim);}
+body.reading .term{display:none;}
+body.reading .reader{display:flex;}
+
+.reader-head{
+  flex:0 0 auto;padding:.5rem 0;
+  border-bottom:1px solid var(--line);color:var(--dim);font-size:.85em;
+}
+.reader-head .wrap{display:flex;align-items:baseline;gap:.8rem;}
+.reader-head .file{color:var(--cyan);}
+.reader-head .spacer{flex:1 1 auto;}
+
+.reader-body{
+  flex:1 1 auto;min-height:0;overflow-y:auto;
+  padding:3.4rem clamp(.9rem,4vw,2rem) 6rem;
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent;
+}
+.reader-body::-webkit-scrollbar{width:9px;}
+.reader-body::-webkit-scrollbar-thumb{background:var(--line);border-radius:9px;}
+
+/* 64ch y no 68: un carácter monoespaciado ocupa más ancho visual que uno
+   proporcional, así que la medida cómoda cae más abajo de lo habitual. */
+.prose{
+  max-width:64ch;margin:0 auto;
+  font-size:1.05em;line-height:1.85;
+  /* El cuerpo va un punto por debajo del blanco del terminal. Así la negrita
+     resalta subiendo a --fg, sin necesidad de sumarle otro color. */
+  color:var(--prose);
+}
+.prose>*{margin:0;}
+
+/* ── Ritmo vertical ────────────────────────────────────────────────────────
+   El aire ANTES de un encabezado es varias veces el de un párrafo, y el de
+   DESPUÉS es mínimo. Eso agrupa cada sección con su texto. Un espaciado
+   uniforme se lee plano por más que la tipografía esté bien. */
+.prose>*+*{margin-top:1.3em;}
+.prose h2{margin-top:3.4em;}
+.prose h2+*{margin-top:1em;}
+.prose h3{margin-top:2.4em;}
+.prose h3+*{margin-top:.85em;}
+.prose h1+*{margin-top:1.8em;}
+.prose pre+*,.prose figure+*,.prose blockquote+*{margin-top:1.8em;}
+.prose hr{margin-top:3.4em;}
+.prose hr+*{margin-top:3.4em;}
+
+/* ── Jerarquía por escala y peso, no por color ─────────────────────────────
+   Antes cada nivel tenía su propio color y competían entre sí. Ahora bajan:
+   grande y blanco, mediano y verde, chico y apagado en versalitas. */
+.prose h1,.prose h2,.prose h3{line-height:1.25;text-wrap:balance;font-weight:700;}
+.prose h1{
+  font-size:2em;color:var(--fg);letter-spacing:-.025em;
+  padding-bottom:1.1rem;border-bottom:1px solid var(--line);
+}
+.prose h2{font-size:1.02em;color:var(--green);}
+.prose h3{
+  font-size:.84em;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.14em;
+}
+
+.prose a{color:var(--blue);text-underline-offset:3px;text-decoration-thickness:1px;}
+.prose a:hover,.prose a:focus-visible{color:var(--gold);text-decoration-color:var(--gold);}
+.prose strong{color:var(--fg);font-weight:700;}
+/* Sin fondo: en un sitio íntegramente monoespaciado el chip solo agrega ruido.
+   El color alcanza para decir "esto es código". */
+.prose code{color:var(--peach);}
+
+.prose pre{
+  background:var(--panel);padding:1.1rem 1.25rem;
+  overflow-x:auto;font-size:.92em;line-height:1.65;
+}
+.prose pre code{color:var(--muted);}
+.prose pre[data-lang]::before{
+  content:attr(data-lang);display:block;
+  color:var(--dim);font-size:.8em;letter-spacing:.14em;text-transform:uppercase;
+  margin-bottom:.75rem;
+}
+.prose blockquote{
+  border-left:2px solid var(--line);padding-left:1.4rem;color:var(--muted);
+}
+.prose ul{padding-left:1.5rem;}
+.prose ul>li+li{margin-top:.45em;}
+.prose li::marker{color:var(--dim);}
+.prose hr{border:0;border-top:1px solid var(--line);width:100%;}
+
+.prose figure{display:block;}
+.prose .imgbox{
+  border:1px solid var(--line);background:var(--panel);color:var(--dim);
+  padding:3rem 1rem;text-align:center;font-size:.9em;
+}
+.prose figcaption{
+  color:var(--dim);font-size:.86em;margin-top:.7rem;line-height:1.6;
+}
+
+/* ══ Táctil y pantallas angostas ═══════════════════════════════════════════
+   En un teléfono no hay teclado hasta que uno lo invoca, y cuando aparece tapa
+   media pantalla. Por eso acá la navegación a dedo no es una alternativa: es
+   LA interfaz. Todo lo que sea destino tiene que poder tocarse cómodo. */
+
+/* Objetivos táctiles: nada por debajo de ~44px de alto. */
+@media (hover:none) and (pointer:coarse){
+  .tabs a{padding:.62rem .85rem;}
+  table.list td{padding-top:.55rem;padding-bottom:.55rem;}
+  .listview .row{padding:.5rem .6rem;}
+  .listview .cap{padding:.4rem .6rem;}
+  .eof button{padding:.7rem 1rem;}
+  .totop{padding:.7rem 1rem;}
+  .foot .wrap{gap:.5rem 1.1rem;padding-top:.6rem;padding-bottom:.6rem;}
+  .term{cursor:default;}
+  /* El hover no existe: el borde del panel se ve siempre, no al pasar por encima. */
+  a.tui{border-color:var(--line2);}
+}
+
+@media (max-width:660px){
+  /* Las pestañas se arrastran de costado en vez de envolverse en dos filas:
+     una barra de pestañas que crece hacia abajo empuja la terminal fuera. */
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:.7rem;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tabs a{flex:0 0 auto;}
+
+  .brand{padding:.9rem 0 .6rem;}
+  .brand .name{font-size:1.3em;}
+  .brand .tag{display:none;}
+
+  /* El banner mide 43 columnas: se ata al ancho de pantalla, no al de texto. */
+  .logo{font-size:clamp(7.5px,2.6vw,12px);}
+
+  /* `.hide-sm` es la regla general: lo secundario desaparece cuando el ancho
+     aprieta, en vez de recortarse a la mitad de una palabra. */
+  .hide-sm{display:none;}
+
+  /* La tabla de `ls` se rompe en filas: tres columnas en 349px dejan la
+     descripción con veinte caracteres y una escalera de renglones sueltos.
+     Así el nombre queda arriba con su cuenta, y la descripción abajo entera. */
+  table.list,table.list tbody{display:block;width:100%;}
+  table.list tr{
+    display:grid;grid-template-columns:1fr auto;gap:0 .8rem;
+    padding:.6rem 0;border-bottom:1px solid var(--line);
+  }
+  table.list tr:last-child{border-bottom:0;}
+  table.list td{display:block;padding:0;}
+  table.list td.c{text-align:right;padding-right:0;}
+  table.list td.d{grid-column:1 / -1;color:var(--muted);}
+
+  .cards{grid-template-columns:1fr;gap:1.5rem;}
+  .reader-body{padding:2.2rem clamp(.9rem,4vw,2rem) 5rem;}
+  .prose h1{font-size:1.6em;}
+  .prose h2{margin-top:2.8em;}
+  .listview{margin-left:0;max-width:100%;}
+  .fetch .info dl{grid-template-columns:auto 1fr;gap:0 .8rem;}
+}
+
+/* El prompt en táctil lleva su propia invitación: tocar ahí — y solo ahí —
+   levanta el teclado. Tocar cualquier otro lado no lo hace. */
+.tap-hint{display:none;color:var(--dim);font-size:.86em;}
+@media (hover:none) and (pointer:coarse){
+  .inputline .caret{display:none;}
+  .inputline.typing .caret{display:inline-block;}
+  .tap-hint{display:inline;}
+  .inputline.typing .tap-hint{display:none;}
+  .inputline{
+    padding:.55rem 0;margin-top:.2rem;
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  }
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;}
+  .caret{animation:none;opacity:1;}
+}
+</style>
+</head>
+
+<body>
+
+<header class="head">
+  <div class="wrap">
+    <div class="brand">
+      <a class="name" href="/" data-go="" aria-label="Inicio">jbmll<span class="dot">.dev</span></a>
+      <span class="tag">terminal personal</span>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Secciones"></nav>
+  </div>
+</header>
+
+<main class="term" id="term" tabindex="-1">
+  <div class="wrap"><div id="scroll"></div></div>
+</main>
+
+<section class="reader" id="reader" aria-label="Lector de artículo" hidden>
+  <div class="reader-head">
+    <div class="wrap">
+      <span>─────</span>
+      <span class="file" id="rd-file"></span>
+      <span class="spacer"></span>
+      <span id="rd-meta"></span>
+    </div>
+  </div>
+  <div class="reader-body" id="rd-body" tabindex="0"></div>
+  <button class="totop" id="totop" type="button">
+    <span class="k">gg</span><span>↑ arriba</span>
+  </button>
+</section>
+
+<label class="visually-hidden" for="entry" style="position:absolute;left:-9999px;">Línea de comandos</label>
+<input id="entry" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Línea de comandos">
+
+<div class="status">
+  <div class="wrap">
+    <span class="mode" id="st-mode">NORMAL</span>
+    <span class="seg path" id="st-path">~/</span>
+    <span class="seg hide-sm" id="st-count">4 secciones</span>
+    <span class="spacer"></span>
+    <span class="seg right hide-sm" id="st-hint">Alt+1..4 salta de sección</span>
+    <span class="seg right" id="st-clock">--:--</span>
+  </div>
+</div>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>© 2026 Juan · jbmll.dev</span>
+    <span class="spacer"></span>
+    <a href="/privacidad">privacidad</a>
+    <a href="/terminos">términos</a>
+    <a href="/rss.xml">rss</a>
+    <a href="https://github.com/jbmll" rel="me noopener">github</a>
+    <a href="/humans.txt" class="hide-sm">humans.txt</a>
+  </div>
+</footer>
+
+<script>
+"use strict";
+
+const BRAIN = "";
+const BANNER = __BANNER__;
+
+/* El árbol es el dato. La terminal, la navbar y las URLs leen todos de aquí:
+   una sola definición gobierna navegación, `ls` e índice de buscadores. */
+const TREE = {
+  "sobre-mi": {
+    kind:"page", desc:"quién soy, stack, experiencia, certificaciones",
+    body:[
+      ["fg-green b","Juan · jbmll"],
+      ["fg-muted","Desarrollador. Este sitio es el baúl donde guardo lo que hago."],
+      ["",""],
+      ["fg-blue b","Tech Stack"],
+      ["fg-dim","calculado desde experiencia + proyectos, nunca escrito a mano"],
+      ["",""],
+      ["stack",null],
+      ["",""],
+      ["fg-dim","(datos de muestra — se reemplazan con tus entradas reales)"]
+    ]
+  },
+  "proyectos": {
+    kind:"dir", desc:"open source, explicado como artículo",
+    items:[
+      {n:"jbsh", st:["TypeScript","Canvas"], kw:["arquitectura","SEO","accesibilidad"],
+       d:"El motor de terminal de este sitio.",
+       min:4, md:[
+        "# jbsh",
+        "",
+        "El motor de terminal que estás usando ahora mismo. No es una ventana",
+        "decorada con tres puntos de colores: es la navegación real del sitio.",
+        "",
+        "## El problema con las terminales de portafolio",
+        "",
+        "Casi todas son un juguete. Escribís un comando, JavaScript pinta texto",
+        "en un `<div>` y la URL nunca cambia. Para un buscador eso es **una sola",
+        "página vacía**: sin URL propia no hay nada que indexar, nada que",
+        "compartir, nada que previsualizar.",
+        "",
+        "Por eso los sitios que lo intentan terminan poniendo una barra de",
+        "navegación al lado — y ahí la terminal se muere, porque nadie escribe",
+        "`ls proyectos` teniendo el botón a un clic.",
+        "",
+        "## Cada comando es una URL",
+        "",
+        "jbsh invierte la relación. Los comandos no pintan texto: **navegan**.",
+        "",
+        "```sh",
+        "cat proyectos/jbsh   ->  /proyectos/jbsh",
+        "ls proyectos         ->  /proyectos",
+        "whoami               ->  /sobre-mi",
+        "```",
+        "",
+        "Cada una de esas rutas existe como HTML estático pre-renderizado. El que",
+        "llega desde Google la ve servida al instante; el que entra por la home",
+        "juega con la terminal. Mismo contenido, dos puertas.",
+        "",
+        "> El botón de atrás funciona. El link es compartible. Eso no es un",
+        "> detalle: es la diferencia entre una interfaz y una animación.",
+        "",
+        "## Un artículo no se lee con cat",
+        "",
+        "Nadie le hace `cat` a un archivo de dos mil palabras. Se abre con un",
+        "pager. Lo que estás leyendo ahora es ese pager, con [glow](https://github.com/charmbracelet/glow)",
+        "como referencia.",
+        "",
+        "El detalle que hace la diferencia es la **medida**: el texto se corta a",
+        "unas 68 columnas. La prosa monoespaciada no es difícil de leer por la",
+        "fuente — es difícil cuando el renglón mide doscientos caracteres y el ojo",
+        "se pierde al volver a empezar.",
+        "",
+        "### Las imágenes",
+        "",
+        "Una terminal de verdad no muestra imágenes, salvo con protocolos como",
+        "sixel. Acá se muestran de verdad, enmarcadas, con el nombre del archivo",
+        "de pie — como un adjunto en un gestor de archivos.",
+        "",
+        "![Diagrama del flujo de navegación](captura.png)",
+        "",
+        "La metáfora es una herramienta para orientar al lector, no una cárcel.",
+        "Cuando pelea con el contenido, gana el contenido.",
+        "",
+        "---",
+        "",
+        "## Cómo se dibuja",
+        "",
+        "El Markdown se convierte a **nodos del DOM**, nunca a cadenas de HTML.",
+        "",
+        "```js",
+        "parent.append(document.createTextNode(texto));",
+        "parent.append(el('code', null, fragmento));",
+        "```",
+        "",
+        "Sin `innerHTML` no hay superficie de XSS. Y eso importa, porque el día",
+        "que este texto venga de la base de datos y se edite desde el panel, el",
+        "cuerpo de un artículo es exactamente el lugar por donde entraría.",
+        "",
+        "Es más fácil no abrir el agujero que acordarse de taparlo."
+       ]},
+      {n:"dotfiles", st:["PowerShell","TOML"], kw:["tipografía","Unicode","tooling"],
+       d:"starship + PSReadLine + FiraCode Nerd Font.",
+       min:2, md:[
+        "# dotfiles",
+        "",
+        "La configuración de terminal de la que salió el diseño entero de este",
+        "sitio. La paleta, la fuente, el prompt y los atajos que estás usando no",
+        "se eligieron para la web: se venían usando desde antes.",
+        "",
+        "## El prompt",
+        "",
+        "starship, dos líneas, un solo archivo compartido entre Windows y Linux.",
+        "",
+        "```toml",
+        "[character]",
+        "success_symbol = \"[\\uEE9C](fg:green)\"",
+        "error_symbol   = \"[\\uEE9C](fg:red)\"",
+        "```",
+        "",
+        "El cerebro cambia de color según si el último comando salió bien. Es un",
+        "indicador de estado que no ocupa ni una línea de interfaz.",
+        "",
+        "## El detalle de la fuente",
+        "",
+        "Ese glifo vive en `U+EE9C`, dentro del **Área de Uso Privado** de",
+        "Unicode: una zona donde el estándar no define nada y cada fuente pone lo",
+        "que quiere. Existe únicamente porque hay una Nerd Font instalada.",
+        "",
+        "En la web, sin empaquetar la fuente, ahí se ve un cuadrado vacío. Por eso",
+        "este sitio lleva la fuente recortada adentro — de 2,6 MB a 20 KB, solo",
+        "los glifos que usa.",
+        "",
+        "> Y una sorpresa: FiraCode **no** tiene el bloque braille del logo.",
+        "> En la terminal se dibuja porque Windows cae a Cascadia sin avisar.",
+        "> En la web ese rescate no existe.",
+        "",
+        "## Los atajos",
+        "",
+        "- `ll` para listar",
+        "- `c` para limpiar, no `clear`",
+        "- `..` y `...` para subir uno o dos niveles",
+        "- `Tab` completa, `Ctrl+R` busca",
+        "",
+        "Todos funcionan acá. Y también funcionan sus equivalentes largos, porque",
+        "un atajo personal no puede ser la única puerta de entrada a tu propio",
+        "portafolio."
+       ]},
+      {n:"—", st:[], kw:[], d:"tus proyectos reales van aquí", ph:true}
+    ]
+  },
+  "publicaciones": {
+    kind:"dir", desc:"producción académica, con DOI",
+    items:[
+      {n:"—", st:[], kw:["journal"], d:"artículo en revista · enlaza al publisher", ph:true},
+      {n:"—", st:[], kw:["preprint"], d:"trabajo propio con DOI", ph:true}
+    ]
+  },
+  "contacto": { kind:"page", desc:"dónde encontrarme",
+    body:[["fg-green b","Contacto"],["fg-muted","correo · github · linkedin"]] }
+};
+
+/* El stack se agrega desde las entradas. Si un proyecto no lo declara, no
+   aparece: por construcción no se puede inflar. */
+function computeStack(){
+  const count = {};
+  for(const k in TREE){
+    (TREE[k].items||[]).forEach(it=>{
+      if(it.ph) return;
+      (it.st||[]).forEach(tech=>{ count[tech]=(count[tech]||0)+1; });
+    });
+  }
+  return Object.entries(count).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
+}
+
+const SECTIONS = Object.keys(TREE);
+const scroll = document.getElementById("scroll");
+const term   = document.getElementById("term");
+const entry  = document.getElementById("entry");
+
+let cwd = "";           // "" = raíz
+let lastOk = true;
+let history = [];
+let hIdx = -1;
+let liveLine = null;
+let busy = true;
+
+const el = (tag,cls,txt)=>{ const e=document.createElement(tag);
+  if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; };
+const pathStr = ()=> cwd ? "…/"+cwd : "~/";
+
+function push(node){ scroll.appendChild(node); term.scrollTop = term.scrollHeight; }
+function line(cls,txt){ const d=el("div","out "+(cls||""),txt); push(d); return d; }
+
+/* ── Boot ─────────────────────────────────────────────────────────────────── */
+const BOOT = [
+  ["0.000000","jbsh 1.0 — arrancando"],
+  ["0.118431","montando /sobre-mi /proyectos /publicaciones /contacto"],
+  ["0.240902","FiraCode Nerd Font Mono · subconjunto de 432 glifos"],
+  ["0.311765","Cascadia Mono · 83 glifos braille"],
+  ["0.402118","listo"]
+];
+
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+async function boot(){
+  for(const [t,msg] of BOOT){
+    const d = el("div","out boot");
+    d.append(el("span","t","[ "+t+" ] "), document.createTextNode(msg));
+    if(msg==="listo") d.append(el("span","ok","  ok"));
+    push(d);
+    if(!reduced) await sleep(85);
+  }
+  if(!reduced) await sleep(140);
+  fetchPanel();
+  line("", "");
+  /* El arranque corre `ls` solo. Un prompt vacío obliga al visitante a adivinar;
+     un listado ya hecho se explica por sí mismo aunque nunca haya visto una
+     terminal. La sección más original del sitio deja de ser la que más gente
+     abandona. */
+  line("fg-dim", "# arranque: ls");
+  listHere();
+  line("", "");
+  line("fg-dim", "# tocá cualquier fila, o escribí — las dos cosas van al mismo lado");
+  if(!TOUCH) line("fg-dim", "# Tab completa · Alt+1..4 salta de sección · 'help' lista todo");
+  else       line("fg-dim", "# 'help' lista todos los comandos");
+  line("", "");
+  busy = false;
+  newPrompt();
+}
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+
+function fetchPanel(){
+  const wrap = el("div","fetch");
+
+  const logo = el("pre","logo",BANNER);
+  logo.setAttribute("aria-hidden","true");
+  wrap.append(logo);
+
+  const info = el("div","info");
+  const title = el("div","title");
+  title.append(el("span","fg-pink b","jmll"), el("span","fg-muted","@"),
+               el("span","fg-cyan b","jbmll-web"));
+  info.append(title, el("div","rule","─".repeat(30)));
+
+  const dl = el("dl");
+  const stack = computeStack();
+  const entries = SECTIONS.reduce((n,k)=>n+((TREE[k].items||[]).filter(i=>!i.ph).length),0);
+  const rows = [
+    ["host","jbmll.dev"],
+    ["shell","jbsh 1.0"],
+    ["runtime","Cloudflare Pages · D1"],
+    ["fuente","FiraCode Nerd Font Mono"],
+    ["stack", stack.map(s=>s[0]).join(" · ") || "—"],
+    ["secciones", String(SECTIONS.length)],
+    ["entradas", String(entries)]
+  ];
+  rows.forEach(([k,v])=>{ dl.append(el("dt",null,k), el("dd",null,v)); });
+  info.append(dl);
+
+  const sw = el("div","swatches");
+  ["--green","--red","--yellow","--blue","--pink","--cyan","--gold","--muted"]
+    .forEach(v=>{ const i=el("i"); i.style.background=`var(${v})`; sw.append(i); });
+  info.append(sw);
+
+  wrap.append(info);
+  push(wrap);
+}
+
+/* ── Prompt ───────────────────────────────────────────────────────────────── */
+function promptHead(){
+  const p = el("div","out pline");
+  const left = el("span","left");
+  if(cwd){
+    /* La ruta del prompt es migaja de pan: se clickea para volver a la raíz. */
+    const home = el("span","fg-blue b");
+    home.append(goLink("/","…/",goHome));
+    const here = el("span","fg-blue b", cwd+" ");
+    left.append(home, here);
+    left.append(el("span","fg-pink","-> "), el("span","fg-pink b","main"));
+  } else {
+    left.append(el("span","fg-blue b","~/ "));
+  }
+  const right = el("span","right");
+  const n = cwd ? (TREE[cwd].items||[]).length : SECTIONS.length;
+  /* El conteo se cae en pantalla angosta: no cabe junto a la ruta y la
+     statusline ya lo muestra. La hora se queda, que es una sola palabra. */
+  right.append(el("span","hide-sm",(cwd ? n+" entradas" : n+" secciones")+"   "),
+               document.createTextNode(clock()));
+  p.append(left, el("span","fill"), right);
+  return p;
+}
+
+function newPrompt(){
+  push(promptHead());
+  const l = el("div","out inputline");
+  const b = el("span","brain "+(lastOk?"ok":"err"),BRAIN);
+  const typed = el("span","typed","");
+  const caret = el("span","caret");
+  l.append(b,typed,caret,el("span","tap-hint","tocá acá para escribir"));
+  push(l);
+  liveLine = {node:l, typed, caret};
+  entry.value = "";
+  renderListView();
+  focusEntry();
+}
+
+/* En táctil el teclado tapa media pantalla, así que no se levanta solo: sube
+   únicamente cuando alguien toca el prompt. En escritorio el foco es gratis y
+   se mantiene siempre. */
+const TOUCH = matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+function focusEntry(force){
+  if(TOUCH && !force) return;
+  entry.focus({preventScroll:true});
+}
+
+document.addEventListener("click", ev=>{
+  const line = ev.target.closest(".inputline");
+  if(!line || busy || reading) return;
+  line.classList.add("typing");
+  entry.focus();
+  /* Tras subir el teclado el navegador reacomoda todo: recién ahí tiene
+     sentido asegurar que la línea siga a la vista. */
+  setTimeout(()=>line.scrollIntoView({block:"end", behavior:"smooth"}), 320);
+});
+
+/* El teclado virtual encoge el viewport visual, pero no siempre el dvh: sin
+   esto la statusline y el prompt quedan tapados justo mientras se escribe.
+
+   Pero el ajuste va SOLO cuando el teclado achica de verdad. Aplicado siempre,
+   rompe el layout: fuera de ese caso visualViewport puede reportar un alto que
+   no es el del marco — en emulación de dispositivos, dentro de un iframe, con
+   la barra del navegador a mitad de camino — y entonces la statusline y el
+   footer se van abajo del corte. Mejor 100dvh, que el navegador ya sabe. */
+if(window.visualViewport){
+  const fit = ()=>{
+    const gap = window.innerHeight - window.visualViewport.height;
+    document.documentElement.style.setProperty(
+      "--vh", gap > 120 ? window.visualViewport.height + "px" : "100dvh");
+  };
+  window.visualViewport.addEventListener("resize", fit);
+  fit();
+}
+
+/* ── ListView (PSReadLine PredictionViewStyle) ─────────────────────────────── */
+let lvItems = [], lvSel = 0, lvNode = null;
+
+function candidates(q){
+  const here = cwd ? (TREE[cwd].items||[]).filter(i=>!i.ph).map(i=>({
+        cmd:"cat "+i.n, hint:(i.st||[]).concat(i.kw||[]).join(" · ")||"entrada"})) : [];
+  const base = [
+    ...SECTIONS.map(s=>({cmd:"cd "+s, hint:TREE[s].desc})),
+    {cmd:"ls",      hint:"listar lo que hay acá"},
+    {cmd:"ll",      hint:"igual que ls — tu alias"},
+    {cmd:"whoami",  hint:"quién soy"},
+    {cmd:"stack",   hint:"tecnologías, calculadas"},
+    ...here,
+    {cmd:"..",      hint:"subir un nivel"},
+    {cmd:"c",       hint:"limpiar — tu alias, no 'clear'"},
+    {cmd:"g",       hint:"abrir GitHub"},
+    {cmd:"ff",      hint:"repetir el arranque"},
+    {cmd:"help",    hint:"todos los comandos"}
+  ];
+  if(!q) return [];
+  const ql = q.toLowerCase();
+  return base.filter(c=>c.cmd.toLowerCase().startsWith(ql)).slice(0,6);
+}
+
+function renderListView(){
+  if(lvNode){ lvNode.remove(); lvNode = null; }
+  lvItems = candidates(entry.value.trim());
+  lvSel = 0;
+  if(!lvItems.length) return;
+  const box = el("div","listview");
+  box.setAttribute("role","listbox");
+  lvItems.forEach((c,i)=>{
+    const r = el("div","row");
+    r.setAttribute("role","option");
+    r.setAttribute("aria-selected", i===0 ? "true" : "false");
+    r.append(el("span","cmd",c.cmd), el("span","hint",c.hint));
+    r.addEventListener("mousedown", ev=>{ ev.preventDefault();
+      entry.value = c.cmd; syncTyped(); run(); });
+    box.append(r);
+  });
+  box.append(el("div","cap","Tab completa · ↑↓ historial · Enter ejecuta"));
+  push(box);
+  lvNode = box;
+}
+function moveSel(d){
+  if(!lvNode) return;
+  const rows = [...lvNode.querySelectorAll(".row")];
+  rows[lvSel].setAttribute("aria-selected","false");
+  lvSel = (lvSel + d + rows.length) % rows.length;
+  rows[lvSel].setAttribute("aria-selected","true");
+}
+
+function syncTyped(){ if(liveLine) liveLine.typed.textContent = entry.value; }
+
+/* ── Comandos ─────────────────────────────────────────────────────────────── */
+/* Cada fila de `ls` es un enlace de verdad. Ahí muere la barrera de entrada: el
+   que sabe escribe `cd proyectos`, el que no, hace clic en la fila. Mismo
+   destino, mismo comando, misma URL. */
+function listHere(){
+  const t = el("table","list");
+
+  if(!cwd){
+    SECTIONS.forEach(s=>{
+      const n = (TREE[s].items||[]).filter(i=>!i.ph).length;
+      const tr = el("tr","row-go");
+      const td = el("td","n");
+      td.append(goLink("/"+s, s+"/", ()=>goSection(s)));
+      tr.append(td,
+                el("td","c", TREE[s].kind==="dir" ? String(n) : "—"),
+                el("td","d",TREE[s].desc));
+      tr.addEventListener("click", ev=>{
+        if(ev.target.closest("a")) return;
+        goSection(s);
+      });
+      t.append(tr);
+    });
+    push(t);
+    return;
+  }
+
+  const node = TREE[cwd];
+  if(node.kind !== "dir"){ return showPage(cwd); }
+  push(cardGrid(node.items, cwd));
+}
+
+/* ── Paneles al estilo TUI ────────────────────────────────────────────────
+   Una "tarjeta" en una TUI es un panel con borde y su título encajado en la
+   línea de arriba — lazygit, btop, k9s. El borde se dibuja con CSS y no con
+   caracteres ┌─┐, porque así se adapta a cualquier ancho sin desalinearse. */
+function cardGrid(items, sec){
+  const grid = el("div","cards");
+  items.forEach(it=>{
+    if(it.ph){
+      const box = el("div","tui ph");
+      box.append(el("span","legend","—"), el("p","desc",it.d));
+      grid.append(box);
+      return;
+    }
+    const open = ()=>{ if(it.md) openReader(it, sec); else showEntry(it, sec); };
+    const a = el("a","tui");
+    a.href = "/"+sec+"/"+it.n;
+    a.append(el("span","legend",it.n));
+    if(it.min) a.append(el("span","meta",it.min+" min"));
+    a.append(el("p","desc",it.d));
+
+    const tags = el("div","tags");
+    /* Stack y palabras clave se muestran distinto porque SON distintos: el
+       stack alimenta el Tech Stack calculado, las palabras clave no. */
+    (it.st||[]).forEach(s=> tags.append(el("span","st",s)));
+    (it.kw||[]).forEach(k=> tags.append(el("span","kw",k)));
+    if(tags.children.length) a.append(tags);
+
+    a.addEventListener("click", ev=>{
+      if(ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+      ev.preventDefault(); open();
+    });
+    grid.append(a);
+  });
+  return grid;
+}
+
+function showEntry(it, sec){
+  line("fg-green b", it.n);
+  line("fg-cyan", (it.st||[]).join(" · "));
+  if((it.kw||[]).length) line("fg-dim", it.kw.map(k=>"#"+k).join(" "));
+  line("fg-muted", it.d);
+  line("fg-dim", "(esta entrada todavía no tiene cuerpo escrito)");
+}
+
+function showStack(){
+  const s = computeStack();
+  if(!s.length){ line("fg-dim","sin entradas todavía — el stack aparece solo"); return; }
+  const max = s[0][1];
+  const t = el("table","list");
+  s.forEach(([tech,n])=>{
+    const tr = el("tr");
+    tr.append(el("td","n",tech),
+              el("td","d bar","█".repeat(Math.round(n/max*10))),
+              el("td","c",n+" uso"+(n>1?"s":"")));
+    t.append(tr);
+  });
+  push(t);
+}
+
+function showPage(name){
+  (TREE[name].body||[]).forEach(([cls,txt])=>{
+    if(cls==="stack"){ showStack(); return; }
+    line(cls, txt||"");
+  });
+}
+
+/* ── Markdown → DOM ────────────────────────────────────────────────────────
+   Deliberadamente construye NODOS, nunca cadenas de HTML. Sin `innerHTML` no
+   hay superficie de XSS el día que el cuerpo del artículo venga de la base y se
+   edite desde el panel: el cuerpo es justo por donde entraría. */
+function inlineMd(text, parent){
+  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\[[^\]]+\]\([^)]+\))/g;
+  let last = 0, m;
+  while((m = re.exec(text))){
+    if(m.index > last) parent.append(document.createTextNode(text.slice(last, m.index)));
+    const tok = m[0];
+    if(tok[0] === "`"){
+      parent.append(el("code", null, tok.slice(1, -1)));
+    } else if(tok[0] === "*"){
+      parent.append(el("strong", null, tok.slice(2, -2)));
+    } else {
+      const cut = tok.indexOf("](");
+      const a = el("a", null, tok.slice(1, cut));
+      a.href = tok.slice(cut + 2, -1);
+      a.rel = "noopener noreferrer";
+      a.target = "_blank";
+      parent.append(a);
+    }
+    last = re.lastIndex;
+  }
+  if(last < text.length) parent.append(document.createTextNode(text.slice(last)));
+}
+
+function renderMd(lines){
+  const root = el("article","prose");
+  let para = [], list = null, i = 0;
+
+  const flushPara = ()=>{ if(!para.length) return;
+    const p = el("p"); inlineMd(para.join(" "), p); root.append(p); para = []; };
+  const flushList = ()=>{ if(list){ root.append(list); list = null; } };
+  const flushAll  = ()=>{ flushPara(); flushList(); };
+
+  while(i < lines.length){
+    const l = lines[i];
+
+    if(l.startsWith("```")){
+      flushAll();
+      const lang = l.slice(3).trim();
+      const buf = [];
+      i++;
+      while(i < lines.length && !lines[i].startsWith("```")){ buf.push(lines[i]); i++; }
+      i++;
+      const pre = el("pre");
+      if(lang) pre.dataset.lang = lang;
+      pre.append(el("code", null, buf.join("\n")));
+      root.append(pre);
+      continue;
+    }
+
+    if(!l.trim()){ flushAll(); i++; continue; }
+
+    if(l.startsWith("### ")){ flushAll(); root.append(el("h3",null,l.slice(4))); i++; continue; }
+    if(l.startsWith("## ")) { flushAll(); root.append(el("h2",null,l.slice(3))); i++; continue; }
+    if(l.startsWith("# "))  { flushAll(); root.append(el("h1",null,l.slice(2))); i++; continue; }
+    if(l.startsWith("---")) { flushAll(); root.append(el("hr")); i++; continue; }
+
+    if(l.startsWith("> ")){
+      flushAll();
+      const buf = [];
+      while(i < lines.length && lines[i].startsWith("> ")){ buf.push(lines[i].slice(2)); i++; }
+      const q = el("blockquote"); inlineMd(buf.join(" "), q); root.append(q);
+      continue;
+    }
+
+    if(l.startsWith("- ")){
+      flushPara();
+      if(!list) list = el("ul");
+      const li = el("li"); inlineMd(l.slice(2), li); list.append(li);
+      i++; continue;
+    }
+
+    const img = l.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if(img){
+      flushAll();
+      const fig = el("figure");
+      /* En el sitio real acá va un <img> con width/height y lazy loading. En el
+         prototipo se muestra el marco para ver cómo respira en la columna. */
+      fig.append(el("div","imgbox","[ "+img[2]+" ]"),
+                 el("figcaption",null,img[1]));
+      root.append(fig);
+      i++; continue;
+    }
+
+    para.push(l);
+    i++;
+  }
+  flushAll();
+  return root;
+}
+
+/* ── Navegación ────────────────────────────────────────────────────────────
+   No hay dos modos. Hay una terminal cuya salida está hecha de enlaces reales:
+   el que sabe escribe, el que no, hace clic, y los dos terminan en la misma
+   URL ejecutando el mismo comando. */
+function goSection(sec){
+  if(reading) closeReader();
+  entry.value = "cd " + sec;
+  syncTyped(); run();
+}
+
+function goHome(){
+  if(reading) closeReader();
+  entry.value = "cd ~";
+  syncTyped(); run();
+}
+
+/* Arranque en frío: vacía el búfer y vuelve a bootear. Es lo que uno espera de
+   volver al inicio en una terminal — no un `cd ~` con el historial colgando. */
+async function reboot(){
+  if(busy) return;
+  if(reading) closeReader();
+  busy = true;
+  cwd = "";
+  lastOk = true;
+  history = [];
+  hIdx = -1;
+  liveLine = null;
+  if(lvNode){ lvNode.remove(); lvNode = null; }
+  entry.value = "";
+  scroll.replaceChildren();
+  sync();
+  await boot();
+}
+
+/* Ancla de navegación: href real (clic del medio, pestaña nueva, rastreadores)
+   y el clic normal lo intercepta la terminal. */
+function goLink(href, label, onGo){
+  const a = el("a","go",label);
+  a.href = href;
+  a.addEventListener("click", ev=>{
+    if(ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+    ev.preventDefault(); onGo();
+  });
+  return a;
+}
+
+/* Las pestañas se dibujan desde TREE: agregar una sección la hace aparecer acá,
+   en `ls` y en los atajos, sin tocar nada más. */
+function buildTabs(){
+  const nav = document.getElementById("tabs");
+  nav.replaceChildren(...SECTIONS.map((sec,i)=>{
+    const a = el("a");
+    a.href = "/" + sec;
+    a.append(el("span","num",(i+1)+":"), document.createTextNode(sec));
+    a.title = TREE[sec].desc;
+    a.addEventListener("click", ev=>{
+      if(ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+      ev.preventDefault(); goSection(sec);
+    });
+    return a;
+  }));
+  markTabs();
+}
+function markTabs(){
+  [...document.getElementById("tabs").children].forEach((a,i)=>{
+    if(SECTIONS[i] === cwd) a.setAttribute("aria-current","page");
+    else a.removeAttribute("aria-current");
+  });
+}
+
+
+/* ── Modo lector ──────────────────────────────────────────────────────────── */
+const reader  = document.getElementById("reader");
+const rdBody  = document.getElementById("rd-body");
+const toTop   = document.getElementById("totop");
+let reading = null;
+
+function scrollTop(){
+  rdBody.scrollTo({ top:0, behavior: reduced ? "auto" : "smooth" });
+  rdBody.focus({preventScroll:true});
+}
+
+/* Bloque de cierre: el (END) de less, con las dos salidas a mano. */
+function buildEof(sec, item){
+  const box = el("div","eof");
+  box.append(el("div","mark","(END)  "+sec+"/"+item.n+".md"));
+
+  const acts = el("div","acts");
+  const btn = (key, label, fn)=>{
+    const b = el("button"); b.type = "button";
+    b.append(el("kbd",null,key), el("span",null,label));
+    b.addEventListener("click", fn);
+    return b;
+  };
+  acts.append(
+    btn("gg","volver arriba", scrollTop),
+    btn("q","salir a "+sec, closeReader)
+  );
+
+  /* Siguiente entrada de la misma sección: leer uno lleva al que sigue. */
+  const items = (TREE[sec].items||[]).filter(i=>!i.ph && i.md);
+  const idx = items.findIndex(i=>i.n === item.n);
+  const next = items[(idx + 1) % items.length];
+  if(next && next.n !== item.n){
+    acts.append(btn("→","siguiente: "+next.n, ()=>openReader(next, sec)));
+  }
+
+  box.append(acts);
+  return box;
+}
+
+toTop.addEventListener("click", scrollTop);
+
+function openReader(item, sec){
+  reading = { item, sec };
+  document.getElementById("rd-file").textContent = sec+"/"+item.n+".md";
+  document.getElementById("rd-meta").textContent =
+    (item.min ? item.min+" min · " : "") + (item.st||[]).concat(item.kw||[]).join(" · ");
+  const art = renderMd(item.md);
+  art.append(buildEof(sec, item));
+  rdBody.replaceChildren(art);
+  rdBody.scrollTop = 0;
+  toTop.classList.remove("on");
+  reader.hidden = false;
+  document.body.classList.add("reading");
+  document.getElementById("st-mode").textContent = "LECTOR";
+  document.getElementById("st-path").textContent = "/"+sec+"/"+item.n;
+  document.getElementById("st-count").textContent = "0%";
+  document.getElementById("st-hint").textContent = "q para salir";
+  rdBody.focus({preventScroll:true});
+}
+
+function closeReader(){
+  reading = null;
+  reader.hidden = true;
+  document.body.classList.remove("reading");
+  document.getElementById("st-mode").textContent = "NORMAL";
+  document.getElementById("st-hint").textContent = "jbmll.dev";
+  sync();
+  focusEntry();
+}
+
+rdBody.addEventListener("scroll", ()=>{
+  if(!reading) return;
+  const max = rdBody.scrollHeight - rdBody.clientHeight;
+  const pct = max <= 0 ? 100 : Math.round(rdBody.scrollTop / max * 100);
+  document.getElementById("st-count").textContent = pct+"%";
+  /* Recién pasada la mitad: antes de eso volver arriba no cuesta nada y el
+     botón sería un estorbo permanente. */
+  toTop.classList.toggle("on", pct > 55);
+});
+
+const HELP = [
+  ["ls · ll",     "listar (ll es tu alias real)"],
+  ["cd · z <d>",  "entrar — los dos funcionan"],
+  [".. · ...",    "subir uno · subir dos"],
+  ["cat <e>",     "abrir una entrada en el lector"],
+  ["  q · Esc",   "salir del lector"],
+  ["  espacio",   "avanzar una pantalla · j k también"],
+  ["  gg · G",    "principio · final del artículo"],
+  ["whoami",      "sobre mí"],
+  ["stack",       "tecnologías, calculadas desde las entradas"],
+  ["c",           "limpiar (tu alias, no 'clear')"],
+  ["reboot",      "arranque en frío, como tocar jbmll.dev"],
+  ["g",           "abrir GitHub"],
+  ["ff",          "repetir el arranque"],
+  ["pwd",         "dónde estoy"]
+];
+
+function exec(raw){
+  const s = raw.trim();
+  if(!s) return true;
+  const [cmd,...rest] = s.split(/\s+/);
+  const arg = rest.join(" ");
+
+  switch(cmd){
+    case "help": case "?": {
+      const t = el("table","list");
+      HELP.forEach(([c,d])=>{ const tr=el("tr");
+        tr.append(el("td","n",c), el("td","d",d)); t.append(tr); });
+      push(t); return true;
+    }
+    case "ls": case "ll": case "dir": listHere(); return true;
+    case "cd": case "z": {
+      if(!arg || arg==="~" || arg==="/"){ cwd=""; sync(); return true; }
+      if(arg===".."){ cwd=""; sync(); return true; }
+      const target = arg.replace(/^\/+|\/+$/g,"");
+      if(TREE[target]){
+        cwd = target; sync();
+        if(TREE[target].kind==="page") showPage(target); else listHere();
+        return true;
+      }
+      line("fg-red","cd: no existe '"+arg+"'");
+      line("fg-dim","secciones: "+SECTIONS.join(" · "));
+      return false;
+    }
+    case "..":  cwd=""; sync(); return true;
+    case "...": cwd=""; sync(); return true;
+    case "pwd": line("fg-blue", cwd ? "/"+cwd : "/"); return true;
+    case "whoami": cwd="sobre-mi"; sync(); showPage("sobre-mi"); return true;
+    case "stack": showStack(); return true;
+    case "cat": case "bat": case "glow": case "less": case "open": {
+      const name = arg.replace(/\.md$/,"").split("/").pop();
+      const all = SECTIONS.flatMap(s=>(TREE[s].items||[]).map(i=>({...i,sec:s})));
+      const hit = all.find(i=>i.n===name && !i.ph);
+      if(!hit){ line("fg-red","cat: no existe '"+(arg||"")+"'");
+                line("fg-dim","probá 'ls' para ver qué hay"); return false; }
+      if(!hit.md){ showEntry(hit, hit.sec); return true; }
+      /* Un artículo largo no se vuelca al stream: se abre en el pager. */
+      openReader(hit, hit.sec);
+      return true;
+    }
+    case "c": case "clear": case "cls":
+      scroll.replaceChildren(); return true;
+    case "reboot": case "reset": reboot(); return true;
+    case "ff": case "fastfetch": case "neofetch": fetchPanel(); return true;
+    case "g": case "github":
+      line("fg-blue","→ github.com/jbmll");
+      line("fg-dim","(en el sitio real abre la pestaña)"); return true;
+    case "date": line("fg-muted", new Date().toLocaleString("es-EC")); return true;
+    default:
+      line("fg-red", cmd+": comando no encontrado");
+      line("fg-dim", "probá 'help', o apretá Tab para ver qué hay");
+      return false;
+  }
+}
+
+function sync(){
+  document.getElementById("st-path").textContent = pathStr();
+  const n = cwd ? (TREE[cwd].items||[]).filter(i=>!i.ph).length : SECTIONS.length;
+  document.getElementById("st-count").textContent =
+    cwd ? n+" entradas" : n+" secciones";
+  markTabs();
+}
+
+function run(){
+  if(busy) return;
+  const raw = entry.value;
+  /* Si venía escribiendo, el teclado se queda: cerrarlo entre un comando y el
+     siguiente obliga a volver a tocar el prompt cada vez. */
+  const wasTyping = document.activeElement === entry;
+  if(lvNode){ lvNode.remove(); lvNode=null; }
+  if(liveLine){
+    liveLine.caret.remove();
+    liveLine.node.querySelector(".tap-hint")?.remove();
+    liveLine.typed.textContent = raw;
+    liveLine = null;
+  }
+  if(raw.trim()){ history.unshift(raw.trim()); }
+  hIdx = -1;
+  lastOk = exec(raw);
+  newPrompt();
+  if(wasTyping && liveLine){
+    liveLine.node.classList.add("typing");
+    focusEntry(true);
+  }
+}
+
+/* ── Teclado ──────────────────────────────────────────────────────────────── */
+entry.addEventListener("input", ()=>{ syncTyped(); renderListView(); });
+
+/* En el lector manda el teclado del pager: q y Esc salen, como en less. */
+let lastG = 0;
+window.addEventListener("keydown", ev=>{
+  if(!reading) return;
+  if(ev.key !== "g") lastG = 0;
+  if(ev.key==="q" || ev.key==="Escape"){ ev.preventDefault(); closeReader(); return; }
+  if(ev.key===" " || ev.key==="PageDown"){
+    ev.preventDefault(); rdBody.scrollBy({top:rdBody.clientHeight*0.9}); return; }
+  if(ev.key==="PageUp"){
+    ev.preventDefault(); rdBody.scrollBy({top:-rdBody.clientHeight*0.9}); return; }
+  /* gg de verdad, no g suelta: en vim la g sola no hace nada, son dos. */
+  if(ev.key==="g"){
+    ev.preventDefault();
+    const now = performance.now();
+    if(now - lastG < 600){ lastG = 0; scrollTop(); } else { lastG = now; }
+    return;
+  }
+  if(ev.key==="G"){ ev.preventDefault(); lastG = 0;
+    rdBody.scrollTo({top:rdBody.scrollHeight, behavior: reduced?"auto":"smooth"}); return; }
+  if(ev.key==="j"){ ev.preventDefault(); rdBody.scrollBy({top:60}); return; }
+  if(ev.key==="k"){ ev.preventDefault(); rdBody.scrollBy({top:-60}); return; }
+}, true);
+
+entry.addEventListener("keydown", ev=>{
+  if(busy || reading){ ev.preventDefault(); return; }
+  if(ev.key==="Enter"){ ev.preventDefault(); run(); return; }
+  if(ev.key==="Tab"){
+    ev.preventDefault();
+    if(lvItems.length){ entry.value = lvItems[lvSel].cmd; syncTyped(); renderListView(); }
+    return;
+  }
+  if(ev.key==="ArrowDown" && lvNode){ ev.preventDefault(); moveSel(1); return; }
+  if(ev.key==="ArrowUp" && lvNode){ ev.preventDefault(); moveSel(-1); return; }
+  if(ev.key==="ArrowUp"){
+    ev.preventDefault();
+    if(hIdx < history.length-1){ hIdx++; entry.value=history[hIdx]; syncTyped(); }
+    return;
+  }
+  if(ev.key==="ArrowDown"){
+    ev.preventDefault();
+    if(hIdx > 0){ hIdx--; entry.value=history[hIdx]; } else { hIdx=-1; entry.value=""; }
+    syncTyped(); return;
+  }
+  if(ev.ctrlKey && ev.key.toLowerCase()==="l"){ ev.preventDefault();
+    scroll.replaceChildren(); newPrompt(); return; }
+});
+
+/* Solo en escritorio: tocar el cuerpo devuelve el foco al prompt. En táctil eso
+   equivaldría a levantar el teclado cada vez que alguien toca para leer. */
+term.addEventListener("mousedown", ev=>{
+  if(TOUCH) return;
+  if(window.getSelection().toString()) return;
+  if(ev.target.closest(".row") || ev.target.closest("a")) return;
+  setTimeout(focusEntry,0);
+});
+
+document.querySelector(".brand .name").addEventListener("click", ev=>{
+  if(ev.metaKey || ev.ctrlKey || ev.shiftKey) return;
+  ev.preventDefault();
+  reboot();
+});
+
+/* Alt+1..4 salta de sección, como el prefijo + número de tmux. Va con Alt para
+   no pelearse con escribir números en el prompt. */
+window.addEventListener("keydown", ev=>{
+  if(!ev.altKey || ev.ctrlKey || ev.metaKey) return;
+  const n = parseInt(ev.key, 10);
+  if(!n || n > SECTIONS.length) return;
+  ev.preventDefault();
+  goSection(SECTIONS[n-1]);
+});
+
+buildTabs();
+
+function clock(){
+  const d = new Date();
+  return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+}
+function tick(){ document.getElementById("st-clock").textContent = clock(); }
+tick(); setInterval(tick, 20000);
+
+boot();
+</script>
+
+</body>
+</html>
