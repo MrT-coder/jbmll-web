@@ -1,7 +1,7 @@
 # Licencia de las fuentes
 
 Los archivos `jb-Regular.woff2` y `jb-Bold.woff2` son **subconjuntos** de
-Fira Code Nerd Font Mono: contienen únicamente los glifos que este sitio usa,
+Fira Code Nerd Font Mono: contienen únicamente los glifos que uso en el sitio,
 lo que reduce cada archivo de 2,6 MB a unos 20 KB.
 
 Un subconjunto es una obra derivada y se distribuye bajo la misma licencia que
@@ -29,8 +29,9 @@ Distribuido bajo la **SIL Open Font License, Version 1.1**.
 
 ## Cascadia Mono
 
-No se distribuye en este sitio. Se usó durante el prototipo para el bloque
-braille, que Fira Code no incluye, y ese archivo quedó fuera del sitio final.
+No la distribuyo en el sitio. La usé durante el prototipo para el bloque
+braille, que Fira Code no incluye, y ese archivo quedó fuera de la versión
+final.
 
 Copyright (c) Microsoft Corporation.
 https://github.com/microsoft/cascadia-code
@@ -45,6 +46,6 @@ incluidas versiones modificadas como estos subconjuntos, siempre que:
 - se conserven los avisos de copyright y de licencia, que es la razón de ser de
   este archivo;
 - las versiones modificadas no se distribuyan bajo los nombres reservados del
-  proyecto original, por lo que estos archivos se llaman `jb-*` y la familia
-  CSS se declara como `JBMono`;
+  proyecto original, por lo que llamo a estos archivos `jb-*` y declaro la
+  familia CSS como `JBMono`;
 - las fuentes no se vendan por sí solas.
