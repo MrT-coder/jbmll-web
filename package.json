@@ -1,0 +1,17 @@
+{
+  "name": "jbmll-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "verify": "node scripts/verify.mjs",
+    "ship": "astro build && node scripts/verify.mjs"
+  },
+  "devDependencies": {
+    "astro": "^7.2.4"
+  }
+}

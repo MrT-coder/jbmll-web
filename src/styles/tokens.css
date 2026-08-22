@@ -1,0 +1,113 @@
+/* ── Fuentes ────────────────────────────────────────────────────────────────
+   FiraCode Nerd Font Mono recortada a los glifos que usa el sitio: 2,6 MB → 20 KB.
+   Conserva U+EE9C (el cerebro del prompt), el bloque U+2588 y el box-drawing
+   doble del banner, más las ligaduras — el `-> ` de starship depende de ellas.
+   Licencia SIL Open Font License 1.1.
+
+   `font-display: block` y no `swap`: el banner y los bordes se dibujan con
+   caracteres que ninguna fuente de sistema tiene. Con `swap` el primer cuadro
+   sería una pared de cuadraditos vacíos antes de acomodarse. Pesan 20 KB y son
+   locales: el bloqueo dura milisegundos. */
+@font-face {
+  font-family: 'JBMono';
+  src: url('/fonts/jb-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'JBMono';
+  src: url('/fonts/jb-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}
+
+/* ── Paleta ─────────────────────────────────────────────────────────────────
+   Esquema GENTLEMAN de Windows Terminal, verbatim. Los mismos valores están en
+   ~/.config/starship.toml: dos fuentes independientes que coinciden. */
+:root {
+  --bg: #06080f;
+  --panel: #191e28;
+  --line: #232a40;
+  --line2: #2b3350;
+  --fg: #f3f6f9;
+  --muted: #8a8fa3;
+  --dim: #5c6170;
+  --green: #b7cc85;
+  --red: #cb7c94;
+  --yellow: #ffe066;
+  --blue: #7fb4ca;
+  --cyan: #7aa89f;
+  --pink: #ff8dd7;
+  --peach: #deba87;
+  --gold: #e0c15a;
+  --sel: #263356;
+
+  /* 78 % de --fg sobre 22 % de --muted. Para prosa larga el blanco pleno del
+     terminal cansa; bajarlo un punto deja lugar a que la negrita resalte sin
+     sumar otro color. */
+  --prose: #dcdfe6;
+
+  /* Piso de 13 px: a 12 px la prosa monoespaciada se lee con esfuerzo en un
+     teléfono, y la terminal no puede pedir esfuerzo antes que contenido. */
+  --fs: clamp(13px, 1.55vw, 14.5px);
+  --lh: 1.65;
+
+  /* Alto real de la ventana. En móvil lo pisa visualViewport cuando sube el
+     teclado: dvh no siempre lo refleja y la statusline queda tapada. */
+  --vh: 100dvh;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  height: var(--vh);
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'JBMono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: var(--fs);
+  line-height: var(--lh);
+  font-variant-ligatures: contextual common-ligatures;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Columna central compartida por cabecera, cuerpo y statusline: mismo ancho y
+   mismo eje, así la página se lee como una pieza y no como capas apiladas. */
+.wrap {
+  width: 100%;
+  max-width: 96ch;
+  margin: 0 auto;
+  padding: 0 clamp(0.8rem, 3vw, 1.6rem);
+}
+
+:focus-visible {
+  outline: 1px solid var(--blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,55 @@
+---
+import '../styles/tokens.css';
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+
+// URL absoluta de esta página. Se calcula desde `site` en astro.config.mjs, así
+// que la canónica y las etiquetas sociales apuntan al dominio real y no a
+// localhost, aunque la página se haya generado en la máquina de desarrollo.
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <!-- charset primero: el banner y los bordes son caracteres Unicode, y sin
+         declararlo el navegador adivina la codificación. -->
+    <meta charset="utf-8" />
+    <!-- Sin esto un navegador móvil finge una pantalla de 980 px y encoge todo:
+         el texto queda ilegible y ninguna media query ve el ancho real. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="author" content="Josue Bladimir Morales Llanganate" />
+    <link rel="canonical" href={canonical} />
+
+    <!-- Pinta la barra del navegador del color del fondo en el móvil. -->
+    <meta name="theme-color" content="#06080F" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    <!-- Las fuentes se descubren dentro del CSS, o sea un salto tarde. El
+         preload las arranca junto con la hoja de estilos: sin esto el banner
+         aparece en blanco durante ese salto. `crossorigin` es obligatorio en
+         fuentes aunque sean del mismo origen; sin él el navegador descarta la
+         precarga y descarga el archivo dos veces. -->
+    <link rel="preload" href="/fonts/jb-Regular.woff2" as="font" type="font/woff2" crossorigin />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="es_EC" />
+    <meta name="twitter:card" content="summary" />
+  </head>
+
+  <body>
+    <slot />
+  </body>
+</html>

@@ -1,0 +1,462 @@
+---
+// El banner vive en un .txt aparte y no dentro de este archivo por una razón
+// concreta: los espacios al final de cada línea son parte del dibujo, y un
+// editor con "trim trailing whitespace" los borra sin avisar. Aislado en su
+// archivo y rellenado acá abajo, sobrevive a esa edición.
+import '../styles/terminal.css';
+import bannerRaw from '../data/banner.txt?raw';
+
+// Se limpia el \r por si el archivo llega con finales de línea de Windows: sin
+// esto el relleno cuenta un carácter de más y el dibujo se desalinea.
+const rows = bannerRaw
+  .replace(/\r/g, '')
+  .replace(/\n+$/, '')
+  .split('\n');
+const width = Math.max(...rows.map((r) => r.length));
+const banner = rows.map((r) => r.padEnd(width)).join('\n');
+
+// U+EE9C: el glifo del prompt de starship — verde si el último comando salió
+// bien, rojo si falló. Vive en el Área de Uso Privado de Unicode, así que solo
+// existe gracias a la fuente que empaquetamos. Se escribe como escape porque
+// crudo es invisible en cualquier editor que no la cargue.
+const BRAIN = '';
+
+const BOOT = [
+  ['0.000000', 'jbsh 1.0 — arrancando'],
+  ['0.118431', 'montando /'],
+  ['0.240902', 'FiraCode Nerd Font Mono · subconjunto de 432 glifos'],
+  ['0.402118', 'listo'],
+];
+
+const INFO = [
+  ['estado', 'en construcción'],
+  ['publicación', 'próximamente'],
+  ['stack', 'Astro · Cloudflare Pages · D1'],
+  ['autor', 'Josue Bladimir Morales Llanganate'],
+];
+---
+
+<main class="term" id="term" tabindex="-1">
+  <div class="wrap">
+    <div id="scroll" aria-live="polite">
+      <div class="boot">
+        {
+          BOOT.map(([t, msg]) => (
+            <div class="out">
+              <span class="t">[ {t} ] </span>{msg}
+              {msg === 'listo' && <span class="ok">  ok</span>}
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="fetch">
+        <pre class="logo" aria-hidden="true">{banner}</pre>
+        <div class="info">
+          <p class="title">
+            <span class="u">josue</span><span class="at">@</span><span class="h">jbmll-web</span>
+          </p>
+          <div class="rule">{'─'.repeat(30)}</div>
+          <dl>
+            {
+              INFO.map(([k, v]) => (
+                <>
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
+                </>
+              ))
+            }
+          </dl>
+        </div>
+      </div>
+
+      <h1 class="out lead">
+        <!-- El "de " va pegado a la etiqueta a propósito: Astro recorta el
+             espacio del final de línea y las palabras quedarían unidas. -->
+        Próximamente, la página oficial de <strong>Josue Bladimir Morales Llanganate</strong> (<span class="sig">JBMLL</span>).
+      </h1>
+      <p class="out note">
+        # proyectos, publicaciones y notas — en una terminal que se navega
+      </p>
+      <p class="out note"># con comandos o con clic. Escriba 'help' mientras tanto.</p>
+      <div class="out sp"></div>
+    </div>
+  </div>
+</main>
+
+<div class="status">
+  <div class="wrap">
+    <span class="mode">NORMAL</span>
+    <span class="seg path">~/</span>
+    <span class="seg hide-sm">en obra</span>
+    <span class="spacer"></span>
+    <span class="seg right" id="st-clock">--:--</span>
+  </div>
+</div>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>© 2026 Josue Bladimir Morales Llanganate</span>
+    <span class="spacer"></span>
+    <a href="https://github.com/jbmll" rel="me noopener">github</a>
+  </div>
+</footer>
+
+<script define:vars={{ BRAIN }}>
+  // Isla única de la página. Sin framework: es un script suelto de unos pocos
+  // KB, y meter React para pintar texto en un div sería mandar cien veces eso.
+  const scroll = document.getElementById('scroll');
+  const term = document.getElementById('term');
+
+  const el = (tag, cls, txt) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.textContent = txt;
+    return e;
+  };
+  const push = (n) => {
+    scroll.append(n);
+    term.scrollTop = term.scrollHeight;
+  };
+  const line = (cls, txt) => push(el('div', 'out ' + (cls || ''), txt));
+
+  // El teclado no sube solo: en un teléfono tapa media pantalla, y esta página
+  // se lee entera sin escribir nada. Solo lo levanta tocar el prompt.
+  const TOUCH = matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+  const input = el('input');
+  input.className = 'entry';
+  input.setAttribute('aria-label', 'Línea de comandos');
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  document.body.append(input);
+
+  let live = null;
+  let ok = true;
+
+  function prompt() {
+    const l = el('div', 'out inputline');
+    l.append(
+      el('span', 'brain ' + (ok ? 'ok' : 'err'), BRAIN),
+      el('span', 'typed', ''),
+      el('span', 'caret'),
+      el('span', 'tap-hint', 'toque aquí para escribir'),
+    );
+    push(l);
+    live = { node: l, typed: l.querySelector('.typed') };
+    input.value = '';
+    if (!TOUCH) input.focus({ preventScroll: true });
+  }
+
+  const HELP = [
+    ['whoami', 'Quién soy'],
+    ['stack', 'Con qué se está construyendo'],
+    ['contacto', 'Dónde encontrarme'],
+    ['c', 'Limpiar la pantalla'],
+  ];
+
+  function exec(raw) {
+    const cmd = raw.trim().split(/\s+/)[0];
+    if (!cmd) return true;
+    switch (cmd) {
+      case 'help':
+      case '?': {
+        const t = el('table', 'list');
+        HELP.forEach(([c, d]) => {
+          const tr = el('tr');
+          tr.append(el('td', 'n', c), el('td', 'd', d));
+          t.append(tr);
+        });
+        push(t);
+        return true;
+      }
+      case 'whoami':
+        line('fg-green b', 'Josue Bladimir Morales Llanganate');
+        line('fg-muted', 'Desarrollador. Aquí reúno lo que construyo, publico y aprendo.');
+        return true;
+      case 'stack':
+        line('fg-muted', 'Astro · Cloudflare Pages · D1 · FiraCode Nerd Font');
+        line('fg-dim', 'Estático de punta a punta. Sin servidor que se caiga un domingo.');
+        return true;
+      case 'contacto':
+        line('fg-blue', 'github.com/jbmll');
+        line('fg-dim', 'El resto, cuando abra el sitio.');
+        return true;
+      case 'c':
+      case 'clear':
+      case 'cls':
+        scroll.replaceChildren();
+        return true;
+      default:
+        line('fg-red', cmd + ': comando no encontrado');
+        line('fg-dim', "El sitio está en obra. Por ahora solo responde 'help'.");
+        return false;
+    }
+  }
+
+  function run() {
+    const raw = input.value;
+    const wasTyping = document.activeElement === input;
+    if (live) {
+      live.node.querySelector('.caret')?.remove();
+      live.node.querySelector('.tap-hint')?.remove();
+      live.typed.textContent = raw;
+      live = null;
+    }
+    ok = exec(raw);
+    prompt();
+    if (wasTyping && live) {
+      live.node.classList.add('typing');
+      input.focus();
+    }
+  }
+
+  input.addEventListener('input', () => {
+    if (live) live.typed.textContent = input.value;
+  });
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      run();
+    }
+  });
+
+  document.addEventListener('click', (ev) => {
+    const l = ev.target.closest('.inputline');
+    if (!l) {
+      if (!TOUCH && !getSelection().toString() && ev.target.closest('#term')) input.focus();
+      return;
+    }
+    l.classList.add('typing');
+    input.focus();
+    setTimeout(() => l.scrollIntoView({ block: 'end', behavior: 'smooth' }), 320);
+  });
+
+  // El teclado virtual encoge el viewport visual, pero no siempre el dvh. El
+  // ajuste va SOLO cuando achica de verdad: aplicado siempre rompe el layout,
+  // porque fuera de ese caso el alto reportado no es el del marco.
+  if (window.visualViewport) {
+    const fit = () => {
+      const gap = window.innerHeight - visualViewport.height;
+      document.documentElement.style.setProperty(
+        '--vh',
+        gap > 120 ? visualViewport.height + 'px' : '100dvh',
+      );
+    };
+    visualViewport.addEventListener('resize', fit);
+    fit();
+  }
+
+  const clock = () => {
+    const d = new Date();
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  };
+  const tick = () => (document.getElementById('st-clock').textContent = clock());
+  tick();
+  setInterval(tick, 20000);
+
+  prompt();
+</script>
+
+<style>
+  .term {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 1.35rem 0 0.5rem;
+    cursor: text;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+  .term::-webkit-scrollbar {
+    width: 9px;
+  }
+  .term::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: 9px;
+  }
+
+  .sp {
+    height: 0.9rem;
+  }
+
+  .boot {
+    color: var(--dim);
+    font-size: 0.9em;
+  }
+  .boot .t {
+    color: var(--muted);
+  }
+  .boot .ok {
+    color: var(--green);
+  }
+
+  /* `flex-wrap` y no `overflow-x`: con scroll horizontal el panel se recorta en
+     pantallas medianas y el último valor queda fuera de la vista sin ningún
+     indicio. Envolviendo, cuando no entra al lado se va abajo entero. */
+  .fetch {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1.3rem clamp(1rem, 3vw, 2.6rem);
+    margin: 1.3rem 0 1.6rem;
+  }
+  .logo {
+    flex: 0 0 auto;
+    margin: 0;
+    white-space: pre;
+    line-height: 1.05;
+    font-size: clamp(7.5px, 1.28vw, 12px);
+    color: var(--green);
+  }
+  /* El min-width importa tanto como la base: sin él el panel se aprieta hasta
+     ser ilegible en vez de bajar a su propia línea. */
+  .info {
+    flex: 1 1 26ch;
+    min-width: min(26ch, 100%);
+  }
+  .info .title {
+    margin: 0 0 0.15rem;
+    font-size: 1em;
+    font-weight: 700;
+  }
+  .info .u {
+    color: var(--pink);
+  }
+  .info .at {
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .info .h {
+    color: var(--cyan);
+  }
+  .info .rule {
+    color: var(--line);
+    margin-bottom: 0.35rem;
+  }
+  .info dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0 1.1rem;
+    margin: 0;
+  }
+  .info dt {
+    color: var(--blue);
+  }
+  .info dd {
+    margin: 0;
+    color: var(--fg);
+  }
+
+  .lead {
+    color: var(--fg);
+    font-size: clamp(1.15em, 2.4vw, 1.45em);
+    font-weight: 400;
+    line-height: 1.45;
+    text-wrap: balance;
+    margin: 0 0 1rem;
+    max-width: 46ch;
+  }
+  .lead strong {
+    color: var(--fg);
+    font-weight: 700;
+  }
+  .lead .sig {
+    color: var(--green);
+    font-weight: 700;
+  }
+  .note {
+    color: var(--dim);
+    margin: 0;
+  }
+
+  .status {
+    flex: 0 0 auto;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    font-size: 0.82em;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .status .wrap {
+    display: flex;
+    align-items: center;
+    padding: 0;
+  }
+  .status .mode {
+    background: var(--gold);
+    color: #06080f;
+    font-weight: 700;
+    padding: 0.2rem 0.7rem;
+    letter-spacing: 0.06em;
+  }
+  .status .seg {
+    padding: 0.2rem 0.7rem;
+    color: var(--muted);
+  }
+  .status .seg.path {
+    color: var(--blue);
+  }
+  .status .seg.right {
+    color: var(--dim);
+  }
+  .spacer {
+    flex: 1 1 auto;
+  }
+
+  /* El footer va debajo de la statusline, no dentro: lo legal y el copyright
+     tienen que ser rastreables, y la statusline es un indicador de estado. */
+  .foot {
+    flex: 0 0 auto;
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+    font-size: 0.78em;
+    color: var(--dim);
+  }
+  .foot .wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 1.1rem;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+  .foot a {
+    color: var(--dim);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  .foot a:hover,
+  .foot a:focus-visible {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+
+  @media (max-width: 660px) {
+    .hide-sm {
+      display: none;
+    }
+    .fetch {
+      gap: 1.3rem;
+    }
+    .logo {
+      align-self: center;
+      font-size: clamp(7.5px, 2.6vw, 12px);
+    }
+    .lead {
+      font-size: 1.05em;
+    }
+  }
+
+  /* En táctil no hay hover y el teclado tapa media pantalla: el prompt lleva su
+     propia invitación, y tocar ahí — y solo ahí — lo levanta. */
+  @media (hover: none) and (pointer: coarse) {
+    .term {
+      cursor: default;
+    }
+    .foot .wrap {
+      padding-top: 0.6rem;
+      padding-bottom: 0.6rem;
+    }
+  }
+</style>
