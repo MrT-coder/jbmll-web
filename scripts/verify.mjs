@@ -108,6 +108,42 @@ for (const cls of RUNTIME) {
   );
 }
 
+console.log('\nBlindaje');
+// Cloudflare Pages sirve las cabeceras desde este archivo. Si no viaja dentro
+// de dist/, el sitio se despliega sin ninguna protección y responde igual.
+const headersPath = join(DIST, '_headers');
+check('_headers desplegado', existsSync(headersPath), 'sin él Cloudflare no aplica ninguna cabecera');
+const headers = existsSync(headersPath) ? readFileSync(headersPath, 'utf8') : '';
+for (const h of [
+  'Content-Security-Policy',
+  'Strict-Transport-Security',
+  'X-Content-Type-Options',
+  'X-Frame-Options',
+  'Referrer-Policy',
+  'Permissions-Policy',
+]) {
+  check('cabecera ' + h, new RegExp('^\\s*' + h + ':', 'm').test(headers));
+}
+
+// Una sola concesión de más vuelve la CSP decorativa, y el navegador no se
+// queja: sigue cargando todo igual.
+const scriptSrc = (headers.match(/script-src[^;]*/) || [''])[0];
+for (const flojo of ["'unsafe-inline'", "'unsafe-eval'", '*']) {
+  check('script-src sin ' + flojo, scriptSrc !== '' && !scriptSrc.includes(flojo));
+}
+
+// Un script en línea obligaría a aflojar la CSP. define:vars lo produce sin
+// avisar y la página se ve idéntica, hasta que en producción queda bloqueado.
+const inline = (html.match(/<script(?![^>]*\ssrc=)[^>]*>/g) || []).filter(
+  (t) => !/type="application\/(ld\+json|json)"/.test(t),
+);
+check('sin scripts en línea', inline.length === 0, inline.join(' '));
+check('sin estilos en línea', !/<style[\s>]/.test(html));
+check('script servido como archivo', /<script[^>]+src="\/_astro\/[^"]+\.js"/.test(html));
+
+// La versión exacta del framework es una pista gratis para quien busca un CVE.
+check('sin meta generator', !/name="generator"/.test(html));
+
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);

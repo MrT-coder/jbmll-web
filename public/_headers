@@ -1,0 +1,39 @@
+# Cabeceras de seguridad. Cloudflare Pages lee este archivo y las aplica en el
+# borde; no hay servidor propio donde configurarlas.
+
+/*
+  # 'none' por defecto: cada permiso se concede a mano y lo que se olvide queda
+  # bloqueado, no permitido. Es la única forma de que la lista no se pudra.
+  # No hay 'unsafe-inline' en script-src porque el script del sitio es un
+  # archivo aparte. Si algún día vuelve un script en línea, esto lo rompe: esa
+  # rotura es la señal, no el estorbo.
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+
+  # Sin preload: la lista de HSTS del navegador es prácticamente irreversible y
+  # se entra ahí a propósito, no de paso.
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+  # El navegador deja de adivinar el tipo de un archivo por su contenido, que es
+  # como un .txt subido termina ejecutándose como script.
+  X-Content-Type-Options: nosniff
+
+  # frame-ancestors ya lo cubre; esto es para los navegadores que no leen CSP.
+  X-Frame-Options: DENY
+
+  # Hacia otro sitio solo viaja el origen, nunca la ruta ni la consulta.
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # El sitio no usa ninguna de estas capacidades: se renuncia a todas para que
+  # un script inyectado tampoco pueda pedirlas.
+  Permissions-Policy: accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()
+
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Resource-Policy: same-origin
+
+# El nombre de estos archivos incluye su hash: si el contenido cambia, cambia la
+# URL. Por eso pueden guardarse para siempre sin quedar obsoletos.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

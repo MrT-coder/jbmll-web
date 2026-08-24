@@ -13,3 +13,17 @@ dist/
 .atl/
 .DS_Store
 Thumbs.db
+
+# Secretos locales de Wrangler. Cloudflare los lee en desarrollo igual que .env,
+# y nadie los asocia con un archivo de entorno hasta que ya se subieron.
+.dev.vars
+.dev.vars.*
+
+# Configuración de editor: es del equipo de quien escribe, no del proyecto.
+.vscode/
+.idea/
+*.swp
+
+# Registros de npm y de las herramientas. Traen rutas absolutas de la máquina.
+*.log
+npm-debug.log*

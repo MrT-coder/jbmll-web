@@ -14,6 +14,8 @@ const banner = rows.map((r) => r.padEnd(width)).join('\n');
 // Área de Uso Privado de Unicode: solo existe gracias a la fuente empaquetada.
 // Como escape y no crudo, porque crudo es invisible en el editor.
 const BRAIN = '';
+// Viaja por data-brain y no por define:vars: define:vars obliga a Astro a
+// dejar el script en línea, y un script en línea exige aflojar la CSP.
 
 const BOOT = [
   ['0.000000', 'jbsh 1.0 — arrancando'],
@@ -30,7 +32,7 @@ const INFO = [
 ];
 ---
 
-<main class="term" id="term" tabindex="-1">
+<main class="term" id="term" tabindex="-1" data-brain={BRAIN}>
   <div class="wrap">
     <div id="scroll" aria-live="polite">
       <div class="boot">
@@ -96,9 +98,10 @@ const INFO = [
   </div>
 </footer>
 
-<script define:vars={{ BRAIN }}>
+<script>
   const scroll = document.getElementById('scroll');
   const term = document.getElementById('term');
+  const BRAIN = term.dataset.brain;
 
   const el = (tag, cls, txt) => {
     const e = document.createElement(tag);
