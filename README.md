@@ -4,8 +4,9 @@ Esta es mi web personal, inspirada en una terminal simple y sencilla. Aquí
 reúno mis proyectos, mis publicaciones y mis notas, y se navega con comandos o
 con clic — como cada quien prefiera.
 
-Por ahora publica una pantalla de «próximamente». El sitio completo lo estoy
-construyendo sobre esta misma base.
+Las cuatro secciones ya están en pie y el contenido es real. Falta llevarlo a
+una base de datos y montar el panel desde el que se edita; hasta entonces vive
+en archivos, detrás de la misma puerta que usará después.
 
 ## Empezar
 
@@ -35,7 +36,13 @@ servidor**.
 public/fonts/           Fira Code recortada, servida como archivo
 src/data/banner.txt     el banner JBMLL, 6 × 43
 src/styles/tokens.css   paleta y tipografía
-src/styles/terminal.css estilos de los elementos que crea el script
+src/styles/terminal.css estilos de lo que no recibe alcance de componente
+src/styles/reader.css   el lector: ritmo vertical y jerarquía sin color
+src/content.config.ts   la forma del contenido, validada al compilar
+src/content/            el contenido: experiencia, proyectos, publicaciones…
+src/data/perfil.ts      quién soy y dónde encontrarme
+src/lib/content.ts      la única puerta a los datos
+src/lib/render.ts       de datos a HTML, sin tocar el DOM
 src/layouts/            cabecera del documento y metadatos
 src/components/         la terminal, mi única isla interactiva
 src/pages/              un archivo aquí es una URL
@@ -87,6 +94,21 @@ sesión propio y, por lo tanto, sin posibilidad de escribirlo mal.
 solo cuando el código corre en producción. Durante el build hay que consultar la
 base por su API HTTP con un token; en `/admin`, por la conexión directa. Dos
 caminos a la misma base, uno para cada momento.
+
+## Dos decisiones que explican el resto
+
+**El stack no se escribe, se cuenta.** Cada trabajo y cada proyecto declara qué
+tecnologías usó, y la lista sale de sumarlas. Una tecnología sin ninguna entrada
+que la respalde no aparece por ningún lado: no hay dónde inflarla. Cuando dos
+entradas describen el mismo trabajo —mi puesto por cuenta propia y el proyecto
+que hice en él— solo una declara el stack, o contaría doble sin que nadie
+mintiera.
+
+**El lector no se renderiza en el navegador.** Abrir un artículo lleva a su URL,
+y esa página la genera Astro con el Markdown ya procesado. Se pierde la
+navegación sin recarga al entrar a un artículo; se gana no enviar un analizador
+de Markdown a cada visita, y que el cuerpo del texto sea legible para quien
+llegue sin JavaScript.
 
 ## Por qué existe `verify`
 

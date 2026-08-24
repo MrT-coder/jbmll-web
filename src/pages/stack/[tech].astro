@@ -1,0 +1,62 @@
+---
+import type { GetStaticPaths } from 'astro';
+import Base from '../../layouts/Base.astro';
+import Terminal from '../../components/Terminal.astro';
+import { getStackConPagina } from '../../lib/content';
+import { slugTech } from '../../lib/render';
+
+// Solo con dos o más usos. Una página que lista una sola cosa no aporta nada
+// que la lista de origen no diga ya.
+export const getStaticPaths: GetStaticPaths = async () => {
+  const stack = await getStackConPagina();
+  return stack.map((s) => ({ params: { tech: slugTech(s.tech) }, props: { uso: s } }));
+};
+
+const { uso } = Astro.props;
+---
+
+<Base
+  title={`${uso.tech} — JBMLL`}
+  description={`Dónde he usado ${uso.tech}: ${uso.usos} trabajos o proyectos.`}
+>
+  <Terminal seccion="sobre-mi" salida="">
+    <article class="lectura">
+      <h1 class="lectura-t">{uso.tech}</h1>
+      <p class="lectura-m">{uso.usos} {uso.usos === 1 ? 'uso' : 'usos'}</p>
+      <ul class="fuentes">
+        {
+          uso.fuentes.map((f) => (
+            <li>
+              <a class="go" href={f.tipo === 'proyecto' ? `/proyectos/${f.id}` : '/sobre-mi#experiencia'}>
+                {f.titulo}
+              </a>
+              <span class="fuente-tipo">{f.tipo}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="lectura-fin">
+        <a class="go" href="/sobre-mi#stack">← volver al stack</a>
+      </p>
+    </article>
+  </Terminal>
+</Base>
+
+<style>
+  .fuentes {
+    margin: 0.8rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .fuentes li {
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .fuente-tipo {
+    float: right;
+    color: var(--dim);
+    font-size: 0.9em;
+  }
+</style>

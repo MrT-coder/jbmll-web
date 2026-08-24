@@ -1,5 +1,6 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { perfil, enlacesDeContacto } from '../data/perfil';
+import type { Fila, Indice, Seccion, TipoDeSeccion, UsoDeStack } from './tipos';
 
 // La única puerta a los datos. Todo el sitio lee por aquí y nada más sabe de
 // dónde sale el contenido. Cambiar los archivos por D1 es reescribir este
@@ -60,14 +61,8 @@ export function tieneCuerpo(entrada: { body?: string }): boolean {
   return (entrada.body ?? '').trim().length > 0;
 }
 
-export interface UsoDeStack {
-  /** Nombre de la tecnología, tal cual se declaró. */
-  tech: string;
-  /** Cuántas entradas la declaran. */
-  usos: number;
-  /** Dónde se usó, para que el número se pueda comprobar. */
-  fuentes: { tipo: 'experiencia' | 'proyecto'; id: string; titulo: string }[];
-}
+// El tipo vive en tipos.ts, con el resto de lo que cruza al cliente.
+export type { UsoDeStack } from './tipos';
 
 /**
  * El stack no se escribe: se calcula sumando lo que declara cada trabajo y cada
@@ -124,4 +119,76 @@ export const MINIMO_PARA_PAGINA_DE_STACK = 2;
 export async function getStackConPagina(): Promise<UsoDeStack[]> {
   const stack = await getStack();
   return stack.filter((s) => s.usos >= MINIMO_PARA_PAGINA_DE_STACK);
+}
+
+// ── El índice ───────────────────────────────────────────────────────────────
+// La proyección plana que consume el renderizador. Se define aquí, junto a los
+// datos, porque decidir qué entra en la vista es decidir sobre los datos.
+
+export const SECCIONES: { slug: string; desc: string; tipo: TipoDeSeccion }[] = [
+  { slug: 'sobre-mi', desc: 'quién soy y con qué trabajo', tipo: 'pagina' },
+  { slug: 'proyectos', desc: 'lo que he construido', tipo: 'coleccion' },
+  { slug: 'publicaciones', desc: 'producción académica, con DOI', tipo: 'coleccion' },
+  { slug: 'contacto', desc: 'dónde encontrarme', tipo: 'pagina' },
+];
+
+function filaDeProyecto(p: Proyecto): Fila {
+  const estados: Record<string, string> = {
+    produccion: 'en producción',
+    activo: 'activo',
+    tesis: 'tesis',
+    archivado: 'archivado',
+  };
+  return {
+    slug: p.id,
+    titulo: p.data.titulo,
+    desc: p.data.desc,
+    href: `/proyectos/${p.id}`,
+    st: [...p.data.st],
+    kw: [...p.data.kw],
+    meta: [estados[p.data.estado], p.data.organizacion, p.data.fecha]
+      .filter(Boolean)
+      .join(' · '),
+  };
+}
+
+function filaDePublicacion(pub: Publicacion): Fila {
+  // Sin cuerpo propio no hay página: solo la fila y el enlace al editor. Una
+  // página que repite el título para mandarte a otro sitio compite consigo
+  // misma en los buscadores.
+  const propia = tieneCuerpo(pub);
+  const doi = pub.data.doi ? `https://doi.org/${pub.data.doi}` : pub.data.url;
+
+  return {
+    slug: pub.id,
+    titulo: pub.data.titulo,
+    desc: [pub.data.venue, pub.data.serie, pub.data.paginas].filter(Boolean).join(' · '),
+    href: propia ? `/publicaciones/${pub.id}` : null,
+    externo: doi ? { href: doi, etiqueta: pub.data.doi ? 'DOI' : 'enlace' } : undefined,
+    st: [],
+    kw: [...pub.data.kw],
+    meta: `${pub.data.anio} · ${pub.data.autores.join('; ')}`,
+  };
+}
+
+export async function getIndice(): Promise<Indice> {
+  const [proyectos, publicaciones, stack] = await Promise.all([
+    getProyectos(),
+    getPublicaciones(),
+    getStack(),
+  ]);
+
+  const entradas: Record<string, Fila[]> = {
+    'sobre-mi': [],
+    proyectos: proyectos.map(filaDeProyecto),
+    publicaciones: publicaciones.map(filaDePublicacion),
+    contacto: [],
+  };
+
+  const secciones: Seccion[] = SECCIONES.map((s) => ({
+    ...s,
+    n: entradas[s.slug]?.length ?? 0,
+  }));
+
+  return { secciones, entradas, stack };
 }

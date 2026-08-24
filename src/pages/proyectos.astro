@@ -1,0 +1,16 @@
+---
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import { getIndice } from '../lib/content';
+import { renderEntradas } from '../lib/render';
+
+const indice = await getIndice();
+const filas = indice.entradas.proyectos;
+---
+
+<Base
+  title="Proyectos — JBMLL"
+  description="Lo que he construido: plataformas en producción, herramientas y trabajo de investigación, con el stack de cada uno."
+>
+  <Terminal seccion="proyectos" salida={renderEntradas(filas)} />
+</Base>

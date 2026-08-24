@@ -1,6 +1,21 @@
 ---
 import '../styles/terminal.css';
 import bannerRaw from '../data/banner.txt?raw';
+import { SECCIONES } from '../lib/content';
+import { esc } from '../lib/render';
+
+interface Props {
+  /** Sección montada, o null en la raíz. Decide la ruta y la pestaña activa. */
+  seccion?: string | null;
+  /** Salida inicial, ya renderizada por src/lib/render.ts. */
+  salida?: string;
+  /** El arranque solo tiene sentido la primera vez, en la raíz. */
+  boot?: boolean;
+  /** Frase de encabezado, cuando la página tiene algo que decir antes. */
+  lead?: string;
+}
+
+const { seccion = null, salida = '', boot = false, lead } = Astro.props;
 
 // Los espacios finales son parte del dibujo y los editores los borran, así que
 // el ancho se restituye acá. El \r se limpia por finales de línea de Windows.
@@ -12,69 +27,74 @@ const width = Math.max(...rows.map((r) => r.length));
 const banner = rows.map((r) => r.padEnd(width)).join('\n');
 
 // Área de Uso Privado de Unicode: solo existe gracias a la fuente empaquetada.
-// Como escape y no crudo, porque crudo es invisible en el editor.
 const BRAIN = '';
 // Viaja por data-brain y no por define:vars: define:vars obliga a Astro a
 // dejar el script en línea, y un script en línea exige aflojar la CSP.
 
 const BOOT = [
   ['0.000000', 'jbsh 1.0 — arrancando'],
-  ['0.118431', 'montando /'],
+  ['0.118431', 'montando ' + SECCIONES.map((s) => '/' + s.slug).join(' ')],
   ['0.240902', 'FiraCode Nerd Font Mono · subconjunto de 432 glifos'],
   ['0.402118', 'listo'],
 ];
 
-const INFO = [
-  ['estado', 'en construcción'],
-  ['publicación', 'próximamente'],
-  ['stack', 'Astro · Cloudflare Pages · D1'],
-  ['autor', 'Josue Bladimir Morales Llanganate'],
-];
+const ruta = seccion ? `~/${seccion}` : '~/';
+
+// El comando que dejó la pantalla así. Se muestra ejecutado, no se ejecuta:
+// quien llega desde un buscador ve la terminal en el estado de esa URL.
+const comando = seccion ? `cd ${seccion}` : 'ls';
 ---
 
-<main class="term" id="term" tabindex="-1" data-brain={BRAIN}>
+<nav class="tabs" id="tabs" aria-label="Secciones">
+  {
+    SECCIONES.map((s, i) => (
+      <a href={`/${s.slug}`} aria-current={s.slug === seccion ? 'page' : undefined} title={s.desc}>
+        <span class="num">{i + 1}:</span>{s.slug}
+      </a>
+    ))
+  }
+</nav>
+
+<main class="term" id="term" tabindex="-1" data-brain={BRAIN} data-seccion={seccion ?? ''}>
   <div class="wrap">
     <div id="scroll" aria-live="polite">
-      <div class="boot">
-        {
-          BOOT.map(([t, msg]) => (
-            <div class="out">
-              <span class="t">[ {t} ] </span>{msg}
-              {msg === 'listo' && <span class="ok">  ok</span>}
+      {
+        boot && (
+          <div class="boot">
+            {BOOT.map(([t, msg]) => (
+              <div class="out">
+                <span class="t">[ {t} ] </span>{msg}
+                {msg === 'listo' && <span class="ok">  ok</span>}
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      {
+        boot && (
+          <div class="fetch">
+            <pre class="logo" aria-hidden="true">{banner}</pre>
+            <div class="info">
+              <p class="title">
+                <span class="u">josue</span><span class="at">@</span><span class="h">jbmll-web</span>
+              </p>
+              <div class="rule">{'─'.repeat(30)}</div>
+              <slot name="info" />
             </div>
-          ))
-        }
+          </div>
+        )
+      }
+
+      {lead && <h1 class="out lead" set:html={lead} />}
+
+      <div class="out done">
+        <span class="brain ok">{BRAIN}</span><span class="typed">{comando}</span>
       </div>
 
-      <div class="fetch">
-        <pre class="logo" aria-hidden="true">{banner}</pre>
-        <div class="info">
-          <p class="title">
-            <span class="u">josue</span><span class="at">@</span><span class="h">jbmll-web</span>
-          </p>
-          <div class="rule">{'─'.repeat(30)}</div>
-          <dl>
-            {
-              INFO.map(([k, v]) => (
-                <>
-                  <dt>{k}</dt>
-                  <dd>{v}</dd>
-                </>
-              ))
-            }
-          </dl>
-        </div>
-      </div>
+      <div id="salida" set:html={salida}></div>
 
-      <h1 class="out lead">
-        <!-- En una sola línea: Astro recorta el espacio del final de línea y un
-             salto junto a una etiqueta pega las palabras. -->
-        Próximamente, la página oficial de <strong>Josue Bladimir Morales Llanganate</strong> (<span class="sig">JBMLL</span>).
-      </h1>
-      <p class="out note">
-        # proyectos, publicaciones y notas — en una terminal que se navega
-      </p>
-      <p class="out note"># con comandos o con clic. Escriba 'help' mientras tanto.</p>
+      <slot />
       <div class="out sp"></div>
     </div>
   </div>
@@ -83,8 +103,8 @@ const INFO = [
 <div class="status">
   <div class="wrap">
     <span class="mode">NORMAL</span>
-    <span class="seg path">~/</span>
-    <span class="seg hide-sm">en obra</span>
+    <span class="seg path" id="st-path">{ruta}</span>
+    <span class="seg hide-sm">{SECCIONES.length} secciones</span>
     <span class="spacer"></span>
     <span class="seg right" id="st-clock">--:--</span>
   </div>
@@ -102,6 +122,11 @@ const INFO = [
   const scroll = document.getElementById('scroll');
   const term = document.getElementById('term');
   const BRAIN = term.dataset.brain;
+  const AQUI = term.dataset.seccion || '';
+
+  const SECCIONES = [...document.querySelectorAll('#tabs a')].map((a) =>
+    a.getAttribute('href').slice(1),
+  );
 
   const el = (tag, cls, txt) => {
     const e = document.createElement(tag);
@@ -144,15 +169,28 @@ const INFO = [
   }
 
   const HELP = [
+    ['ls', 'Listar lo que hay aquí'],
+    ['cd <sección>', 'Entrar en una sección'],
+    ['cd ~', 'Volver al inicio'],
     ['whoami', 'Quién soy'],
-    ['stack', 'Con qué se está construyendo'],
+    ['stack', 'Con qué trabajo, contado desde los datos'],
     ['contacto', 'Dónde encontrarme'],
     ['c', 'Limpiar la pantalla'],
   ];
 
+  // Cada comando termina en una URL. En esta fase eso significa una navegación
+  // de verdad; el estado de esa URL ya viene renderizado del servidor.
+  const ir = (href) => {
+    location.href = href;
+    return true;
+  };
+
   function exec(raw) {
-    const cmd = raw.trim().split(/\s+/)[0];
+    const partes = raw.trim().split(/\s+/);
+    const cmd = partes[0];
+    const arg = partes[1];
     if (!cmd) return true;
+
     switch (cmd) {
       case 'help':
       case '?': {
@@ -165,26 +203,57 @@ const INFO = [
         push(t);
         return true;
       }
+
+      case 'ls':
+      case 'll':
+      case 'dir':
+        // En la raíz ya está en pantalla; dentro de una sección, también.
+        return ir(AQUI ? '/' + AQUI : '/');
+
+      case 'cd':
+      case 'z': {
+        if (!arg || arg === '~' || arg === '/') return ir('/');
+        const destino = arg.replace(/^\/+|\/+$/g, '');
+        if (SECCIONES.includes(destino)) return ir('/' + destino);
+        line('fg-red', `cd: ${destino}: no existe`);
+        line('fg-dim', "Escriba 'ls' para ver qué hay.");
+        return false;
+      }
+
+      case '..':
+      case '...':
+        return ir('/');
+
+      case 'pwd':
+        line('fg-blue', AQUI ? '/' + AQUI : '/');
+        return true;
+
       case 'whoami':
-        line('fg-green b', 'Josue Bladimir Morales Llanganate');
-        line('fg-muted', 'Desarrollador. Aquí reúno lo que construyo, publico y aprendo.');
-        return true;
+        return ir('/sobre-mi');
+
       case 'stack':
-        line('fg-muted', 'Astro · Cloudflare Pages · D1 · FiraCode Nerd Font');
-        line('fg-dim', 'Estático de punta a punta. Sin servidor que se caiga un domingo.');
-        return true;
+        return ir('/sobre-mi#stack');
+
       case 'contacto':
-        line('fg-blue', 'github.com/MrT-coder');
-        line('fg-dim', 'El resto, cuando abra el sitio.');
-        return true;
+        return ir('/contacto');
+
       case 'c':
       case 'clear':
       case 'cls':
         scroll.replaceChildren();
         return true;
+
+      case 'g':
+      case 'github':
+        return ir('https://github.com/MrT-coder');
+
+      case 'date':
+        line('fg-muted', new Date().toLocaleString('es-EC'));
+        return true;
+
       default:
         line('fg-red', cmd + ': comando no encontrado');
-        line('fg-dim', "El sitio está en obra. Por ahora solo responde 'help'.");
+        line('fg-dim', "Escriba 'help' para ver qué responde.");
         return false;
     }
   }
@@ -217,6 +286,17 @@ const INFO = [
   });
 
   document.addEventListener('click', (ev) => {
+    // Los enlaces navegan solos: interceptarlos aquí rompería el clic del
+    // medio y la apertura en pestaña nueva.
+    if (ev.target.closest('a')) return;
+
+    // Un panel entero es pulsable, pero solo si no se está seleccionando texto.
+    const panel = ev.target.closest('.panel[data-go]');
+    if (panel && !getSelection().toString()) {
+      location.href = panel.dataset.go;
+      return;
+    }
+
     const l = ev.target.closest('.inputline');
     if (!l) {
       if (!TOUCH && !getSelection().toString() && ev.target.closest('#term')) input.focus();
@@ -225,6 +305,16 @@ const INFO = [
     l.classList.add('typing');
     input.focus();
     setTimeout(() => l.scrollIntoView({ block: 'end', behavior: 'smooth' }), 320);
+  });
+
+  // Alt+1..4 salta de sección, como las ventanas de tmux.
+  document.addEventListener('keydown', (ev) => {
+    if (!ev.altKey || ev.ctrlKey || ev.metaKey) return;
+    const i = Number(ev.key) - 1;
+    if (i >= 0 && i < SECCIONES.length) {
+      ev.preventDefault();
+      location.href = '/' + SECCIONES[i];
+    }
   });
 
   // Solo cuando el teclado achica de verdad: aplicado siempre rompe el layout,
@@ -253,6 +343,50 @@ const INFO = [
 </script>
 
 <style>
+  /* Navegación visible aparte de la terminal: quien llega de un buscador no
+     tiene por qué saber que puede escribir. */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 0 1rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs a {
+    padding: 0.45rem 1.1ch;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+  }
+
+  .tabs a:hover,
+  .tabs a:focus-visible {
+    color: var(--fg);
+  }
+
+  .tabs a[aria-current='page'] {
+    color: var(--green);
+    border-bottom-color: var(--green);
+  }
+
+  .tabs .num {
+    color: var(--dim);
+    margin-right: 0.3ch;
+  }
+
+  /* El comando que dejó la pantalla en este estado, mostrado ya ejecutado. */
+  .done .brain {
+    margin-right: 1ch;
+    color: var(--green);
+  }
+
   .term {
     flex: 1 1 auto;
     min-height: 0;

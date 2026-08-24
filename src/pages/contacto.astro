@@ -1,0 +1,17 @@
+---
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import { getPerfil } from '../lib/content';
+import { renderContacto } from '../lib/render';
+
+const perfil = getPerfil();
+---
+
+<Base
+  title="Contacto — JBMLL"
+  description="Correo, WhatsApp, GitHub, LinkedIn y ORCID de Josue Bladimir Morales Llanganate."
+>
+  <Terminal seccion="contacto" salida={renderContacto(perfil.contacto)}>
+    <p class="out note"># {perfil.ubicacion} · {perfil.disponibilidad}</p>
+  </Terminal>
+</Base>

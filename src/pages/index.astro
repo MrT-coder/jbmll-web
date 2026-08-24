@@ -1,11 +1,39 @@
 ---
 import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
+import { getIndice, getPerfil } from '../lib/content';
+import { renderSecciones } from '../lib/render';
+
+const indice = await getIndice();
+const perfil = getPerfil();
+
+// En una sola línea: Astro recorta el espacio del final de línea y un salto
+// junto a una etiqueta pega las palabras.
+const LEAD =
+  'Soy <strong>Josue Bladimir Morales Llanganate</strong> (<span class="sig">JBMLL</span>), desarrollador backend.';
+
+const INFO = [
+  ['autor', perfil.nombre],
+  ['rol', perfil.titular],
+  ['ubicación', perfil.ubicacion],
+  ['stack', `${indice.stack.length} tecnologías, contadas desde los datos`],
+];
 ---
 
 <Base
-  title="Josue Bladimir Morales Llanganate (JBMLL) — próximamente"
-  description="Página oficial de Josue Bladimir Morales Llanganate (JBMLL), en construcción. Proyectos, publicaciones y notas, en una terminal que se navega con comandos o con clic."
+  title="Josue Bladimir Morales Llanganate — JBMLL"
+  description="Desarrollador backend Java. Proyectos, publicaciones y notas, en una terminal que se navega con comandos o con clic."
 >
-  <Terminal />
+  <Terminal boot lead={LEAD} salida={renderSecciones(indice.secciones)}>
+    <dl slot="info">
+      {
+        INFO.map(([k, v]) => (
+          <>
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </>
+        ))
+      }
+    </dl>
+  </Terminal>
 </Base>

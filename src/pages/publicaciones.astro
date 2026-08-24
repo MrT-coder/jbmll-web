@@ -1,0 +1,16 @@
+---
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import { getIndice } from '../lib/content';
+import { renderEntradas } from '../lib/render';
+
+const indice = await getIndice();
+const filas = indice.entradas.publicaciones;
+---
+
+<Base
+  title="Publicaciones — JBMLL"
+  description="Producción académica revisada por pares, con su DOI y el enlace al editor."
+>
+  <Terminal seccion="publicaciones" salida={renderEntradas(filas)} />
+</Base>

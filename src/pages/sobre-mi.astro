@@ -1,0 +1,151 @@
+---
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import {
+  getPerfil,
+  getExperiencia,
+  getEducacion,
+  getCertificaciones,
+  getStack,
+  MINIMO_PARA_PAGINA_DE_STACK,
+} from '../lib/content';
+import { renderStack, slugTech } from '../lib/render';
+
+const perfil = getPerfil();
+const [experiencia, educacion, certificaciones, stack] = await Promise.all([
+  getExperiencia(),
+  getEducacion(),
+  getCertificaciones(),
+  getStack(),
+]);
+
+// Experiencia, certificaciones y educación son colecciones separadas en los
+// datos y bloques de una sola página en la vista. El día que crezcan se
+// independizan sin migrar nada.
+const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'presente'}`;
+---
+
+<Base
+  title="Sobre mí — JBMLL"
+  description={`${perfil.titular}. Experiencia, formación, certificaciones y el stack calculado desde los datos.`}
+>
+  <Terminal seccion="sobre-mi" salida="">
+    <section class="bloque">
+      <h1 class="out lead">{perfil.nombre}</h1>
+      <p class="out note"># {perfil.titular} · {perfil.ubicacion}</p>
+    </section>
+
+    <section class="bloque" id="stack">
+      <h2 class="bloque-t">stack</h2>
+      <p class="out note">
+        # no está escrito a mano: se suma desde lo que declara cada trabajo y cada proyecto
+      </p>
+      <div set:html={renderStack(stack, MINIMO_PARA_PAGINA_DE_STACK)} />
+    </section>
+
+    <section class="bloque" id="experiencia">
+      <h2 class="bloque-t">experiencia</h2>
+      {
+        experiencia.map((e) => (
+          <article class="item">
+            <h3 class="item-t">
+              {e.data.puesto} <span class="item-org">· {e.data.organizacion}</span>
+            </h3>
+            <p class="item-m">
+              {periodo(e.data.inicio, e.data.fin)} · {e.data.ubicacion}
+              {e.data.modalidad && ` · ${e.data.modalidad}`}
+            </p>
+            {e.data.st.length > 0 && (
+              <ul class="chips">
+                {e.data.st.map((t) => (
+                  <li>
+                    <a class="chip" href={`/stack/${slugTech(t)}`}>
+                      {t}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+        ))
+      }
+    </section>
+
+    <section class="bloque" id="educacion">
+      <h2 class="bloque-t">educación</h2>
+      {
+        educacion.map((e) => (
+          <article class="item">
+            <h3 class="item-t">
+              {e.data.titulo} <span class="item-org">· {e.data.institucion}</span>
+            </h3>
+            <p class="item-m">
+              {periodo(e.data.inicio, e.data.fin)} · {e.data.ubicacion}
+              {e.data.registro && ` · ${e.data.registro}`}
+            </p>
+          </article>
+        ))
+      }
+    </section>
+
+    <section class="bloque" id="certificaciones">
+      <h2 class="bloque-t">certificaciones y cursos</h2>
+      <table class="list">
+        <tbody>
+          {
+            certificaciones.map((c) => (
+              <tr>
+                <td class="n">{c.data.nombre}</td>
+                <td class="c">{c.data.fecha ?? '—'}</td>
+                <td class="d">
+                  {[c.data.emisor, c.data.horas && `${c.data.horas} h`].filter(Boolean).join(' · ')}
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </section>
+  </Terminal>
+</Base>
+
+<style>
+  .bloque {
+    margin: 1.6rem 0;
+  }
+
+  .bloque-t {
+    margin: 0 0 0.5rem;
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--green);
+  }
+
+  .bloque-t::before {
+    content: '## ';
+    color: var(--dim);
+  }
+
+  .item {
+    margin: 0 0 1.2rem;
+    padding-left: 1.5ch;
+    border-left: 1px solid var(--line);
+  }
+
+  .item-t {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 700;
+  }
+
+  .item-org {
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .item-m {
+    margin: 0.15rem 0 0;
+    color: var(--dim);
+    font-size: 0.92em;
+  }
+</style>

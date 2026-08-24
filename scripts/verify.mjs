@@ -38,11 +38,13 @@ check('exactamente un h1', h1s.length === 1, h1s.length + ' encontrados');
 const h1txt = (h1s[0] || '').replace(/<[^>]+>/g, '');
 // Astro recorta el espacio al final de línea: un salto junto a una etiqueta
 // pega las palabras. Se lee bien en el código y se ve mal en pantalla.
-check(
-  'h1 con el nombre completo y bien separado',
-  /oficial de Josue Bladimir Morales Llanganate \(JBMLL\)/.test(h1txt.replace(/\s+/g, ' ')),
-  h1txt.replace(/\s+/g, ' ').trim(),
-);
+const h1limpio = h1txt.replace(/\s+/g, ' ').trim();
+check('h1 con el nombre completo', h1limpio.includes('Josue Bladimir Morales Llanganate'), h1limpio);
+// Se ata a la forma del fallo y no al texto: una minúscula seguida de mayúscula
+// o de un paréntesis es una palabra pegada. Atarlo a una frase concreta lo
+// convierte en una prueba que hay que reescribir cada vez que cambia la copia.
+const pegadas = h1limpio.match(/[a-záéíóúñ][A-ZÁÉÍÓÚÑ(]/g) || [];
+check('h1 sin palabras pegadas', pegadas.length === 0, pegadas.join(', '));
 check('theme-color', /name="theme-color"/.test(html));
 
 console.log('\nDominio');
@@ -160,6 +162,80 @@ check(
 const ordenado = stack.every((s, i) => i === 0 || stack[i - 1].usos >= s.usos);
 check('stack ordenado por frecuencia', ordenado);
 
+console.log('\nRutas');
+const leer = (f) => (existsSync(join(DIST, f)) ? readFileSync(join(DIST, f), 'utf8') : '');
+
+// El sitio se navega por URL, no solo desde la terminal. Cada sección tiene que
+// responder por su cuenta.
+const SECCIONES = ['sobre-mi', 'proyectos', 'publicaciones', 'contacto'];
+for (const sec of SECCIONES) {
+  check(`/${sec} generada`, existsSync(join(DIST, `${sec}.html`)));
+}
+
+// Sin JavaScript la página tiene que traer su contenido. Es la diferencia entre
+// una página que un buscador lee y una que ve vacía.
+const proyectos = leer('proyectos.html');
+check(
+  '/proyectos trae su contenido sin JavaScript',
+  proyectos.includes('estudio jurídico') && proyectos.includes('panel'),
+);
+const sobreMi = leer('sobre-mi.html');
+check(
+  '/sobre-mi trae experiencia y stack sin JavaScript',
+  sobreMi.includes('FirmaSeguraEc') && sobreMi.includes('Spring Boot'),
+);
+
+// Una publicación sin cuerpo propio no genera página. Si la generara, sería un
+// título repetido compitiendo con el original del editor.
+const sitemap = leer('sitemap-0.xml');
+const publicaciones = leer('publicaciones.html');
+check(
+  'la publicación sin cuerpo no tiene página',
+  !existsSync(join(DIST, 'publicaciones', 'xr-salento-2026-tea.html')),
+);
+check('esa publicación tampoco está en el sitemap', !sitemap.includes('xr-salento'));
+check('pero sí aparece en su índice, con su DOI', publicaciones.includes('doi.org'));
+
+// Una página de tecnología con un solo uso no dice nada que la lista de origen
+// no diga ya.
+const conPagina = stack.filter((s) => s.usos >= 2).map((s) => s.tech);
+const paginasStack = existsSync(join(DIST, 'stack'))
+  ? readdirSync(join(DIST, 'stack')).filter((f) => f.endsWith('.html'))
+  : [];
+check(
+  'una página de stack por cada tecnología con 2+ usos',
+  paginasStack.length === conPagina.length,
+  `${paginasStack.length} páginas para ${conPagina.length} tecnologías`,
+);
+const soloUno = stack.filter((s) => s.usos < 2).length;
+check('ninguna página para las de un solo uso', soloUno > 0 && paginasStack.length < stack.length);
+
+// El número que se ve y el número al que se llama tienen que ser el mismo.
+// Escribirlos por separado es cómo dejan de serlo.
+const contacto = leer('contacto.html');
+const wa = (contacto.match(/wa\.me\/(\d+)/) || [])[1] || '';
+const visible = (contacto.match(/\+(\d[\d\s]+\d)/) || [])[1] || '';
+check('el enlace de WhatsApp existe', wa.length > 0);
+check(
+  'el número visible es el número del enlace',
+  wa.length > 0 && wa === visible.replace(/\s/g, ''),
+  `enlace ${wa} · visible ${visible}`,
+);
+
+console.log('\nAlcance del CSS en set:html');
+// Lo que se inserta con set:html no recibe la marca de alcance de Astro, igual
+// que lo que crea el script. Sus estilos tienen que estar sin alcance o la
+// página se ve casi bien y nada avisa.
+const INYECTADAS = ['panel', 'panel-t', 'panel-d', 'chips', 'chip', 'panels', 'row-go'];
+for (const cls of INYECTADAS) {
+  const suelta = new RegExp('\\.' + cls + '(?![\\w-])(?!\\[data-astro-cid)');
+  check(
+    'sin alcance: .' + cls,
+    suelta.test(css),
+    'lo inserta set:html y nunca recibe la marca de alcance',
+  );
+}
+
 console.log('\nBlindaje');
 // Cloudflare Pages sirve las cabeceras desde este archivo. Si no viaja dentro
 // de dist/, el sitio se despliega sin ninguna protección y responde igual.
@@ -191,6 +267,10 @@ const inline = (html.match(/<script(?![^>]*\ssrc=)[^>]*>/g) || []).filter(
 );
 check('sin scripts en línea', inline.length === 0, inline.join(' '));
 check('sin estilos en línea', !/<style[\s>]/.test(html));
+// Un atributo style= también lo bloquea style-src, y no deja rastro visible:
+// el estilo simplemente no se aplica. Es más fácil de colar que un <style>.
+const atributos = html.match(/\sstyle="[^"]*"/g) || [];
+check('sin atributos style=', atributos.length === 0, atributos.join(' '));
 check('script servido como archivo', /<script[^>]+src="\/_astro\/[^"]+\.js"/.test(html));
 
 // La versión exacta del framework es una pista gratis para quien busca un CVE.
