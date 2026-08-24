@@ -108,6 +108,19 @@ for (const cls of RUNTIME) {
   );
 }
 
+// El enlace vive en el HTML y el comando `contacto` lo repite dentro del script.
+// Estuvieron apuntando a un usuario que no existe y la página no se rompe: un
+// enlace muerto se ve igual que uno bueno hasta que alguien lo pulsa.
+const jsFiles = existsSync(join(DIST, '_astro'))
+  ? readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.js'))
+  : [];
+const js = jsFiles.map((f) => readFileSync(join(DIST, '_astro', f), 'utf8')).join('\n');
+const handles = new Set(
+  [...(html + '\n' + js).matchAll(/github\.com\/([\w-]+)/g)].map((m) => m[1]),
+);
+check('un solo usuario de GitHub', handles.size === 1, [...handles].join(', '));
+check('usuario de GitHub correcto', handles.has('MrT-coder'), [...handles].join(', '));
+
 console.log('\nBlindaje');
 // Cloudflare Pages sirve las cabeceras desde este archivo. Si no viaja dentro
 // de dist/, el sitio se despliega sin ninguna protección y responde igual.
