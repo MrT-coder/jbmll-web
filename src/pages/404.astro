@@ -1,0 +1,16 @@
+---
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import { getIndice } from '../lib/content';
+import { renderSecciones } from '../lib/render';
+
+// Sin este archivo, Cloudflare Pages responde a cualquier ruta inexistente con
+// index.html y estado 200. El sitio parece funcionar y en realidad tiene
+// infinitas URLs sirviendo el mismo contenido: para un buscador eso es
+// contenido duplicado, y ningún enlace roto se detecta jamás.
+const indice = await getIndice();
+---
+
+<Base title="No existe — JBMLL" description="Esa ruta no existe. Estas son las secciones que sí.">
+  <Terminal lead="cat: no such file or directory" salida={renderSecciones(indice.secciones)} />
+</Base>

@@ -167,6 +167,11 @@ const leer = (f) => (existsSync(join(DIST, f)) ? readFileSync(join(DIST, f), 'ut
 
 // El sitio se navega por URL, no solo desde la terminal. Cada sección tiene que
 // responder por su cuenta.
+// Sin 404.html, Cloudflare Pages responde a CUALQUIER ruta inexistente con
+// index.html y estado 200: infinitas URLs sirviendo lo mismo, que para un
+// buscador es contenido duplicado, y ningún enlace roto se detecta jamás.
+check('404.html generada', existsSync(join(DIST, '404.html')), 'sin ella toda ruta inventada responde 200');
+
 const SECCIONES = ['sobre-mi', 'proyectos', 'publicaciones', 'contacto'];
 for (const sec of SECCIONES) {
   check(`/${sec} generada`, existsSync(join(DIST, `${sec}.html`)));
