@@ -227,6 +227,52 @@ check(
   `enlace ${wa} · visible ${visible}`,
 );
 
+console.log('\nLector');
+const art = leer('proyectos/estudio-juridico.html');
+check('la página de artículo se genera', art.length > 0);
+
+// El cuerpo lo procesa Astro al compilar. Si apareciera un analizador de
+// Markdown en el cliente, serían kilobytes enviados para hacer dos veces algo
+// que ya está hecho.
+check(
+  'el cuerpo llega procesado, no en Markdown',
+  art.includes('<h2') && !art.includes('## Acceso'),
+);
+check('sin analizador de Markdown en el cliente', !/marked|markdown-it|remark|micromark/i.test(js));
+
+// La medida acotada es lo que hace legible la prosa monoespaciada. El problema
+// nunca fue la fuente, fue el largo de renglón.
+check('la prosa tiene medida acotada', /\.prose\s*\{[^}]*max-width:\s*64ch/.test(css));
+
+// El aire ANTES de un encabezado es varias veces el de un párrafo y el de
+// DESPUÉS es mínimo: eso agrupa cada sección con su texto. Con un espaciado
+// uniforme el texto se lee plano por buena que sea la tipografía.
+const h2Antes = (css.match(/\.prose h2\s*\{\s*margin-top:\s*([\d.]+)em/) || [])[1];
+const h2Despues = (css.match(/\.prose h2\s*\+\s*\*\s*\{\s*margin-top:\s*([\d.]+)em/) || [])[1];
+check(
+  'ritmo vertical: más aire antes del encabezado que después',
+  h2Antes && h2Despues && Number(h2Antes) > Number(h2Despues) * 2,
+  `antes ${h2Antes}em, después ${h2Despues}em`,
+);
+
+// Cada salida lleva su tecla escrita. Una tecla que aparece en pantalla y no
+// hace nada es peor que no ponerla.
+const teclas = [...art.matchAll(/<kbd>([^<]+)<\/kbd>/g)].map((m) => m[1].trim());
+check('el fin de artículo ofrece salidas', teclas.length > 0, teclas.join(' '));
+check(
+  'las teclas escritas las lee el script',
+  /\.eof-acts a/.test(js) && /querySelector\(['"`]kbd['"`]\)/.test(js),
+  'el HTML declara la tecla y el script la lee de ahí',
+);
+
+// Llegar al final y no tener a dónde ir es cuando alguien cierra la pestaña.
+check('el artículo enlaza a su colección', art.includes('href="/proyectos"'));
+const otro = leer('proyectos/apoyo-terapeutico-tea.html');
+check(
+  'los artículos se enlazan entre sí',
+  art.includes('/proyectos/apoyo-terapeutico-tea') && otro.includes('/proyectos/estudio-juridico'),
+);
+
 console.log('\nAlcance del CSS en set:html');
 // Lo que se inserta con set:html no recibe la marca de alcance de Astro, igual
 // que lo que crea el script. Sus estilos tienen que estar sin alcance o la

@@ -3,26 +3,32 @@ import type { GetStaticPaths } from 'astro';
 import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import Terminal from '../../components/Terminal.astro';
-import { getProyectos } from '../../lib/content';
+import { getProyectos, vecinos } from '../../lib/content';
 import { slugTech } from '../../lib/render';
 
 export const getStaticPaths: GetStaticPaths = async () => {
   const proyectos = await getProyectos();
-  return proyectos.map((p) => ({ params: { slug: p.id }, props: { proyecto: p } }));
+  return proyectos.map((p) => ({
+    params: { slug: p.id },
+    props: { proyecto: p, ...vecinos(proyectos, p.id) },
+  }));
 };
 
-const { proyecto } = Astro.props;
+const { proyecto, anterior, siguiente } = Astro.props;
+
+// El cuerpo lo procesa Astro al compilar. Al navegador no llega ni un byte de
+// analizador de Markdown.
 const { Content } = await render(proyecto);
 
-// El cuerpo lo procesa Astro al compilar. En el navegador no entra ni un byte
-// de analizador de Markdown.
+const meta = [proyecto.data.organizacion, proyecto.data.fecha].filter(Boolean).join(' · ');
 ---
 
 <Base title={`${proyecto.data.titulo} — JBMLL`} description={proyecto.data.desc}>
   <Terminal seccion="proyectos" salida="">
     <article class="lectura">
       <h1 class="lectura-t">{proyecto.data.titulo}</h1>
-      <p class="lectura-m">{proyecto.data.fecha}{proyecto.data.organizacion && ` · ${proyecto.data.organizacion}`}</p>
+      <p class="lectura-m">{meta}</p>
+
       <ul class="chips">
         {
           proyecto.data.st.map((t) => (
@@ -34,10 +40,39 @@ const { Content } = await render(proyecto);
           ))
         }
       </ul>
-      <Content />
-      <p class="lectura-fin">
-        <a class="go" href="/proyectos">← volver a proyectos</a>
-      </p>
+
+      <div class="prose">
+        <Content />
+      </div>
+
+      <footer class="eof">
+        <p class="eof-mark">(END)</p>
+        <ul class="eof-acts">
+          <li>
+            <a href="/proyectos"><kbd>q</kbd>volver a proyectos</a>
+          </li>
+          {
+            anterior && (
+              <li>
+                <a href={`/proyectos/${anterior.id}`}>
+                  <kbd>k</kbd>
+                  {anterior.data.titulo}
+                </a>
+              </li>
+            )
+          }
+          {
+            siguiente && (
+              <li>
+                <a href={`/proyectos/${siguiente.id}`}>
+                  <kbd>j</kbd>
+                  {siguiente.data.titulo}
+                </a>
+              </li>
+            )
+          }
+        </ul>
+      </footer>
     </article>
   </Terminal>
 </Base>

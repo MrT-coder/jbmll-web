@@ -192,3 +192,22 @@ export async function getIndice(): Promise<Indice> {
 
   return { secciones, entradas, stack };
 }
+
+/**
+ * Vecinos dentro de una colección ya ordenada. Llegar al final de un artículo y
+ * no tener a dónde ir es el momento exacto en que alguien cierra la pestaña.
+ *
+ * El orden lo decide quien listó la colección, no esta función: así el enlace
+ * «siguiente» lleva siempre a lo que está debajo en el índice.
+ */
+export function vecinos<T extends { id: string }>(
+  coleccion: T[],
+  id: string,
+): { anterior: T | null; siguiente: T | null } {
+  const i = coleccion.findIndex((e) => e.id === id);
+  if (i === -1) return { anterior: null, siguiente: null };
+  return {
+    anterior: coleccion[i - 1] ?? null,
+    siguiente: coleccion[i + 1] ?? null,
+  };
+}

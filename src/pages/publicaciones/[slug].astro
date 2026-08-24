@@ -3,19 +3,21 @@ import type { GetStaticPaths } from 'astro';
 import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import Terminal from '../../components/Terminal.astro';
-import { getPublicaciones, tieneCuerpo } from '../../lib/content';
+import { getPublicaciones, tieneCuerpo, vecinos } from '../../lib/content';
 
 // Solo las que tienen algo propio que decir. Una publicación que se agota en su
 // enlace al editor no genera página: sería un título repetido compitiendo con
 // el original en los buscadores.
 export const getStaticPaths: GetStaticPaths = async () => {
   const publicaciones = await getPublicaciones();
-  return publicaciones
-    .filter(tieneCuerpo)
-    .map((p) => ({ params: { slug: p.id }, props: { publicacion: p } }));
+  const conCuerpo = publicaciones.filter(tieneCuerpo);
+  return conCuerpo.map((p) => ({
+    params: { slug: p.id },
+    props: { publicacion: p, ...vecinos(conCuerpo, p.id) },
+  }));
 };
 
-const { publicacion } = Astro.props;
+const { publicacion, anterior, siguiente } = Astro.props;
 const { Content } = await render(publicacion);
 const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : publicacion.data.url;
 ---
@@ -28,13 +30,55 @@ const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : p
     <article class="lectura">
       <h1 class="lectura-t">{publicacion.data.titulo}</h1>
       <p class="lectura-m">
-        {publicacion.data.autores.join('; ')} · {publicacion.data.anio} · {publicacion.data.venue}
+        {publicacion.data.autores.join('; ')}
+        <br />
+        {[publicacion.data.venue, publicacion.data.serie, publicacion.data.anio]
+          .filter(Boolean)
+          .join(' · ')}
       </p>
-      <Content />
-      <p class="lectura-fin">
-        {doi && <a class="go" href={doi} rel="noopener">{publicacion.data.doi ?? 'enlace'}</a>}
-        <a class="go" href="/publicaciones">← volver a publicaciones</a>
-      </p>
+
+      <div class="prose">
+        <Content />
+      </div>
+
+      <footer class="eof">
+        <p class="eof-mark">(END)</p>
+        <ul class="eof-acts">
+          <li>
+            <a href="/publicaciones"><kbd>q</kbd>volver a publicaciones</a>
+          </li>
+          {
+            doi && (
+              <li>
+                <a href={doi} rel="noopener">
+                  <kbd>o</kbd>
+                  {publicacion.data.doi ? 'abrir el DOI' : 'abrir el original'}
+                </a>
+              </li>
+            )
+          }
+          {
+            anterior && (
+              <li>
+                <a href={`/publicaciones/${anterior.id}`}>
+                  <kbd>k</kbd>
+                  {anterior.data.titulo}
+                </a>
+              </li>
+            )
+          }
+          {
+            siguiente && (
+              <li>
+                <a href={`/publicaciones/${siguiente.id}`}>
+                  <kbd>j</kbd>
+                  {siguiente.data.titulo}
+                </a>
+              </li>
+            )
+          }
+        </ul>
+      </footer>
     </article>
   </Terminal>
 </Base>

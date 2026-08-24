@@ -317,6 +317,27 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
     }
   });
 
+  // Las teclas del final de un artículo salen del propio HTML: cada salida
+  // lleva su <kbd> escrito y de ahí se lee el atajo. Escribir la tecla en el
+  // botón y además en el script es cómo dejan de coincidir.
+  const salidas = new Map();
+  document.querySelectorAll('.eof-acts a').forEach((a) => {
+    const k = a.querySelector('kbd');
+    if (k) salidas.set(k.textContent.trim().toLowerCase(), a.getAttribute('href'));
+  });
+
+  if (salidas.size) {
+    document.addEventListener('keydown', (ev) => {
+      if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
+      // Si hay algo escrito en el prompt, la tecla es parte del comando.
+      if (input.value !== '') return;
+      const href = salidas.get(ev.key.toLowerCase());
+      if (!href) return;
+      ev.preventDefault();
+      location.href = href;
+    });
+  }
+
   // Solo cuando el teclado achica de verdad: aplicado siempre rompe el layout,
   // porque fuera de ese caso el alto reportado no es el del marco.
   if (window.visualViewport) {

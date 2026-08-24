@@ -1,92 +1,239 @@
 /* Lector.
  *
- * El cuerpo lo genera Astro al compilar, así que llega al HTML sin la marca de
- * alcance de ningún componente: sus estilos tienen que vivir en un archivo como
- * este. Es la misma razón por la que los estilos de la terminal están fuera.
+ * Un artículo largo no se lee con `cat`, se lee con un pager. La referencia es
+ * glow: márgenes, jerarquía y una medida acotada.
  *
- * Jerarquía por escala y peso, no por color. En una terminal el color ya
- * significa otra cosa. */
+ * El cuerpo lo genera Astro al compilar, así que llega al HTML sin la marca de
+ * alcance de ningún componente. Por eso sus estilos viven acá, igual que los de
+ * la terminal. */
 
 .lectura {
-  max-width: 68ch;
-  margin: 1.4rem 0 0;
-  color: var(--prose);
+  padding: 2.6rem 0 4rem;
 }
 
 .lectura-t {
+  max-width: 34ch;
   margin: 0;
-  font-size: 1.35em;
+  font-size: 2em;
   font-weight: 700;
-  line-height: 1.35;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
   color: var(--fg);
 }
 
 .lectura-m {
-  margin: 0.35rem 0 1.2rem;
+  max-width: 64ch;
+  margin: 1rem 0 0;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid var(--line);
   color: var(--dim);
-  font-size: 0.92em;
+  font-size: 0.88em;
+  line-height: 1.7;
 }
 
-.lectura h2 {
-  margin: 2rem 0 0.6rem;
+/* 64ch y no 68: un carácter monoespaciado ocupa más ancho visual que uno
+   proporcional, así que la medida cómoda cae más abajo de lo habitual. Ese
+   límite es lo que hace legible la prosa monoespaciada — el problema nunca fue
+   la fuente, fue el largo de renglón. */
+.prose {
+  max-width: 64ch;
+  margin: 2.4rem 0 0;
   font-size: 1.05em;
+  line-height: 1.85;
+  /* Un punto por debajo del blanco de la terminal: así la negrita resalta
+     subiendo a --fg, sin necesidad de sumarle otro color. */
+  color: var(--prose);
+}
+
+.prose > * {
+  margin: 0;
+}
+
+/* ── Ritmo vertical ────────────────────────────────────────────────────────
+   El aire ANTES de un encabezado es varias veces el de un párrafo, y el de
+   DESPUÉS es mínimo. Eso agrupa cada sección con su texto. Un espaciado
+   uniforme se lee plano por más que la tipografía esté bien. */
+.prose > * + * {
+  margin-top: 1.3em;
+}
+
+.prose h2 {
+  margin-top: 3.4em;
+}
+
+.prose h2 + * {
+  margin-top: 1em;
+}
+
+.prose h3 {
+  margin-top: 2.4em;
+}
+
+.prose h3 + * {
+  margin-top: 0.85em;
+}
+
+.prose pre + *,
+.prose blockquote + * {
+  margin-top: 1.8em;
+}
+
+.prose hr,
+.prose hr + * {
+  margin-top: 3.4em;
+}
+
+/* ── Jerarquía por escala y peso, no por color ─────────────────────────────
+   En una terminal el color ya significa otra cosa. Si cada nivel toma el suyo,
+   compiten entre ellos y ninguno manda. Acá bajan: mediano y verde, chico y
+   apagado en versalitas. */
+.prose h2,
+.prose h3 {
+  line-height: 1.25;
   font-weight: 700;
+  text-wrap: balance;
+}
+
+.prose h2 {
+  font-size: 1.02em;
+  color: var(--green);
+}
+
+.prose h3 {
+  font-size: 0.84em;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.prose a {
+  color: var(--blue);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.prose a:hover,
+.prose a:focus-visible {
+  color: var(--gold);
+  text-decoration-color: var(--gold);
+}
+
+.prose strong {
   color: var(--fg);
-}
-
-.lectura h2::before {
-  content: '## ';
-  color: var(--dim);
-  font-weight: 400;
-}
-
-.lectura h3 {
-  margin: 1.5rem 0 0.5rem;
-  font-size: 1em;
   font-weight: 700;
-  color: var(--fg);
 }
 
-.lectura p {
-  margin: 0 0 1.1rem;
-}
-
-.lectura ul,
-.lectura ol {
-  margin: 0 0 1.1rem;
-  padding-left: 2.5ch;
-}
-
-.lectura li {
-  margin: 0.25rem 0;
-}
-
-.lectura strong {
-  font-weight: 700;
-  color: var(--fg);
-}
-
-.lectura code {
-  padding: 0.05rem 0.5ch;
-  background: var(--panel);
+/* Sin fondo: en un sitio íntegramente monoespaciado el recuadro solo agrega
+   ruido. El color alcanza para decir «esto es código». */
+.prose code {
   color: var(--peach);
 }
 
-.lectura a {
-  color: var(--blue);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
+.prose pre {
+  background: var(--panel);
+  padding: 1.1rem 1.25rem;
+  overflow-x: auto;
+  font-size: 0.92em;
+  line-height: 1.65;
 }
 
-.lectura a:hover,
-.lectura a:focus-visible {
-  border-bottom-color: currentColor;
+.prose pre code {
+  color: var(--muted);
 }
 
-.lectura-fin {
-  display: flex;
-  gap: 2ch;
-  margin: 2.2rem 0 0;
-  padding-top: 1rem;
+.prose blockquote {
+  border-left: 2px solid var(--line);
+  padding-left: 1.4rem;
+  color: var(--muted);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.5rem;
+}
+
+.prose li + li {
+  margin-top: 0.45em;
+}
+
+.prose li::marker {
+  color: var(--dim);
+}
+
+.prose hr {
+  border: 0;
   border-top: 1px solid var(--line);
+}
+
+/* ── Fin de artículo ───────────────────────────────────────────────────────
+   `less` cierra el búfer con (END). Acá ese marcador además ofrece las salidas,
+   y cada una lleva escrita la tecla: se usa con el ratón y de paso se aprende
+   el atajo. */
+.eof {
+  max-width: 64ch;
+  margin-top: 5rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--line);
+}
+
+.eof-mark {
+  margin: 0;
+  color: var(--dim);
+  font-size: 0.86em;
+}
+
+.eof-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eof-acts a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9em;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.eof-acts a:hover,
+.eof-acts a:focus-visible {
+  color: var(--fg);
+  border-color: var(--green);
+  background: var(--panel);
+}
+
+.eof-acts kbd {
+  font: inherit;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  padding: 0 0.3em;
+  line-height: 1.4;
+}
+
+.eof-acts a:hover kbd,
+.eof-acts a:focus-visible kbd {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+@media (max-width: 660px) {
+  .lectura {
+    padding-top: 1.8rem;
+  }
+
+  .lectura-t {
+    font-size: 1.55em;
+  }
 }
