@@ -121,6 +121,45 @@ const handles = new Set(
 check('un solo usuario de GitHub', handles.size === 1, [...handles].join(', '));
 check('usuario de GitHub correcto', handles.has('MrT-coder'), [...handles].join(', '));
 
+console.log('\nDatos');
+// El stack es la promesa del sitio: cada tecnología enlaza a la evidencia de
+// haberla usado. Si el número y las fuentes se separan, el sitio miente sin que
+// nadie lo haya escrito.
+const stackPath = join(DIST, 'stack.json');
+check('stack.json generado', existsSync(stackPath));
+const stack = existsSync(stackPath) ? JSON.parse(readFileSync(stackPath, 'utf8')) : [];
+check('stack no vacío', stack.length > 0);
+
+const sinFuente = stack.filter((s) => s.usos !== s.fuentes.length);
+check(
+  'cada uso del stack tiene su fuente',
+  sinFuente.length === 0,
+  sinFuente.map((s) => `${s.tech}: ${s.usos} usos, ${s.fuentes.length} fuentes`).join('; '),
+);
+
+// La misma entrada contada dos veces infla el número sin que se note.
+const repetidas = stack.filter((s) => new Set(s.fuentes.map((f) => f.id)).size !== s.fuentes.length);
+check('sin fuentes repetidas', repetidas.length === 0, repetidas.map((s) => s.tech).join(', '));
+
+// «PostgreSQL» y «postgresql» son la misma tecnología escrita de dos formas, y
+// el conteo se parte en dos sin avisar. Es el fallo más fácil de cometer al
+// agregar una entrada nueva.
+const porNombre = new Map();
+for (const s of stack) {
+  const clave = s.tech.toLowerCase().replace(/[\s.-]/g, '');
+  porNombre.set(clave, [...(porNombre.get(clave) || []), s.tech]);
+}
+const variantes = [...porNombre.values()].filter((v) => v.length > 1);
+check(
+  'sin tecnologías escritas de dos formas',
+  variantes.length === 0,
+  variantes.map((v) => v.join(' / ')).join('; '),
+);
+
+// Ordenado por frecuencia: es lo que hace legible la lista.
+const ordenado = stack.every((s, i) => i === 0 || stack[i - 1].usos >= s.usos);
+check('stack ordenado por frecuencia', ordenado);
+
 console.log('\nBlindaje');
 // Cloudflare Pages sirve las cabeceras desde este archivo. Si no viaja dentro
 // de dist/, el sitio se despliega sin ninguna protección y responde igual.

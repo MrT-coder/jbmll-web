@@ -1,0 +1,49 @@
+# Las entradas sin fecha son las que no la tienen registrada. Se deja el hueco
+# a propósito: inventarla sería peor que no mostrarla.
+- id: nasa-open-science-101
+  nombre: Open Science 101
+  emisor: NASA
+  fecha: 2026-07
+  credencial: af9bf0c4-961a-40c7-8a60-fc34260b8d81
+  tipo: certificacion
+
+- id: metadocencia-ciencia-abierta
+  nombre: Herramientas de Ciencia Abierta
+  emisor: MetaDocencia
+  fecha: 2026-07
+  tipo: curso
+
+- id: generative-ai-leader
+  nombre: Generative AI Leader
+  tipo: certificacion
+
+- id: gemini-enterprise-agent-ready
+  nombre: Gemini Enterprise Agent Ready
+  emisor: Google
+  tipo: certificacion
+
+- id: generative-ai-healthcare
+  nombre: Generative AI for Healthcare
+  tipo: certificacion
+
+- id: google-cloud-cybersecurity
+  nombre: Beginners Google Cloud Cybersecurity Certificate
+  emisor: Google Cloud
+  tipo: certificacion
+
+- id: fortinet-threat-landscape
+  nombre: FCF — Introduction to the Threat Landscape 3.0
+  emisor: Fortinet
+  fecha: 2025-07
+  tipo: certificacion
+
+- id: computo-en-la-nube
+  nombre: Fundamentos del Cómputo en la Nube
+  emisor: Fundación Carlos Slim «Aprende»
+  fecha: 2025-06
+  horas: 45
+  tipo: curso
+
+- id: workshop-10000-becas-ia
+  nombre: El Workshop 10.000 Becas IA
+  tipo: curso

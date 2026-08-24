@@ -12,7 +12,9 @@
     "ship": "astro build && node scripts/verify.mjs"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.10",
     "@astrojs/sitemap": "^3.7.3",
-    "astro": "^7.2.4"
+    "astro": "^7.2.4",
+    "typescript": "^6.0.3"
   }
 }
