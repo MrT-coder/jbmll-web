@@ -1,5 +1,5 @@
 ---
-import type { GetStaticPaths } from 'astro';
+import type { InferGetStaticPropsType } from 'astro';
 import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import Terminal from '../../components/Terminal.astro';
@@ -8,7 +8,7 @@ import { getPublicaciones, tieneCuerpo, vecinos } from '../../lib/content';
 // Solo las que tienen algo propio que decir. Una publicación que se agota en su
 // enlace al editor no genera página: sería un título repetido compitiendo con
 // el original en los buscadores.
-export const getStaticPaths: GetStaticPaths = async () => {
+export const getStaticPaths = async () => {
   const publicaciones = await getPublicaciones();
   const conCuerpo = publicaciones.filter(tieneCuerpo);
   return conCuerpo.map((p) => ({
@@ -16,6 +16,8 @@ export const getStaticPaths: GetStaticPaths = async () => {
     props: { publicacion: p, ...vecinos(conCuerpo, p.id) },
   }));
 };
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
 
 const { publicacion, anterior, siguiente } = Astro.props;
 const { Content } = await render(publicacion);

@@ -1,18 +1,20 @@
 ---
-import type { GetStaticPaths } from 'astro';
+import type { InferGetStaticPropsType } from 'astro';
 import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import Terminal from '../../components/Terminal.astro';
 import { getProyectos, vecinos } from '../../lib/content';
 import { slugTech } from '../../lib/render';
 
-export const getStaticPaths: GetStaticPaths = async () => {
+export const getStaticPaths = async () => {
   const proyectos = await getProyectos();
   return proyectos.map((p) => ({
     params: { slug: p.id },
     props: { proyecto: p, ...vecinos(proyectos, p.id) },
   }));
 };
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
 
 const { proyecto, anterior, siguiente } = Astro.props;
 

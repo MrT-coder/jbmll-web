@@ -9,7 +9,7 @@
     "preview": "astro preview",
     "check": "astro check",
     "verify": "node scripts/verify.mjs",
-    "ship": "astro build && node scripts/verify.mjs"
+    "ship": "astro check && astro build && node scripts/verify.mjs"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

@@ -225,3 +225,24 @@ a.go:focus-visible {
 .stack td.c {
   color: var(--green);
 }
+
+/* ── ListView ───────────────────────────────────────────────────────────────
+   La respuesta de PSReadLine al «no sé qué escribir»: las opciones aparecen
+   mientras se teclea, en vez de esconderse detrás de Tab. Quien no conoce la
+   terminal descubre los comandos sin preguntarle a nadie. */
+
+.lv {
+  margin: 0.2rem 0 0.4rem 3ch;
+  border-left: 1px solid var(--line2);
+}
+
+.lv-i {
+  padding: 0.1rem 1.2ch;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.lv-i:hover {
+  background: var(--sel);
+  color: var(--fg);
+}

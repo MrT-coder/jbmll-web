@@ -1,5 +1,5 @@
 ---
-import type { GetStaticPaths } from 'astro';
+import type { InferGetStaticPropsType } from 'astro';
 import Base from '../../layouts/Base.astro';
 import Terminal from '../../components/Terminal.astro';
 import { getStackConPagina } from '../../lib/content';
@@ -7,10 +7,12 @@ import { slugTech } from '../../lib/render';
 
 // Solo con dos o más usos. Una página que lista una sola cosa no aporta nada
 // que la lista de origen no diga ya.
-export const getStaticPaths: GetStaticPaths = async () => {
+export const getStaticPaths = async () => {
   const stack = await getStackConPagina();
   return stack.map((s) => ({ params: { tech: slugTech(s.tech) }, props: { uso: s } }));
 };
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
 
 const { uso } = Astro.props;
 ---

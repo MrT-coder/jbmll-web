@@ -287,6 +287,70 @@ for (const cls of INYECTADAS) {
   );
 }
 
+console.log('\nTerminal');
+// Los datos que la terminal necesita para navegar sin recargar. Si no se
+// generan, cada comando cae a una navegación normal y nadie se entera de que
+// la mitad de la fase no está haciendo nada.
+const indicePath = join(DIST, 'indice.json');
+check('indice.json generado', existsSync(indicePath));
+const indice = existsSync(indicePath) ? JSON.parse(readFileSync(indicePath, 'utf8')) : {};
+check(
+  'el índice trae secciones, entradas y stack',
+  Array.isArray(indice.secciones) && indice.entradas && Array.isArray(indice.stack),
+);
+check(
+  'las entradas del índice son las mismas del sitio',
+  (indice.entradas?.proyectos || []).length === 2 &&
+    (indice.entradas?.publicaciones || []).length === 1,
+);
+
+// El prototipo tenía href reales y ningún pushState: navegar dejaba la URL en
+// la portada, así que nada era compartible ni indexable.
+check('la navegación cambia la URL', /pushState/.test(js));
+check('el botón atrás está atendido', /popstate/.test(js));
+check(
+  'el estado inicial entra al historial',
+  /replaceState/.test(js),
+  'sin él, el primer «atrás» tras navegar no tiene a dónde volver',
+);
+
+// Escribir sin saber qué se puede escribir es la barrera de entrada de
+// cualquier terminal.
+check('completado con Tab', /Tab/.test(js));
+check('historial con las flechas', /ArrowUp/.test(js) && /ArrowDown/.test(js));
+check('atajos de sección', /altKey/.test(js));
+
+// El historial de comandos es de la sesión, no un dato que valga la pena
+// conservar entre visitas.
+check('el historial usa almacenamiento de sesión', /sessionStorage/.test(js));
+check('sin almacenamiento persistente', !/localStorage/.test(js));
+
+// La terminal se apoya en el índice, pero la página tiene que servir igual si
+// ese índice no llega.
+check(
+  'la terminal cae a navegación normal sin el índice',
+  /location\.href/.test(js),
+  'si el índice falla, el servidor renderiza igual cada URL',
+);
+
+// El script vive en un .ts para que la verificación de tipos lo alcance. Dentro
+// de un .astro no lo revisa nadie.
+check('la terminal es un módulo aparte', existsSync('src/scripts/terminal.ts'));
+const tsScript = existsSync('src/scripts/terminal.ts')
+  ? readFileSync('src/scripts/terminal.ts', 'utf8')
+  : '';
+check(
+  'el componente no lleva lógica suelta',
+  readFileSync('src/components/Terminal.astro', 'utf8').includes("import '../scripts/terminal'"),
+);
+// Un `!` apaga la comprobación justo donde hace falta.
+const bangs = tsScript.match(/\w!\.|\w!\)/g) || [];
+check('sin aserciones que apaguen la verificación', bangs.length === 0, bangs.join(' '));
+
+// El proyecto va en español neutro, en el producto y en la conversación.
+const voseo = /\bprobá\b|\bmirá\b|\bfijate\b|\btenés\b|\bpodés\b|\bhacé\b|\bescribí\b/i;
+check('sin voseo en la interfaz', !voseo.test(tsScript) && !voseo.test(html));
+
 console.log('\nBlindaje');
 // Cloudflare Pages sirve las cabeceras desde este archivo. Si no viaja dentro
 // de dist/, el sitio se despliega sin ninguna protección y responde igual.
