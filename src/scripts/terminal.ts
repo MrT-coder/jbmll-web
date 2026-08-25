@@ -9,7 +9,6 @@ import { renderSecciones, renderEntradas, renderStack } from '../lib/render';
 
 const nodoScroll = document.getElementById('scroll');
 const nodoTerm = document.getElementById('term');
-const salidaInicial = document.getElementById('salida');
 const stPath = document.getElementById('st-path');
 const stClock = document.getElementById('st-clock');
 const tabs = document.getElementById('tabs');
@@ -31,6 +30,10 @@ const SECCIONES: string[] = [...(tabs?.querySelectorAll('a') ?? [])].map((a) =>
 
 /** Sección montada. Cambia al navegar sin recargar. */
 let aqui = term.dataset.seccion ?? '';
+
+// La pantalla tal como la entregó el servidor: arranque, banner y primera
+// salida. Se guarda antes de que el prompt la toque, para poder volver a ella.
+const pantallaInicial = scroll.innerHTML;
 let indice: Indice | null = null;
 
 const el = <K extends keyof HTMLElementTagNameMap>(
@@ -146,20 +149,26 @@ const completables = (): string[] => [
  * navegación normal. El servidor ya sabe renderizar cualquiera de estas URLs.
  */
 function navegar(seccion: string, empujar = true): boolean {
-  if (!indice) {
-    location.href = seccion ? '/' + seccion : '/';
-    return true;
-  }
-  const html = seccion ? renderEntradas(indice.entradas[seccion] ?? []) : renderSecciones(indice.secciones);
+  const url = seccion ? '/' + seccion : '/';
+
+  // Sin índice no hay nada que renderizar acá. El servidor sabe hacerlo.
+  if (!indice) return irFuera(url);
+
+  // Una sección de tipo página no es una lista: su contenido son bloques con
+  // experiencia, formación o datos de contacto, y eso lo arma el servidor. Solo
+  // las colecciones se pueden listar en el cliente.
+  const meta = indice.secciones.find((s) => s.slug === seccion);
+  if (seccion && meta?.tipo !== 'coleccion') return irFuera(url);
+
+  // La salida se AÑADE debajo, como en cualquier terminal. Reemplazar el bloque
+  // de arriba deja al usuario mirando un prompt donde no pasó nada.
+  push(fragmento(seccion ? renderEntradas(indice.entradas[seccion] ?? []) : renderSecciones(indice.secciones)));
 
   aqui = seccion;
   term.dataset.seccion = seccion;
-  if (salidaInicial) salidaInicial.innerHTML = html;
-  else push(fragmento(html));
-
   if (stPath) stPath.textContent = seccion ? `~/${seccion}` : '~/';
   marcarTabs();
-  if (empujar) history.pushState({ seccion }, '', seccion ? '/' + seccion : '/');
+  if (empujar) history.pushState({ seccion }, '', url);
   return true;
 }
 
@@ -268,8 +277,10 @@ function exec(raw: string): boolean {
     case 'c':
     case 'clear':
     case 'cls':
-      scroll.replaceChildren();
-      return true;
+      // En una terminal `clear` deja la pantalla vacía. Acá no: una pantalla
+      // negra sin nada no es una función, es un callejón sin salida para quien
+      // llegó a un sitio web. Vuelve al inicio, que es de donde se parte.
+      return reiniciar();
 
     case 'g':
     case 'github':
@@ -284,6 +295,21 @@ function exec(raw: string): boolean {
       line('fg-dim', "Escriba 'help', o pulse Tab para ver qué hay.");
       return false;
   }
+}
+
+/**
+ * Vuelve al inicio: la portada, con su arranque y su listado. Desde otra URL
+ * hace falta pedirla al servidor, que es quien tiene ese HTML.
+ */
+function reiniciar(): boolean {
+  if (location.pathname !== '/') return irFuera('/');
+  scroll.innerHTML = pantallaInicial;
+  aqui = '';
+  term.dataset.seccion = '';
+  if (stPath) stPath.textContent = '~/';
+  marcarTabs();
+  term.scrollTop = 0;
+  return true;
 }
 
 function run() {

@@ -46,6 +46,7 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
 ---
 
 <nav class="tabs" id="tabs" aria-label="Secciones">
+  <a class="marca" href="/" aria-label="Volver al inicio">JBMLL</a>
   {
     SECCIONES.map((s, i) => (
       <a href={`/${s.slug}`} aria-current={s.slug === seccion ? 'page' : undefined} title={s.desc}>
@@ -128,7 +129,11 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
   /* Navegación visible aparte de la terminal: quien llega de un buscador no
      tiene por qué saber que puede escribir. */
   .tabs {
+    /* Sin flex-shrink: 0 el navegador le quita alto cuando falta espacio, y el
+       header aparece cortado por la mitad. */
+    flex: 0 0 auto;
     display: flex;
+    align-items: center;
     gap: 0;
     border-bottom: 1px solid var(--line);
     padding: 0 1rem;
@@ -156,6 +161,21 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
   .tabs a[aria-current='page'] {
     color: var(--green);
     border-bottom-color: var(--green);
+  }
+
+  .marca {
+    padding: 0.45rem 1.4ch 0.45rem 0;
+    margin-right: 0.6ch;
+    border-right: 1px solid var(--line);
+    color: var(--green);
+    font-weight: 700;
+    text-decoration: none;
+    letter-spacing: 0.06em;
+  }
+
+  .marca:hover,
+  .marca:focus-visible {
+    color: var(--fg);
   }
 
   .tabs .num {
@@ -281,6 +301,7 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
 
   .status {
     flex: 0 0 auto;
+    flex: 0 0 auto;
     background: var(--panel);
     border-top: 1px solid var(--line);
     font-size: 0.82em;
@@ -315,6 +336,7 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
 
   /* Debajo de la statusline y no dentro: lo legal tiene que ser rastreable. */
   .foot {
+    flex: 0 0 auto;
     flex: 0 0 auto;
     background: var(--bg);
     border-top: 1px solid var(--line);

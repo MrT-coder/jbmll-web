@@ -53,8 +53,8 @@ const proyectos = defineCollection({
     st: z.array(z.string()).min(1),
     kw: z.array(z.string()).default([]),
 
-    repo: z.string().url().optional(),
-    demo: z.string().url().optional(),
+    repo: z.url().optional(),
+    demo: z.url().optional(),
     destacado: z.boolean().default(false),
     borrador: z.boolean().default(false),
   }),
@@ -72,7 +72,7 @@ const publicaciones = defineCollection({
     editorial: z.string().optional(),
     paginas: z.string().optional(),
     doi: z.string().optional(),
-    url: z.string().url().optional(),
+    url: z.url().optional(),
 
     // El trabajo que dio origen al artículo. Igual que en experiencia, el
     // stack se hereda de ahí y no se vuelve a contar.
@@ -107,7 +107,7 @@ const certificaciones = defineCollection({
     fecha: mes.optional(),
     horas: z.number().int().positive().optional(),
     credencial: z.string().optional(),
-    url: z.string().url().optional(),
+    url: z.url().optional(),
     tipo: z.enum(['certificacion', 'curso']).default('certificacion'),
   }),
 });

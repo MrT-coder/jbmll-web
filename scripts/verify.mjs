@@ -351,6 +351,34 @@ check('sin aserciones que apaguen la verificación', bangs.length === 0, bangs.j
 const voseo = /\bprobá\b|\bmirá\b|\bfijate\b|\btenés\b|\bpodés\b|\bhacé\b|\bescribí\b/i;
 check('sin voseo en la interfaz', !voseo.test(tsScript) && !voseo.test(html));
 
+// Sin una marca en el header no hay forma de volver al inicio sin escribir un
+// comando, y quien llega de un buscador no sabe que puede escribir.
+check('el header lleva marca de vuelta al inicio', /class="marca"[^>]*href="\/"/.test(html));
+
+// Sin flex-shrink: 0 el navegador le quita alto al header cuando falta espacio,
+// y las letras aparecen cortadas por la mitad.
+check(
+  'el header no puede encogerse',
+  /\.tabs[^{]*\{[^}]*flex:\s*(none|0\s+0\s+auto)/.test(css),
+  'el minificador escribe `flex: none` donde el fuente dice `0 0 auto`',
+);
+
+// `clear` en una terminal vacía la pantalla. En un sitio web eso deja al
+// visitante en un callejón sin salida, así que vuelve al inicio.
+check(
+  'clear vuelve al inicio, no al vacío',
+  /function reiniciar/.test(tsScript) && !/scroll\.replaceChildren/.test(tsScript),
+  'los nombres locales no sobreviven al minificado: se comprueba en el fuente',
+);
+
+// Una sección de tipo página no es una lista: su contenido lo arma el servidor.
+// Renderizarla en el cliente deja un prompt donde no pasó nada.
+check(
+  'solo las colecciones se listan en el cliente',
+  /tipo !== 'coleccion'/.test(tsScript) && /coleccion/.test(js),
+  'una sección de tipo página tiene que navegarse de verdad',
+);
+
 console.log('\nBlindaje');
 // Cloudflare Pages sirve las cabeceras desde este archivo. Si no viaja dentro
 // de dist/, el sitio se despliega sin ninguna protección y responde igual.
