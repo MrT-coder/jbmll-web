@@ -1,6 +1,6 @@
 /* Verifica el sitio compilado. Cada comprobación existe por un fallo real, y
  * todos fallaban en silencio. El detalle, en el README. */
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DIST = 'dist';
@@ -476,7 +476,11 @@ const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);
 console.log('  html  ' + kb(htmlSize));
 console.log('  css   ' + kb(Buffer.byteLength(css)));
-console.log('  fuentes ' + kb(41516));
+const pesoFuentes = readdirSync(join(DIST, 'fonts'))
+  .filter((f) => f.endsWith('.woff2'))
+  .reduce((n, f) => n + statSync(join(DIST, 'fonts', f)).size, 0);
+console.log('  fuentes ' + kb(pesoFuentes));
+check('las fuentes por debajo de 80 KB', pesoFuentes < 80 * 1024, kb(pesoFuentes));
 check('html por debajo de 50 KB', htmlSize < 50 * 1024, kb(htmlSize));
 
 console.log(fails ? '\n' + fails + ' FALLAS\n' : '\ntodo verde\n');
