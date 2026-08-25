@@ -237,3 +237,15 @@
     font-size: 1.55em;
   }
 }
+
+/* La prosa de una página singular acompaña a los bloques de datos, no es el
+   artículo entero: menos aire arriba y sin el ritmo de un texto largo. */
+.prose.intro {
+  margin-top: 1.2rem;
+  font-size: 1em;
+  line-height: 1.75;
+}
+
+.prose.intro > * + * {
+  margin-top: 1em;
+}

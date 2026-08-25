@@ -211,3 +211,15 @@ export function vecinos<T extends { id: string }>(
     siguiente: coleccion[i + 1] ?? null,
   };
 }
+
+export type Pagina = CollectionEntry<'paginas'>;
+
+/**
+ * Una página singular por su identificador. La prosa se escribe en Markdown y
+ * los bloques de datos los arma el sitio: así lo libre se escribe libre y lo
+ * que se calcula no se puede desincronizar a mano.
+ */
+export async function getPagina(id: string): Promise<Pagina | null> {
+  const todas = await getCollection('paginas');
+  return todas.find((p) => p.id === id) ?? null;
+}

@@ -94,6 +94,17 @@ const educacion = defineCollection({
   }),
 });
 
+// Las páginas: sobre-mí y contacto. Su prosa se escribe en Markdown y sus
+// bloques de datos los arma el sitio. Separarlos deja escribir libre lo que es
+// libre, sin poder desincronizar lo que se calcula.
+const paginas = defineCollection({
+  loader: base('paginas'),
+  schema: z.object({
+    titulo: z.string(),
+    desc: z.string(),
+  }),
+});
+
 // Nueve entradas de una línea, sin cuerpo. Nueve archivos sueltos serían nueve
 // oportunidades de escribir el frontmatter distinto.
 const certificaciones = defineCollection({
@@ -113,6 +124,7 @@ const certificaciones = defineCollection({
 });
 
 export const collections = {
+  paginas,
   experiencia,
   proyectos,
   publicaciones,

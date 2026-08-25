@@ -246,3 +246,21 @@ a.go:focus-visible {
   background: var(--sel);
   color: var(--fg);
 }
+
+/* Icono de tecnología: un carácter de la Nerd Font, no una imagen. Hereda el
+   color del texto, que es lo que lo hace parte de la terminal y no un adorno
+   pegado encima. */
+.ico {
+  display: inline-block;
+  width: 2.2ch;
+  color: var(--cyan);
+}
+
+/* La barra mide usos contados. No es una escala de dominio: ese número no
+   existe en ningún dato. */
+.stack td.bar {
+  color: var(--green);
+  letter-spacing: -0.1em;
+  padding-right: 1.2ch;
+  white-space: nowrap;
+}

@@ -1,7 +1,9 @@
 ---
 import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
+import { render } from 'astro:content';
 import {
+  getPagina,
   getPerfil,
   getExperiencia,
   getEducacion,
@@ -10,14 +12,19 @@ import {
   MINIMO_PARA_PAGINA_DE_STACK,
 } from '../lib/content';
 import { renderStack, slugTech } from '../lib/render';
+import { iconoDe } from '../data/iconos';
 
 const perfil = getPerfil();
-const [experiencia, educacion, certificaciones, stack] = await Promise.all([
+const [pagina, experiencia, educacion, certificaciones, stack] = await Promise.all([
+  getPagina('sobre-mi'),
   getExperiencia(),
   getEducacion(),
   getCertificaciones(),
   getStack(),
 ]);
+
+// La prosa la escribe el Markdown; los bloques de abajo salen de los datos.
+const Prosa = pagina ? (await render(pagina)).Content : null;
 
 // Experiencia, certificaciones y educación son colecciones separadas en los
 // datos y bloques de una sola página en la vista. El día que crezcan se
@@ -33,6 +40,7 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
     <section class="bloque">
       <h1 class="out lead">{perfil.nombre}</h1>
       <p class="out note"># {perfil.titular} · {perfil.ubicacion}</p>
+      {Prosa && <div class="prose intro"><Prosa /></div>}
     </section>
 
     <section class="bloque" id="stack">
@@ -60,7 +68,7 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
                 {e.data.st.map((t) => (
                   <li>
                     <a class="chip" href={`/stack/${slugTech(t)}`}>
-                      {t}
+                      <span class="ico" aria-hidden="true">{iconoDe(t)}</span>{t}
                     </a>
                   </li>
                 ))}

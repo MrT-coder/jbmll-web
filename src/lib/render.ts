@@ -1,4 +1,5 @@
 import type { Fila, Indice, Seccion, UsoDeStack } from './tipos';
+import { iconoDe } from '../data/iconos';
 
 // Funciones puras: entran datos, sale HTML. No tocan el DOM ni leen nada.
 //
@@ -73,20 +74,35 @@ export function renderEntradas(filas: Fila[]): string {
  * cuentas es un stack que hay que creer; este se puede comprobar.
  */
 export function renderStack(stack: UsoDeStack[], minimoParaPagina = 2): string {
+  // La barra mide usos contados, no dominio autodeclarado. Un porcentaje de
+  // «nivel» no sale de ningún dato: lo pone quien escribe y nadie puede
+  // comprobarlo. Esto sí — cada barra enlaza a dónde se usó.
+  const tope = Math.max(1, ...stack.map((s) => s.usos));
+
   const filas = stack
     .map((s) => {
-      const nombre =
-        s.usos >= minimoParaPagina
-          ? `<a class="go" href="/stack/${esc(slugTech(s.tech))}">${esc(s.tech)}</a>`
-          : esc(s.tech);
+      const conPagina = s.usos >= minimoParaPagina;
+      const url = `/stack/${esc(slugTech(s.tech))}`;
+      const nombre = conPagina
+        ? `<a class="go" href="${url}">${esc(s.tech)}</a>`
+        : esc(s.tech);
+
+      // aria-hidden: el icono es decorativo y su nombre ya está al lado. Un
+      // lector de pantalla leería el codepoint del Área de Uso Privado, que no
+      // significa nada.
+      const icono = `<span class="ico" aria-hidden="true">${esc(iconoDe(s.tech))}</span>`;
+      const barra = '█'.repeat(Math.max(1, Math.round((s.usos / tope) * 8)));
       const fuentes = s.fuentes.map((f) => esc(f.titulo)).join(' · ');
+
       return `<tr>
-    <td class="n">${nombre}</td>
+    <td class="n">${icono}${nombre}</td>
+    <td class="bar" title="${s.usos} ${s.usos === 1 ? 'uso' : 'usos'}">${barra}</td>
     <td class="c">${s.usos}</td>
     <td class="d">${fuentes}</td>
   </tr>`;
     })
     .join('\n');
+
   return `<table class="list stack">\n${filas}\n</table>`;
 }
 

@@ -227,6 +227,58 @@ check(
   `enlace ${wa} · visible ${visible}`,
 );
 
+console.log('\nStack visual');
+const sm = leer('sobre-mi.html');
+
+// La barra mide usos contados. Un porcentaje de dominio no sale de ningún dato:
+// lo pone quien escribe y nadie puede comprobarlo.
+const barras = [...sm.matchAll(/<td class="bar"[^>]*title="(\d+) usos?"[^>]*>(█+)</g)].map(
+  (m) => ({ usos: Number(m[1]), largo: m[2].length }),
+);
+check('el stack se dibuja con barras', barras.length > 0, `${barras.length} filas`);
+check(
+  'la barra es proporcional a los usos contados',
+  barras.length > 0 &&
+    barras.every((b) => b.largo >= 1) &&
+    new Set(barras.map((b) => `${b.usos}:${b.largo}`)).size ===
+      new Set(barras.map((b) => b.usos)).size,
+  'a igual número de usos, igual largo de barra',
+);
+// Si alguna vez aparece un porcentaje, es que el número se inventó.
+check('sin porcentajes de dominio', !/\b\d{1,3}\s*%/.test(sm), 'ese número no sale de ningún dato');
+
+// Los iconos son caracteres de la fuente empaquetada, no imágenes: no tocan
+// img-src, escalan y heredan el color del texto.
+check('los iconos son texto, no imágenes', /class="ico"/.test(sm) && !/<img/.test(sm));
+check('los iconos no los lee un lector de pantalla', /class="ico" aria-hidden="true"/.test(sm));
+
+// Un codepoint del Área de Uso Privado que no esté en la fuente sale como
+// cuadrado vacío, y nada avisa.
+const declarados = [
+  ...readFileSync('src/data/iconos.ts', 'utf8').matchAll(/\\u([0-9A-Fa-f]{4})/g),
+].map((m) => parseInt(m[1], 16));
+check('hay iconos declarados', declarados.length > 0, `${declarados.length}`);
+const usadosEnHtml = [...sm.matchAll(/<span class="ico"[^>]*>(.)</g)].map((m) =>
+  m[1].codePointAt(0),
+);
+check(
+  'todo icono que se pinta está declarado',
+  usadosEnHtml.every((c) => declarados.includes(c)),
+  'un codepoint sin glifo sale como cuadrado vacío',
+);
+
+console.log('\nPáginas en Markdown');
+// La prosa se escribe libre; los bloques de datos los arma el sitio. Así lo que
+// se calcula no se puede desincronizar escribiéndolo a mano.
+check('la prosa de sobre-mí viene de un Markdown', existsSync('src/content/paginas/sobre-mi.md'));
+check('la de contacto también', existsSync('src/content/paginas/contacto.md'));
+check('la prosa llega procesada al HTML', /class="prose intro"/.test(sm));
+check(
+  'el stack sigue saliendo de los datos, no del Markdown',
+  !readFileSync('src/content/paginas/sobre-mi.md', 'utf8').includes('█'),
+  'si el Markdown dibujara el stack, dejaría de contarse solo',
+);
+
 console.log('\nLector');
 const art = leer('proyectos/estudio-juridico.html');
 check('la página de artículo se genera', art.length > 0);

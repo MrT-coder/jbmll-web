@@ -1,10 +1,13 @@
 ---
 import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
-import { getPerfil } from '../lib/content';
+import { render } from 'astro:content';
+import { getPagina, getPerfil } from '../lib/content';
 import { renderContacto } from '../lib/render';
 
 const perfil = getPerfil();
+const pagina = await getPagina('contacto');
+const Prosa = pagina ? (await render(pagina)).Content : null;
 ---
 
 <Base
@@ -12,6 +15,7 @@ const perfil = getPerfil();
   description="Correo, WhatsApp, GitHub, LinkedIn y ORCID de Josue Bladimir Morales Llanganate."
 >
   <Terminal seccion="contacto" salida={renderContacto(perfil.contacto)}>
+    {Prosa && <div class="prose intro"><Prosa /></div>}
     <p class="out note"># {perfil.ubicacion} · {perfil.disponibilidad}</p>
   </Terminal>
 </Base>
