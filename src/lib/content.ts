@@ -1,6 +1,7 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { perfil, enlacesDeContacto } from '../data/perfil';
-import type { Fila, Indice, Seccion, TipoDeSeccion, UsoDeStack } from './tipos';
+import type { Fila, Indice, Seccion, Tech, TipoDeSeccion, UsoDeStack } from './tipos';
+import { slugTech } from './render';
 
 // La única puerta a los datos. Todo el sitio lee por aquí y nada más sabe de
 // dónde sale el contenido. Cambiar los archivos por D1 es reescribir este
@@ -121,6 +122,22 @@ export async function getStackConPagina(): Promise<UsoDeStack[]> {
   return stack.filter((s) => s.usos >= MINIMO_PARA_PAGINA_DE_STACK);
 }
 
+/**
+ * Las tecnologías con página propia, como conjunto de nombres. Es la única
+ * fuente de verdad sobre si un chip de tecnología enlaza: `panel()`,
+ * `sobre-mi.astro` y `proyectos/[slug].astro` pintaban ese mismo chip cada
+ * uno por su cuenta, y por eso enlazaban a páginas que `getStaticPaths` de
+ * `/stack/[tech]` nunca generó.
+ */
+export async function getTechsConPagina(): Promise<Set<string>> {
+  const stack = await getStackConPagina();
+  return new Set(stack.map((s) => s.tech));
+}
+
+function techDe(tech: string, conPagina: Set<string>): Tech {
+  return { tech, href: conPagina.has(tech) ? `/stack/${slugTech(tech)}` : null };
+}
+
 // ── El índice ───────────────────────────────────────────────────────────────
 // La proyección plana que consume el renderizador. Se define aquí, junto a los
 // datos, porque decidir qué entra en la vista es decidir sobre los datos.
@@ -132,7 +149,7 @@ export const SECCIONES: { slug: string; desc: string; tipo: TipoDeSeccion }[] = 
   { slug: 'contacto', desc: 'dónde encontrarme', tipo: 'pagina' },
 ];
 
-function filaDeProyecto(p: Proyecto): Fila {
+function filaDeProyecto(p: Proyecto, conPagina: Set<string>): Fila {
   const estados: Record<string, string> = {
     produccion: 'en producción',
     activo: 'activo',
@@ -144,7 +161,7 @@ function filaDeProyecto(p: Proyecto): Fila {
     titulo: p.data.titulo,
     desc: p.data.desc,
     href: `/proyectos/${p.id}`,
-    st: [...p.data.st],
+    st: p.data.st.map((tech) => techDe(tech, conPagina)),
     kw: [...p.data.kw],
     meta: [estados[p.data.estado], p.data.organizacion, p.data.fecha]
       .filter(Boolean)
@@ -172,15 +189,16 @@ function filaDePublicacion(pub: Publicacion): Fila {
 }
 
 export async function getIndice(): Promise<Indice> {
-  const [proyectos, publicaciones, stack] = await Promise.all([
+  const [proyectos, publicaciones, stack, conPagina] = await Promise.all([
     getProyectos(),
     getPublicaciones(),
     getStack(),
+    getTechsConPagina(),
   ]);
 
   const entradas: Record<string, Fila[]> = {
     'sobre-mi': [],
-    proyectos: proyectos.map(filaDeProyecto),
+    proyectos: proyectos.map((p) => filaDeProyecto(p, conPagina)),
     publicaciones: publicaciones.map(filaDePublicacion),
     contacto: [],
   };

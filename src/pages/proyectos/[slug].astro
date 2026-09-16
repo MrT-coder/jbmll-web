@@ -3,20 +3,20 @@ import type { InferGetStaticPropsType } from 'astro';
 import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import Terminal from '../../components/Terminal.astro';
-import { getProyectos, vecinos } from '../../lib/content';
+import { getProyectos, getTechsConPagina, vecinos } from '../../lib/content';
 import { slugTech } from '../../lib/render';
 
 export const getStaticPaths = async () => {
-  const proyectos = await getProyectos();
+  const [proyectos, conPagina] = await Promise.all([getProyectos(), getTechsConPagina()]);
   return proyectos.map((p) => ({
     params: { slug: p.id },
-    props: { proyecto: p, ...vecinos(proyectos, p.id) },
+    props: { proyecto: p, conPagina, ...vecinos(proyectos, p.id) },
   }));
 };
 
 type Props = InferGetStaticPropsType<typeof getStaticPaths>;
 
-const { proyecto, anterior, siguiente } = Astro.props;
+const { proyecto, conPagina, anterior, siguiente } = Astro.props;
 
 // El cuerpo lo procesa Astro al compilar. Al navegador no llega ni un byte de
 // analizador de Markdown.
@@ -35,9 +35,13 @@ const meta = [proyecto.data.organizacion, proyecto.data.fecha].filter(Boolean).j
         {
           proyecto.data.st.map((t) => (
             <li>
-              <a class="chip" href={`/stack/${slugTech(t)}`}>
-                {t}
-              </a>
+              {conPagina.has(t) ? (
+                <a class="chip" href={`/stack/${slugTech(t)}`}>
+                  {t}
+                </a>
+              ) : (
+                <span class="chip">{t}</span>
+              )}
             </li>
           ))
         }

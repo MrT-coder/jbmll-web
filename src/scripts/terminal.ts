@@ -381,8 +381,13 @@ input.addEventListener('keydown', (ev) => {
   }
 
   if (ev.key === 'Tab') {
-    ev.preventDefault();
+    // Shift+Tab nunca completa: siempre sale hacia atrás. Con el input vacío
+    // tampoco hay nada que completar, así que Tab se comporta como Tab normal
+    // y deja salir el foco hacia los enlaces de la página. Una terminal que se
+    // queda con la tecla y no devuelve nada deja fuera a quien no usa ratón.
     const v = input.value.trim();
+    if (ev.shiftKey || !v) return;
+    ev.preventDefault();
     const opciones = completables().filter((c) => c.startsWith(v));
     if (!opciones.length) return;
     // Con una sola opción, completar. Con varias, el prefijo común: es lo que

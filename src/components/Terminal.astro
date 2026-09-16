@@ -301,7 +301,6 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
 
   .status {
     flex: 0 0 auto;
-    flex: 0 0 auto;
     background: var(--panel);
     border-top: 1px solid var(--line);
     font-size: 0.82em;
@@ -327,8 +326,12 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
   .status .seg.path {
     color: var(--blue);
   }
+  /* --muted y no --dim: esta barra tiene fondo --panel, que es más claro que
+     --bg, y ahí --dim se queda en 4.18:1. Sobre --panel no hay sitio para un
+     cuarto nivel de gris sin bajar de 4.5:1, así que el reloj comparte el
+     tono del resto de segmentos en lugar de ser más tenue que ellos. */
   .status .seg.right {
-    color: var(--dim);
+    color: var(--muted);
   }
   .spacer {
     flex: 1 1 auto;

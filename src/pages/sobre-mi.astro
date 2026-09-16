@@ -9,18 +9,20 @@ import {
   getEducacion,
   getCertificaciones,
   getStack,
+  getTechsConPagina,
   MINIMO_PARA_PAGINA_DE_STACK,
 } from '../lib/content';
 import { renderStack, slugTech } from '../lib/render';
 import { iconoDe } from '../data/iconos';
 
 const perfil = getPerfil();
-const [pagina, experiencia, educacion, certificaciones, stack] = await Promise.all([
+const [pagina, experiencia, educacion, certificaciones, stack, conPagina] = await Promise.all([
   getPagina('sobre-mi'),
   getExperiencia(),
   getEducacion(),
   getCertificaciones(),
   getStack(),
+  getTechsConPagina(),
 ]);
 
 // La prosa la escribe el Markdown; los bloques de abajo salen de los datos.
@@ -67,9 +69,15 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
               <ul class="chips">
                 {e.data.st.map((t) => (
                   <li>
-                    <a class="chip" href={`/stack/${slugTech(t)}`}>
-                      <span class="ico" aria-hidden="true">{iconoDe(t)}</span>{t}
-                    </a>
+                    {conPagina.has(t) ? (
+                      <a class="chip" href={`/stack/${slugTech(t)}`}>
+                        <span class="ico" aria-hidden="true">{iconoDe(t)}</span>{t}
+                      </a>
+                    ) : (
+                      <span class="chip">
+                        <span class="ico" aria-hidden="true">{iconoDe(t)}</span>{t}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ul>
