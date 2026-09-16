@@ -3,9 +3,12 @@ import '../styles/terminal.css';
 import bannerRaw from '../data/banner.txt?raw';
 import { SECCIONES } from '../lib/content';
 import { esc } from '../lib/render';
+import Sidebar from './Sidebar.astro';
+import Statusline from './Statusline.astro';
+import type { DocumentoAbierto } from '../lib/tipos';
 
 interface Props {
-  /** Sección montada, o null en la raíz. Decide la ruta y la pestaña activa. */
+  /** Sección montada, o null en la raíz. Decide la ruta y el workspace activo. */
   seccion?: string | null;
   /** Salida inicial, ya renderizada por src/lib/render.ts. */
   salida?: string;
@@ -13,9 +16,15 @@ interface Props {
   boot?: boolean;
   /** Frase de encabezado, cuando la página tiene algo que decir antes. */
   lead?: string;
+  /** True en una página de detalle: el workspace de `seccion` es su padre, no
+   * su propia raíz. Decide si la barra lateral marca `location` o `page`. */
+  detalle?: boolean;
+  /** El documento propio, en una página de detalle. La barra lateral lo sirve
+   * como el único «leyendo» en abiertos, sin depender de JavaScript. */
+  documento?: DocumentoAbierto | null;
 }
 
-const { seccion = null, salida = '', boot = false, lead } = Astro.props;
+const { seccion = null, salida = '', boot = false, lead, detalle = false, documento = null } = Astro.props;
 
 // Los espacios finales son parte del dibujo y los editores los borran, así que
 // el ancho se restituye acá. El \r se limpia por finales de línea de Windows.
@@ -43,80 +52,68 @@ const ruta = seccion ? `~/${seccion}` : '~/';
 // El comando que dejó la pantalla así. Se muestra ejecutado, no se ejecuta:
 // quien llega desde un buscador ve la terminal en el estado de esa URL.
 const comando = seccion ? `cd ${seccion}` : 'ls';
+
+// El valor sin JavaScript para la statusline: el servidor solo conoce el
+// documento propio de esta página, si lo hay. sidebar.ts lo corrige apenas
+// fusiona la lista con lo que había en la sesión.
+const abiertosSsr = documento ? 1 : 0;
 ---
 
-<nav class="tabs" id="tabs" aria-label="Secciones">
-  <a class="marca" href="/" aria-label="Volver al inicio">JBMLL</a>
-  {
-    SECCIONES.map((s, i) => (
-      <a href={`/${s.slug}`} aria-current={s.slug === seccion ? 'page' : undefined} title={s.desc}>
-        <span class="num">{i + 1}:</span>{s.slug}
-      </a>
-    ))
-  }
-</nav>
+<div class="shell">
+  <Sidebar actual={seccion} detalle={detalle} documento={documento} />
 
-<main class="term" id="term" tabindex="-1" data-brain={BRAIN} data-seccion={seccion ?? ''}>
-  <div class="wrap">
-    <div id="scroll" aria-live="polite">
-      {
-        boot && (
-          <div class="boot">
-            {BOOT.map(([t, msg]) => (
-              <div class="out">
-                <span class="t">[ {t} ] </span>{msg}
-                {msg === 'listo' && <span class="ok">  ok</span>}
-              </div>
-            ))}
-          </div>
-        )
-      }
-
-      {
-        boot && (
-          <div class="fetch">
-            <pre class="logo" aria-hidden="true">{banner}</pre>
-            <div class="info">
-              <p class="title">
-                <span class="u">josue</span><span class="at">@</span><span class="h">jbmll-web</span>
-              </p>
-              <div class="rule">{'─'.repeat(30)}</div>
-              <slot name="info" />
+  <main class="term" id="term" tabindex="-1" data-brain={BRAIN} data-seccion={seccion ?? ''} data-detalle={detalle ? '1' : ''}>
+    <div class="wrap">
+      <div id="scroll" aria-live="polite">
+        {
+          boot && (
+            <div class="boot">
+              {BOOT.map(([t, msg]) => (
+                <div class="out">
+                  <span class="t">[ {t} ] </span>{msg}
+                  {msg === 'listo' && <span class="ok">  ok</span>}
+                </div>
+              ))}
             </div>
-          </div>
-        )
-      }
+          )
+        }
 
-      {lead && <h1 class="out lead" set:html={lead} />}
+        {
+          boot && (
+            <div class="fetch">
+              <pre class="logo" aria-hidden="true">{banner}</pre>
+              <div class="info">
+                <p class="title">
+                  <span class="u">josue</span><span class="at">@</span><span class="h">jbmll-web</span>
+                </p>
+                <div class="rule">{'─'.repeat(30)}</div>
+                <slot name="info" />
+              </div>
+            </div>
+          )
+        }
 
-      <div class="out done">
-        <span class="brain ok">{BRAIN}</span><span class="typed">{comando}</span>
+        {lead && <h1 class="out lead" set:html={lead} />}
+
+        <div class="out done">
+          <span class="brain ok">{BRAIN}</span><span class="typed">{comando}</span>
+        </div>
+
+        <div id="salida" set:html={salida}></div>
+
+        <slot />
+        <div class="out sp"></div>
       </div>
-
-      <div id="salida" set:html={salida}></div>
-
-      <slot />
-      <div class="out sp"></div>
     </div>
-  </div>
-</main>
-
-<div class="status">
-  <div class="wrap">
-    <span class="mode">NORMAL</span>
-    <span class="seg path" id="st-path">{ruta}</span>
-    <span class="seg hide-sm">{SECCIONES.length} secciones</span>
-    <span class="spacer"></span>
-    <span class="seg right" id="st-clock">--:--</span>
-  </div>
+  </main>
 </div>
 
+<Statusline ruta={ruta} abiertos={abiertosSsr} />
+
 <footer class="foot">
-  <div class="wrap">
-    <span>© 2026 Josue Bladimir Morales Llanganate</span>
-    <span class="spacer"></span>
-    <a href="https://github.com/MrT-coder" rel="me noopener">github</a>
-  </div>
+  <span>© 2026 Josue Bladimir Morales Llanganate</span>
+  <span class="spacer"></span>
+  <a href="https://github.com/MrT-coder" rel="me noopener">github</a>
 </footer>
 
 <script>
@@ -126,67 +123,20 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
 </script>
 
 <style>
-  /* Navegación visible aparte de la terminal: quien llega de un buscador no
-     tiene por qué saber que puede escribir. */
-  .tabs {
-    /* Sin flex-shrink: 0 el navegador le quita alto cuando falta espacio, y el
-       header aparece cortado por la mitad. */
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 0;
-    border-bottom: 1px solid var(--line);
-    padding: 0 var(--space-5);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .tabs::-webkit-scrollbar {
-    display: none;
-  }
-
-  .tabs a {
-    padding: var(--space-3) 1.1ch;
-    color: var(--muted);
-    text-decoration: none;
-    white-space: nowrap;
-    border-bottom: 2px solid transparent;
-  }
-
-  .tabs a:hover,
-  .tabs a:focus-visible {
-    color: var(--fg);
-  }
-
-  .tabs a[aria-current='page'] {
-    color: var(--green);
-    border-bottom-color: var(--green);
-  }
-
-  .marca {
-    padding: var(--space-3) 1.4ch var(--space-3) 0;
-    margin-right: 0.6ch;
-    border-right: 1px solid var(--line);
-    color: var(--green);
-    font-weight: 700;
-    text-decoration: none;
-    letter-spacing: var(--tracking-wide);
-  }
-
-  .marca:hover,
-  .marca:focus-visible {
-    color: var(--fg);
-  }
-
-  .tabs .num {
-    color: var(--dim);
-    margin-right: 0.3ch;
-  }
-
   /* El comando que dejó la pantalla en este estado, mostrado ya ejecutado. */
   .done .brain {
     margin-right: 1ch;
     color: var(--green);
+  }
+
+  /* La barra lateral y el contenido, uno al lado del otro. Sin flex-shrink: 0
+     en .sidebar (ver sidebar.css) el navegador le quita ancho cuando falta
+     espacio, y el texto de cada workspace se aprieta hasta ser ilegible. */
+  .shell {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    overflow: hidden;
   }
 
   .term {
@@ -299,59 +249,25 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
     margin: 0;
   }
 
-  .status {
-    flex: 0 0 auto;
-    background: var(--panel);
-    border-top: 1px solid var(--line);
-    font-size: var(--text-xs);
-    white-space: nowrap;
-    overflow: hidden;
-  }
-  .status .wrap {
-    display: flex;
-    align-items: center;
-    padding: 0;
-  }
-  .status .mode {
-    background: var(--gold);
-    color: #06080f;
-    font-weight: 700;
-    padding: var(--space-2) var(--space-4);
-    letter-spacing: var(--tracking-wide);
-  }
-  .status .seg {
-    padding: var(--space-2) var(--space-4);
-    color: var(--muted);
-  }
-  .status .seg.path {
-    color: var(--blue);
-  }
-  /* --muted y no --dim: esta barra tiene fondo --panel, que es más claro que
-     --bg, y ahí --dim se queda en 4.18:1. Sobre --panel no hay sitio para un
-     cuarto nivel de gris sin bajar de 4.5:1, así que el reloj comparte el
-     tono del resto de segmentos en lugar de ser más tenue que ellos. */
-  .status .seg.right {
-    color: var(--muted);
-  }
+  /* La barra de estado vive en Statusline.astro: sus reglas están ahí. Este
+     .spacer es del pie de página, que sigue viviendo acá. */
   .spacer {
     flex: 1 1 auto;
   }
 
-  /* Debajo de la statusline y no dentro: lo legal tiene que ser rastreable. */
+  /* Debajo de la statusline y no dentro: lo legal tiene que ser rastreable.
+     A todo el ancho del visor, como la statusline: .wrap lo dejaba centrado
+     en una columna de 96ch, desalineado del resto de la maqueta. */
   .foot {
     flex: 0 0 auto;
-    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-5);
+    padding: var(--space-3) clamp(var(--space-4), 3vw, var(--space-7));
     background: var(--bg);
     border-top: 1px solid var(--line);
     font-size: var(--text-xs);
     color: var(--dim);
-  }
-  .foot .wrap {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-5);
-    padding-top: var(--space-3);
-    padding-bottom: var(--space-3);
   }
   .foot a {
     color: var(--dim);
@@ -365,8 +281,10 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
   }
 
   @media (max-width: 660px) {
-    .hide-sm {
-      display: none;
+    /* La barra lateral se apila arriba del contenido en vez de ir al costado:
+       a este ancho no hay sitio para las dos columnas. */
+    .shell {
+      flex-direction: column;
     }
     .fetch {
       gap: var(--space-6);
@@ -383,10 +301,6 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
   @media (hover: none) and (pointer: coarse) {
     .term {
       cursor: default;
-    }
-    .foot .wrap {
-      padding-top: var(--space-3);
-      padding-bottom: var(--space-3);
     }
   }
 </style>

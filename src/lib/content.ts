@@ -1,6 +1,6 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { perfil, enlacesDeContacto } from '../data/perfil';
-import type { Fila, Indice, Seccion, Tech, TipoDeSeccion, UsoDeStack } from './tipos';
+import type { Fila, Indice, Seccion, Tech, TipoDeSeccion, UsoDeStack, Workspace } from './tipos';
 import { slugTech } from './render';
 
 // La única puerta a los datos. Todo el sitio lee por aquí y nada más sabe de
@@ -148,6 +148,42 @@ export const SECCIONES: { slug: string; desc: string; tipo: TipoDeSeccion }[] = 
   { slug: 'publicaciones', desc: 'producción académica, con DOI', tipo: 'coleccion' },
   { slug: 'contacto', desc: 'dónde encontrarme', tipo: 'pagina' },
 ];
+
+// ── Barra lateral ────────────────────────────────────────────────────────────
+// Un único origen para la lista de workspaces: la barra lateral y cualquier
+// otra vista que necesite listar secciones leen de aquí, no escriben su propia
+// copia.
+
+export const WORKSPACES: Workspace[] = [
+  { slug: '', ruta: '/', nombre: '~' },
+  ...SECCIONES.map((s) => ({ slug: s.slug, ruta: `/${s.slug}`, nombre: s.slug })),
+];
+
+/**
+ * La segunda línea de cada workspace, como en herdr bajo cada repositorio. Los
+ * conteos salen del índice, nunca escritos a mano: así no se pueden
+ * desincronizar de lo que el sitio realmente lista.
+ */
+export function subtituloDeWorkspace(slug: string, indice: Indice): string {
+  switch (slug) {
+    case '':
+      return 'terminal';
+    case 'sobre-mi':
+      return 'whoami · stack';
+    case 'proyectos': {
+      const n = indice.entradas.proyectos?.length ?? 0;
+      return `${n} ${n === 1 ? 'proyecto' : 'proyectos'}`;
+    }
+    case 'publicaciones': {
+      const n = indice.entradas.publicaciones?.length ?? 0;
+      return `${n} ${n === 1 ? 'publicación' : 'publicaciones'}`;
+    }
+    case 'contacto':
+      return 'correo · github';
+    default:
+      return '';
+  }
+}
 
 function filaDeProyecto(p: Proyecto, conPagina: Set<string>): Fila {
   const estados: Record<string, string> = {

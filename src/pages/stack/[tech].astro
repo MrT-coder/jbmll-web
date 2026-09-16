@@ -21,7 +21,12 @@ const { uso } = Astro.props;
   title={`${uso.tech} — JBMLL`}
   description={`Dónde he usado ${uso.tech}: ${uso.usos} trabajos o proyectos.`}
 >
-  <Terminal seccion="sobre-mi" salida="">
+  <Terminal
+    seccion="sobre-mi"
+    salida=""
+    detalle
+    documento={{ href: `/stack/${slugTech(uso.tech)}`, titulo: uso.tech, tipo: 'stack' }}
+  >
     <article class="lectura">
       <h1 class="lectura-t">{uso.tech}</h1>
       <p class="lectura-m">{uso.usos} {uso.usos === 1 ? 'uso' : 'usos'}</p>

@@ -1,0 +1,67 @@
+---
+interface Props {
+  /** La ruta que muestra el segmento central: `~/` o `~/sección`. */
+  ruta: string;
+  /** Cuántos documentos hay abiertos en la sesión, para el segmento que se
+   * oculta en móvil. Es el valor sin JavaScript: 1 en una página de detalle,
+   * 0 en una de sección. sidebar.ts lo corrige apenas fusiona la sesión. */
+  abiertos: number;
+}
+
+const { ruta, abiertos } = Astro.props;
+const etiquetaAbiertos = `${abiertos} ${abiertos === 1 ? 'abierto' : 'abiertos'}`;
+---
+
+<div class="status">
+  <span class="mode">NORMAL</span>
+  <span class="seg path" id="st-path">{ruta}</span>
+  <span class="seg hide-sm" id="st-abiertos">{etiquetaAbiertos}</span>
+  <span class="spacer"></span>
+  <span class="seg right" id="st-clock">--:--</span>
+</div>
+
+<style>
+  /* A todo el ancho del visor, debajo de la barra lateral y del contenido —
+     no metida en la columna de lectura de .wrap, que la dejaba centrada y
+     desalineada del resto de la maqueta. */
+  .status {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .status .mode {
+    background: var(--gold);
+    color: #06080f;
+    font-weight: 700;
+    padding: var(--space-2) var(--space-4);
+    letter-spacing: var(--tracking-wide);
+  }
+  .status .seg {
+    padding: var(--space-2) var(--space-4);
+    color: var(--muted);
+  }
+  .status .seg.path {
+    color: var(--blue);
+  }
+  /* --muted y no --dim: esta barra tiene fondo --panel, que es más claro que
+     --bg, y ahí --dim se queda en 4.18:1. Sobre --panel no hay sitio para un
+     cuarto nivel de gris sin bajar de 4.5:1, así que el reloj comparte el
+     tono del resto de segmentos en lugar de ser más tenue que ellos. */
+  .status .seg.right {
+    color: var(--muted);
+  }
+  .spacer {
+    flex: 1 1 auto;
+  }
+
+  @media (max-width: 660px) {
+    .hide-sm {
+      display: none;
+    }
+  }
+</style>
