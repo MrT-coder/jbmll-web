@@ -484,10 +484,10 @@ for (const token of ['fg', 'muted', 'dim', 'prose']) {
 // 2026-09-15. Los tokens no se listan a mano: se leen de las propias reglas
 // .status, para que una regla nueva entre sola en la comprobación.
 const panel = leerToken('panel');
-const terminalAstro = readFileSync('src/components/Terminal.astro', 'utf8');
+const statuslineAstro = readFileSync('src/components/Statusline.astro', 'utf8');
 const tokensSobrePanel = [
   ...new Set(
-    (terminalAstro.match(/\.status[^{]*\{[^}]*\}/g) ?? [])
+    (statuslineAstro.match(/\.status[^{]*\{[^}]*\}/g) ?? [])
       .flatMap((regla) => [...regla.matchAll(/color:\s*var\(--([a-z0-9-]+)\)/g)])
       .map((m) => m[1]),
   ),
@@ -736,16 +736,218 @@ check('sin aserciones que apaguen la verificación', bangs.length === 0, bangs.j
 const voseo = /\bprobá\b|\bmirá\b|\bfijate\b|\btenés\b|\bpodés\b|\bhacé\b|\bescribí\b/i;
 check('sin voseo en la interfaz', !voseo.test(tsScript) && !voseo.test(html));
 
-// Sin una marca en el header no hay forma de volver al inicio sin escribir un
-// comando, y quien llega de un buscador no sabe que puede escribir.
-check('el header lleva marca de vuelta al inicio', /class="marca"[^>]*href="\/"/.test(html));
-
-// Sin flex-shrink: 0 el navegador le quita alto al header cuando falta espacio,
-// y las letras aparecen cortadas por la mitad.
+// Sin un enlace de vuelta al inicio en la barra lateral no hay forma de volver
+// sin escribir un comando, y quien llega de un buscador no sabe que puede
+// escribir. El workspace `~` es ese enlace.
 check(
-  'el header no puede encogerse',
-  /\.tabs[^{]*\{[^}]*flex:\s*(none|0\s+0\s+auto)/.test(css),
-  'el minificador escribe `flex: none` donde el fuente dice `0 0 auto`',
+  'la barra lateral lleva un enlace de vuelta al inicio',
+  /aria-label="Workspaces"[^>]*>[\s\S]*?href="\/"/.test(html),
+);
+
+// Sin flex-shrink: 0 el navegador le quita ancho a la barra lateral cuando
+// falta espacio, y el texto de cada workspace se aprieta hasta ser ilegible.
+check(
+  'la barra lateral no puede encogerse',
+  /\.sidebar[^{]*\{[^}]*flex:\s*0\s+0/.test(css),
+  'sin flex: 0 0 la barra se encoge junto con el contenido',
+);
+
+console.log('\nBarra lateral');
+// El header de pestañas se reemplazó por una barra lateral inspirada en herdr:
+// workspaces arriba, documentos abiertos abajo. Cada comprobación de acá existe
+// porque se escribió en rojo antes de implementar la barra, siguiendo TDD.
+
+const navSidebarSrc = '<nav[^>]*aria-label="Workspaces"[^>]*>[\\s\\S]*?<\\/nav>';
+const WORKSPACES_ESPERADOS = ['/', '/sobre-mi', '/proyectos', '/publicaciones', '/contacto'];
+
+function navsDeWorkspaces(contenido) {
+  return contenido.match(new RegExp(navSidebarSrc, 'g')) || [];
+}
+
+const navFaltanteOMultiple = [];
+const navOrdenIncorrecto = [];
+for (const archivo of paginasHtml) {
+  const contenido = readFileSync(archivo, 'utf8');
+  const navs = navsDeWorkspaces(contenido);
+  if (navs.length !== 1) {
+    navFaltanteOMultiple.push(`${relative(DIST, archivo)} (${navs.length})`);
+    continue;
+  }
+  const hrefs = [...navs[0].matchAll(/<a[^>]*\shref="([^"]+)"/g)].map((m) => m[1]).slice(0, 5);
+  if (JSON.stringify(hrefs) !== JSON.stringify(WORKSPACES_ESPERADOS)) {
+    navOrdenIncorrecto.push(`${relative(DIST, archivo)}: ${hrefs.join(' ')}`);
+  }
+}
+check(
+  'cada página tiene exactamente un nav[aria-label="Workspaces"]',
+  navFaltanteOMultiple.length === 0,
+  navFaltanteOMultiple.join(', '),
+);
+check(
+  'los 5 workspaces están en el orden y con las rutas correctas',
+  navOrdenIncorrecto.length === 0,
+  navOrdenIncorrecto.join(' · '),
+);
+
+function navWorkspacesDe(archivo) {
+  const contenido = leer(archivo);
+  return navsDeWorkspaces(contenido)[0] || '';
+}
+function actualesDe(navHtml) {
+  return [...navHtml.matchAll(/<a[^>]*\shref="([^"]+)"[^>]*\saria-current="(page|location)"/g)];
+}
+
+// El workspace actual: exactamente uno por página, y el correcto. Las páginas
+// de detalle marcan `location` sobre el workspace padre, no `page`: no son la
+// raíz de la sección, son un documento dentro de ella.
+const CASOS_ACTUAL = [
+  ['index.html', '/', 'page'],
+  ['sobre-mi.html', '/sobre-mi', 'page'],
+  ['proyectos.html', '/proyectos', 'page'],
+  ['proyectos/estudio-juridico.html', '/proyectos', 'location'],
+  ['stack/postgresql.html', '/sobre-mi', 'location'],
+  ['publicaciones.html', '/publicaciones', 'page'],
+  ['contacto.html', '/contacto', 'page'],
+];
+const actualMal = [];
+for (const [archivo, hrefEsperado, tipoEsperado] of CASOS_ACTUAL) {
+  const actuales = actualesDe(navWorkspacesDe(archivo));
+  const ok =
+    actuales.length === 1 && actuales[0][1] === hrefEsperado && actuales[0][2] === tipoEsperado;
+  if (!ok) {
+    actualMal.push(`${archivo}: ${actuales.map((a) => a[1] + '=' + a[2]).join(',') || 'ninguno'}`);
+  }
+}
+check(
+  'exactamente un workspace actual por página, y el correcto',
+  actualMal.length === 0,
+  actualMal.join(' · '),
+);
+
+// «Abiertos»: una página de detalle se sirve a sí misma como el único
+// «leyendo», sin depender de JavaScript. Una página de sección no tiene nada
+// que ofrecer todavía: el estado vacío.
+const abiertosListaSrc = '<ul[^>]*id="sidebar-abiertos-lista"[^>]*>[\\s\\S]*?<\\/ul>';
+function abiertosDe(archivo) {
+  return (leer(archivo).match(new RegExp(abiertosListaSrc)) || [])[0] || '';
+}
+
+const CASOS_DETALLE = ['proyectos/estudio-juridico.html', 'stack/postgresql.html'];
+const detalleMal = CASOS_DETALLE.filter((a) => {
+  const bloque = abiertosDe(a);
+  const items = (bloque.match(/<li/g) || []).length;
+  return items !== 1 || !/ab-actual/.test(bloque) || !/leyendo/.test(bloque);
+});
+check(
+  'una página de detalle se sirve como el único «leyendo» en abiertos',
+  detalleMal.length === 0,
+  detalleMal.join(', '),
+);
+
+const CASOS_SECCION = ['index.html', 'sobre-mi.html', 'proyectos.html', 'publicaciones.html', 'contacto.html'];
+const seccionMal = CASOS_SECCION.filter((a) => {
+  const bloque = abiertosDe(a);
+  return !/nada abierto/.test(bloque) || /ab-actual/.test(bloque);
+});
+check(
+  'una página de sección sirve el estado vacío de abiertos',
+  seccionMal.length === 0,
+  seccionMal.join(', '),
+);
+
+// Los conteos de cada subtítulo salen del índice, nunca escritos a mano: si se
+// separan, el sitio miente sin que nadie lo haya escrito.
+const nProyectosIdx = indice.entradas?.proyectos?.length ?? 0;
+const nPublicacionesIdx = indice.entradas?.publicaciones?.length ?? 0;
+const subProyectosEsperado = `${nProyectosIdx} ${nProyectosIdx === 1 ? 'proyecto' : 'proyectos'}`;
+const subPublicacionesEsperado = `${nPublicacionesIdx} ${nPublicacionesIdx === 1 ? 'publicación' : 'publicaciones'}`;
+const navInicio = navWorkspacesDe('index.html');
+check(
+  'el subtítulo de proyectos cuenta lo que hay en el índice',
+  navInicio.includes(subProyectosEsperado),
+  `se esperaba "${subProyectosEsperado}"`,
+);
+check(
+  'el subtítulo de publicaciones cuenta lo que hay en el índice',
+  navInicio.includes(subPublicacionesEsperado),
+  `se esperaba "${subPublicacionesEsperado}"`,
+);
+
+// El header de pestañas es historia: si algo de su marcado sobrevive, es que
+// quedó a medio migrar.
+check('el header de pestañas desapareció', !/id="tabs"/.test(html) && !/class="marca"/.test(html));
+
+// El guion del lado del cliente vive en su propio módulo, igual que la
+// terminal, para que `tsc` lo revise.
+const sidebarTsPath = 'src/scripts/sidebar.ts';
+check('src/scripts/sidebar.ts existe', existsSync(sidebarTsPath));
+const sidebarTs = existsSync(sidebarTsPath) ? readFileSync(sidebarTsPath, 'utf8') : '';
+const totalSessionStorageSidebar = (sidebarTs.match(/sessionStorage\./g) || []).length;
+const tryBlocksSidebar = sidebarTs.match(/try\s*\{[\s\S]*?\}\s*catch/g) || [];
+const sessionStorageEnTry = tryBlocksSidebar.reduce(
+  (n, b) => n + (b.match(/sessionStorage\./g) || []).length,
+  0,
+);
+check(
+  'todo acceso a sessionStorage en sidebar.ts va dentro de un try',
+  totalSessionStorageSidebar > 0 && totalSessionStorageSidebar === sessionStorageEnTry,
+  `${sessionStorageEnTry} de ${totalSessionStorageSidebar} dentro de un try`,
+);
+
+console.log('\nBarra lateral (retoque visual)');
+// Estas comprobaciones nacieron de una revisión visual sobre capturas de
+// pantalla, no de una regresión de comportamiento: el HTML era válido y el
+// script funcionaba, pero el navegador dibujaba viñetas y dos columnas con
+// indentaciones distintas. Se leen contra la hoja de estilos porque ahí es
+// donde vive el fallo — el marcado no deja ningún rastro de una lista sin
+// resetear.
+
+check(
+  'las listas de la barra lateral resetean list-style',
+  /\.sidebar\s+ul\s*\{[^}]*list-style:\s*none/.test(css),
+  'sin el reseteo, el navegador dibuja • en cada fila (el fallo real: el nav de workspaces no llevaba la clase que traía el reseteo)',
+);
+
+// El mismo fallo se repitió dos veces en esta ronda: una regla de CSS
+// correcta que apunta a una clase que el elemento nunca llevó. Esta
+// comprobación ata el nav al selector real que usa su relleno, para que un
+// tercer descuido de este tipo no vuelva a pasar en silencio.
+check(
+  'el nav de workspaces lleva la clase que le da su relleno',
+  /<nav id="sidebar-workspaces" class="sidebar-workspaces"/.test(html),
+  'sin la clase, .sidebar-workspaces { padding: ... } nunca se aplica y la fila queda pegada al borde',
+);
+
+check(
+  'la marca JBMLL vuelve a estar en la barra lateral, enlazada al inicio',
+  /<a class="sidebar-marca"[^>]*href="\/"[^>]*>JBMLL<\/a>/.test(html),
+);
+
+// La marca vive fuera del nav[aria-label="Workspaces"]: si estuviera dentro,
+// sería un sexto enlace y rompería el orden de los cinco workspaces que ya
+// comprueba la sección «Barra lateral».
+check(
+  'la marca no es parte de la lista de workspaces',
+  !/sidebar-marca/.test(navInicio),
+);
+
+check(
+  'la columna de glifo tiene un ancho fijo, igual en workspaces y abiertos',
+  /\.ws-glifo\s*,\s*\.ab-glifo\s*\{[^}]*width:\s*2ch/.test(css),
+  'sin un ancho compartido, ✓ y ◉ no alinean con el resto de la fila',
+);
+
+console.log('\nStatusline');
+
+check(
+  'la statusline ya no vive dentro de la columna de lectura (.wrap)',
+  !/<div class="status">\s*<div class="wrap">/.test(html),
+  '.wrap la centraba en una columna de 96ch, desalineada de la barra lateral',
+);
+
+check(
+  'la statusline cuenta documentos abiertos, no un total de secciones escrito a mano',
+  /id="st-abiertos"[^>]*>\d+\s+(?:abierto|abiertos)</.test(html) && !/\d+\s+secciones</.test(html),
 );
 
 // `clear` en una terminal vacía la pantalla. En un sitio web eso deja al

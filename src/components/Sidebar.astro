@@ -1,0 +1,97 @@
+---
+import '../styles/sidebar.css';
+import { WORKSPACES, subtituloDeWorkspace, getIndice } from '../lib/content';
+import type { DocumentoAbierto, TipoDocumentoAbierto } from '../lib/tipos';
+
+interface Props {
+  /** Workspace montado: '' es la raíz, o uno de los slugs de SECCIONES. */
+  actual?: string | null;
+  /** True en una página de detalle (un proyecto, una publicación, una
+   * tecnología): el workspace padre se marca `aria-current="location"` y no
+   * `"page"`, porque no es la raíz de la sección. */
+  detalle?: boolean;
+  /** El documento propio, cuando la página es de detalle. Sin él, «abiertos»
+   * sirve su estado vacío: sin sesión no hay nada que listar todavía. */
+  documento?: DocumentoAbierto | null;
+}
+
+const { actual = null, detalle = false, documento = null } = Astro.props;
+
+const indice = await getIndice();
+
+const ETIQUETA_TIPO: Record<TipoDocumentoAbierto, string> = {
+  proyecto: 'proyecto',
+  publicacion: 'publicación',
+  stack: 'stack',
+};
+---
+
+<button id="sidebar-toggle" class="sidebar-alterna" type="button" aria-expanded="false" aria-controls="sidebar">
+  <span aria-hidden="true">☰</span> menú
+</button>
+
+<button id="sidebar-scrim" class="sidebar-scrim" type="button" tabindex="-1" aria-hidden="true"></button>
+
+<div id="sidebar" class="sidebar" aria-label="Menú">
+  <button id="sidebar-cerrar" class="sidebar-cerrar" type="button" aria-label="Cerrar menú">
+    <span aria-hidden="true">✕</span>
+  </button>
+
+  <a class="sidebar-marca" href="/" aria-label="Volver al inicio">JBMLL</a>
+
+  <nav id="sidebar-workspaces" class="sidebar-workspaces" aria-label="Workspaces">
+    <h2 class="sidebar-subt">workspaces</h2>
+    <ul>
+      {
+        WORKSPACES.map((w) => {
+          const esActual = w.slug === actual;
+          const glifo = esActual ? '◉' : '○';
+          const estado = esActual ? 'actual' : 'sin visitar';
+          return (
+            <li>
+              <a
+                class:list={['ws-item', esActual && 'ws-actual']}
+                href={w.ruta}
+                data-slug={w.slug}
+                aria-current={esActual ? (detalle ? 'location' : 'page') : undefined}
+              >
+                <span class="sr-only">{estado}</span>
+                <span class="ws-linea1">
+                  <span class="ws-glifo" aria-hidden="true">{glifo}</span>
+                  <span class="ws-nombre">{w.nombre}</span>
+                </span>
+                <span class="ws-sub">{subtituloDeWorkspace(w.slug, indice)}</span>
+              </a>
+            </li>
+          );
+        })
+      }
+    </ul>
+  </nav>
+
+  <section class="sidebar-abiertos" aria-labelledby="sidebar-abiertos-t">
+    <h2 id="sidebar-abiertos-t" class="sidebar-subt">abiertos</h2>
+    <ul id="sidebar-abiertos-lista">
+      {
+        documento ? (
+          <li>
+            <a class="ab-item ab-actual" href={documento.href} data-tipo={documento.tipo} aria-current="page">
+              <span class="ws-linea1">
+                <span class="ab-glifo" aria-hidden="true">◉</span>
+                <span class="ab-titulo">{documento.titulo}</span>
+              </span>
+              <span class="ab-sub">leyendo · {ETIQUETA_TIPO[documento.tipo]}</span>
+            </a>
+          </li>
+        ) : (
+          <li class="ab-vacio">nada abierto</li>
+        )
+      }
+    </ul>
+  </section>
+</div>
+
+<script>
+  // Vive en su propio módulo, igual que la terminal, para que `tsc` lo revise.
+  import '../scripts/sidebar';
+</script>

@@ -45,3 +45,22 @@ export interface Indice {
   entradas: Record<string, Fila[]>;
   stack: UsoDeStack[];
 }
+
+// ── Barra lateral ────────────────────────────────────────────────────────────
+
+/** Un workspace de la barra lateral: la raíz (`~`) o una sección. */
+export interface Workspace {
+  slug: string;
+  ruta: string;
+  nombre: string;
+}
+
+/** El tipo de documento que puede quedar «abierto» en la sesión. */
+export type TipoDocumentoAbierto = 'proyecto' | 'publicacion' | 'stack';
+
+/** Un documento de detalle: lo que la sección «abiertos» lista y persiste. */
+export interface DocumentoAbierto {
+  href: string;
+  titulo: string;
+  tipo: TipoDocumentoAbierto;
+}

@@ -28,7 +28,12 @@ const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : p
   title={`${publicacion.data.titulo} — JBMLL`}
   description={`${publicacion.data.venue} · ${publicacion.data.anio}`}
 >
-  <Terminal seccion="publicaciones" salida="">
+  <Terminal
+    seccion="publicaciones"
+    salida=""
+    detalle
+    documento={{ href: `/publicaciones/${publicacion.id}`, titulo: publicacion.data.titulo, tipo: 'publicacion' }}
+  >
     <article class="lectura">
       <h1 class="lectura-t">{publicacion.data.titulo}</h1>
       <p class="lectura-m">

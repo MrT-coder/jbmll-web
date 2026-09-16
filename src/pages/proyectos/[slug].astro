@@ -26,7 +26,12 @@ const meta = [proyecto.data.organizacion, proyecto.data.fecha].filter(Boolean).j
 ---
 
 <Base title={`${proyecto.data.titulo} — JBMLL`} description={proyecto.data.desc}>
-  <Terminal seccion="proyectos" salida="">
+  <Terminal
+    seccion="proyectos"
+    salida=""
+    detalle
+    documento={{ href: `/proyectos/${proyecto.id}`, titulo: proyecto.data.titulo, tipo: 'proyecto' }}
+  >
     <article class="lectura">
       <h1 class="lectura-t">{proyecto.data.titulo}</h1>
       <p class="lectura-m">{meta}</p>

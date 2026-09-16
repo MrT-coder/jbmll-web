@@ -11,7 +11,11 @@ const nodoScroll = document.getElementById('scroll');
 const nodoTerm = document.getElementById('term');
 const stPath = document.getElementById('st-path');
 const stClock = document.getElementById('st-clock');
-const tabs = document.getElementById('tabs');
+// La lista de secciones ya no vive en un header de pestañas: vive en los
+// workspaces de la barra lateral. sidebar.ts marca cuál está activo; acá solo
+// se lee, para completar comandos y para que un clic sobre un enlace de
+// workspace navegue sin recargar en vez de repetir la petición al servidor.
+const workspaces = document.getElementById('sidebar-workspaces');
 
 // Si falta el andamiaje, no hay terminal que arrancar. Fallar acá es mejor que
 // dejar media interfaz montada respondiendo a medias.
@@ -24,7 +28,7 @@ const scroll = nodoScroll;
 const term = nodoTerm;
 
 const BRAIN = term.dataset.brain ?? '';
-const SECCIONES: string[] = [...(tabs?.querySelectorAll('a') ?? [])].map((a) =>
+const SECCIONES: string[] = [...(workspaces?.querySelectorAll('a') ?? [])].map((a) =>
   (a.getAttribute('href') ?? '').slice(1),
 );
 
@@ -166,8 +170,11 @@ function navegar(seccion: string, empujar = true): boolean {
 
   aqui = seccion;
   term.dataset.seccion = seccion;
+  // Nunca a una página de detalle: esta rama solo navega entre workspaces
+  // completos. sidebar.ts observa este atributo para actualizar la barra
+  // lateral sin que este módulo tenga que conocerla.
+  term.dataset.detalle = '';
   if (stPath) stPath.textContent = seccion ? `~/${seccion}` : '~/';
-  marcarTabs();
   if (empujar) history.pushState({ seccion }, '', url);
   return true;
 }
@@ -175,14 +182,6 @@ function navegar(seccion: string, empujar = true): boolean {
 /** HTML de render.ts a nodos. El contenido es propio y ya viene escapado. */
 function fragmento(html: string): DocumentFragment {
   return document.createRange().createContextualFragment(html);
-}
-
-function marcarTabs() {
-  tabs?.querySelectorAll('a').forEach((a) => {
-    const destino = (a.getAttribute('href') ?? '').slice(1);
-    if (destino === aqui) a.setAttribute('aria-current', 'page');
-    else a.removeAttribute('aria-current');
-  });
 }
 
 const irFuera = (href: string): boolean => {
@@ -306,8 +305,8 @@ function reiniciar(): boolean {
   scroll.innerHTML = pantallaInicial;
   aqui = '';
   term.dataset.seccion = '';
+  term.dataset.detalle = '';
   if (stPath) stPath.textContent = '~/';
-  marcarTabs();
   term.scrollTop = 0;
   return true;
 }

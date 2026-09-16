@@ -122,6 +122,21 @@ body {
   outline-offset: 2px;
 }
 
+/* Visible solo para quien usa un lector de pantalla: fuera de la pantalla en
+   vez de con display: none, que también lo saca del árbol de accesibilidad.
+   clip-path y no el viejo clip: rect(): así no hace falta el margin: -1px que
+   ese truco necesitaba, y --space-* no tiene un paso de 1px que lo sustituya. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
