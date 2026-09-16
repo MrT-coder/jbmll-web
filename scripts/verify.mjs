@@ -110,6 +110,87 @@ const definidas = new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]))
 const fantasma = [...usadas].filter((v) => !definidas.has(v));
 check('sin variables fantasma', fantasma.length === 0, fantasma.join(', '));
 
+console.log('\nEscala de espaciado');
+// Un rem o px suelto en margin/padding/gap/inset es la escala arbitraria que
+// --space-* vino a reemplazar: si se cuela uno nuevo, esta comprobación lo
+// atrapa antes de que se sume a la mezcla.
+function archivosConExtension(dir, ext) {
+  let out = [];
+  for (const nombre of readdirSync(dir)) {
+    const ruta = join(dir, nombre);
+    if (statSync(ruta).isDirectory()) out = out.concat(archivosConExtension(ruta, ext));
+    else if (nombre.endsWith(ext)) out.push(ruta);
+  }
+  return out;
+}
+const fuentesCss = archivosConExtension('src', '.css');
+const fuentesAstro = archivosConExtension('src', '.astro');
+
+const PROP_ESPACIADO =
+  /\b(margin(?:-top|-right|-bottom|-left)?|padding(?:-top|-right|-bottom|-left)?|row-gap|column-gap|gap|inset)\s*:\s*([^;]+);/;
+const VALOR_CRUDO = /(-?\d*\.?\d+)(rem|px)/g;
+
+// 0 no necesita token, auto no es una medida y -9999px es el truco conocido
+// para sacar un elemento de pantalla sin tocar el layout: los tres quedan
+// fuera del barrido a propósito.
+function valoresCrudos(valor) {
+  return [...valor.matchAll(VALOR_CRUDO)].filter(([literal, num]) => {
+    if (literal === '-9999px') return false;
+    return Number(num) !== 0;
+  });
+}
+
+function crudosEnTexto(rutaMostrada, texto, offsetLinea) {
+  const encontrados = [];
+  texto.split('\n').forEach((linea, i) => {
+    const decl = PROP_ESPACIADO.exec(linea);
+    if (!decl) return;
+    if (valoresCrudos(decl[2]).length > 0) {
+      encontrados.push(`${rutaMostrada}:${offsetLinea + i + 1}`);
+    }
+  });
+  return encontrados;
+}
+
+let crudos = [];
+for (const ruta of fuentesCss) {
+  const mostrada = ruta.replace(/\\/g, '/');
+  crudos = crudos.concat(crudosEnTexto(mostrada, readFileSync(ruta, 'utf8'), 0));
+}
+for (const ruta of fuentesAstro) {
+  const mostrada = ruta.replace(/\\/g, '/');
+  const contenido = readFileSync(ruta, 'utf8');
+  const bloque = contenido.match(/<style>[\s\S]*?<\/style>/);
+  if (!bloque) continue;
+  const offsetLinea = contenido.slice(0, bloque.index).split('\n').length - 1;
+  crudos = crudos.concat(crudosEnTexto(mostrada, bloque[0], offsetLinea));
+}
+check(
+  'sin rem/px sueltos en margin/padding/gap/inset',
+  crudos.length === 0,
+  crudos.join(' · '),
+);
+
+const tokensSrc = readFileSync('src/styles/tokens.css', 'utf8');
+const espaciosFaltantes = [];
+for (let n = 1; n <= 10; n++) {
+  if (!new RegExp(`--space-${n}:\\s*[\\d.]+rem`).test(tokensSrc)) espaciosFaltantes.push(`--space-${n}`);
+}
+check('las diez variables --space-* existen en tokens.css', espaciosFaltantes.length === 0, espaciosFaltantes.join(', '));
+
+console.log('\nPunto de quiebre');
+// Dos anchos de quiebre son dos sitios donde el diseño puede desalinearse
+// entre sí sin que ninguna comprobación anterior lo note.
+const anchosDistintos = [];
+for (const ruta of [...fuentesCss, ...fuentesAstro]) {
+  const contenido = readFileSync(ruta, 'utf8');
+  for (const m of contenido.matchAll(/@media[^{]*\((?:max|min)-width:\s*([^)]+)\)/g)) {
+    const valor = m[1].trim();
+    if (valor !== '660px') anchosDistintos.push(`${ruta.replace(/\\/g, '/')}: ${valor}`);
+  }
+}
+check('un solo punto de quiebre, 660px', anchosDistintos.length === 0, anchosDistintos.join(' · '));
+
 console.log('\nAlcance del CSS');
 // Los estilos de un .astro llevan alcance y no alcanzan a los elementos que
 // crea el script. La página se ve casi bien y nada avisa.

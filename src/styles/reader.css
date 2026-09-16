@@ -8,7 +8,7 @@
  * la terminal. */
 
 .lectura {
-  padding: 2.6rem 0 4rem;
+  padding: var(--space-8) 0 var(--space-9);
 }
 
 .lectura-t {
@@ -24,8 +24,8 @@
 
 .lectura-m {
   max-width: 64ch;
-  margin: 1rem 0 0;
-  padding-bottom: 1.1rem;
+  margin: var(--space-5) 0 0;
+  padding-bottom: var(--space-5);
   border-bottom: 1px solid var(--line);
   color: var(--dim);
   font-size: 0.88em;
@@ -38,7 +38,7 @@
    la fuente, fue el largo de renglón. */
 .prose {
   max-width: 64ch;
-  margin: 2.4rem 0 0;
+  margin: var(--space-8) 0 0;
   font-size: 1.05em;
   line-height: 1.85;
   /* Un punto por debajo del blanco de la terminal: así la negrita resalta
@@ -132,7 +132,7 @@
 
 .prose pre {
   background: var(--panel);
-  padding: 1.1rem 1.25rem;
+  padding: var(--space-5) var(--space-6);
   overflow-x: auto;
   font-size: 0.92em;
   line-height: 1.65;
@@ -144,13 +144,13 @@
 
 .prose blockquote {
   border-left: 2px solid var(--line);
-  padding-left: 1.4rem;
+  padding-left: var(--space-7);
   color: var(--muted);
 }
 
 .prose ul,
 .prose ol {
-  padding-left: 1.5rem;
+  padding-left: var(--space-7);
 }
 
 .prose li + li {
@@ -172,8 +172,8 @@
    el atajo. */
 .eof {
   max-width: 64ch;
-  margin-top: 5rem;
-  padding-top: 1.6rem;
+  margin-top: var(--space-10);
+  padding-top: var(--space-7);
   border-top: 1px solid var(--line);
 }
 
@@ -186,8 +186,8 @@
 .eof-acts {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 1.1rem 0 0;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
   padding: 0;
   list-style: none;
 }
@@ -195,8 +195,8 @@
 .eof-acts a {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.55rem;
-  padding: 0.4rem 0.85rem;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--line);
   color: var(--muted);
   text-decoration: none;
@@ -230,7 +230,7 @@
 
 @media (max-width: 660px) {
   .lectura {
-    padding-top: 1.8rem;
+    padding-top: var(--space-7);
   }
 
   .lectura-t {
@@ -241,7 +241,7 @@
 /* La prosa de una página singular acompaña a los bloques de datos, no es el
    artículo entero: menos aire arriba y sin el ritmo de un texto largo. */
 .prose.intro {
-  margin-top: 1.2rem;
+  margin-top: var(--space-6);
   font-size: 1em;
   line-height: 1.75;
 }
