@@ -191,6 +191,121 @@ for (const ruta of [...fuentesCss, ...fuentesAstro]) {
 }
 check('un solo punto de quiebre, 660px', anchosDistintos.length === 0, anchosDistintos.join(' · '));
 
+console.log('\nEscala tipográfica');
+// Un em, un número o una unidad sueltos en font-size/line-height/letter-spacing
+// son la escala arbitraria que --text-*/--lh-*/--tracking-* vino a reemplazar:
+// si se cuela uno nuevo, esta comprobación lo atrapa antes de que se sume a la
+// mezcla.
+
+// Las excepciones se atan al selector de la regla y no al número de línea: una
+// línea agregada más arriba no rompe la comprobación, y un valor crudo nuevo no
+// se cuela por caer en una línea exceptuada.
+
+// El banner ASCII vive fuera de la escala: su clamp en px mantiene el dibujo
+// dentro del ancho, no es texto que deba medirse en em.
+const BANNER_EXCEPCIONES = [/^\.logo$/];
+
+// La barra de uso se dibuja pegando glifos █: el letter-spacing negativo es un
+// truco de empaquetado de caracteres, no una decisión sobre texto legible.
+const GLIFO_EXCEPCIONES = [/^\.stack td\.bar$/];
+
+const RAW_FONT_SIZE = /\bfont-size\s*:\s*([^;]+);/;
+const RAW_LINE_HEIGHT = /\bline-height\s*:\s*([^;]+);/;
+const RAW_LETTER_SPACING = /\bletter-spacing\s*:\s*([^;]+);/;
+const esCrudo = (valor) => /\d/.test(valor) && !/^var\(/.test(valor.trim());
+
+function crudosDeclaracion(regexProp, excepciones) {
+  const encontrados = [];
+  const revisarTexto = (mostrada, texto, offsetLinea) => {
+    let selector = '';
+    texto.split('\n').forEach((linea, i) => {
+      const apertura = linea.match(/^\s*([^{}]+?)\s*\{\s*$/);
+      if (apertura) selector = apertura[1];
+      const m = regexProp.exec(linea);
+      if (m && esCrudo(m[1]) && !excepciones.some((re) => re.test(selector))) {
+        encontrados.push(`${mostrada}:${offsetLinea + i + 1}`);
+      }
+    });
+  };
+  for (const ruta of fuentesCss) {
+    revisarTexto(ruta.replace(/\\/g, '/'), readFileSync(ruta, 'utf8'), 0);
+  }
+  for (const ruta of fuentesAstro) {
+    const contenido = readFileSync(ruta, 'utf8');
+    const bloque = contenido.match(/<style>[\s\S]*?<\/style>/);
+    if (!bloque) continue;
+    const offsetLinea = contenido.slice(0, bloque.index).split('\n').length - 1;
+    revisarTexto(ruta.replace(/\\/g, '/'), bloque[0], offsetLinea);
+  }
+  return encontrados;
+}
+
+const crudosFontSize = crudosDeclaracion(RAW_FONT_SIZE, BANNER_EXCEPCIONES);
+check('sin font-size crudo fuera de --text-*', crudosFontSize.length === 0, crudosFontSize.join(' · '));
+
+const crudosLineHeight = crudosDeclaracion(RAW_LINE_HEIGHT, BANNER_EXCEPCIONES);
+check('sin line-height crudo fuera de --lh-*', crudosLineHeight.length === 0, crudosLineHeight.join(' · '));
+
+const crudosLetterSpacing = crudosDeclaracion(RAW_LETTER_SPACING, GLIFO_EXCEPCIONES);
+check(
+  'sin letter-spacing crudo fuera de --tracking-*',
+  crudosLetterSpacing.length === 0,
+  crudosLetterSpacing.join(' · '),
+);
+
+const TOKENS_TIPOGRAFIA = [
+  '--text-xs',
+  '--text-sm',
+  '--text-base',
+  '--text-md',
+  '--text-lg',
+  '--text-xl',
+  '--text-2xl',
+  '--lh-tight',
+  '--lh-snug',
+  '--lh-loose',
+  '--tracking-tight',
+  '--tracking-wide',
+  '--tracking-wider',
+];
+const tokensTipografiaFaltantes = TOKENS_TIPOGRAFIA.filter(
+  (t) => !new RegExp(`${t}:\\s*\\S`).test(tokensSrc),
+);
+check(
+  'las variables de escala tipográfica existen en tokens.css',
+  tokensTipografiaFaltantes.length === 0,
+  tokensTipografiaFaltantes.join(', '),
+);
+
+function valoresDeclaracion(regexProp) {
+  const valores = [];
+  const revisarTexto = (mostrada, texto) => {
+    for (const m of texto.matchAll(new RegExp(regexProp.source, 'g'))) {
+      valores.push({ ruta: mostrada, valor: m[1].trim() });
+    }
+  };
+  for (const ruta of fuentesCss) {
+    revisarTexto(ruta.replace(/\\/g, '/'), readFileSync(ruta, 'utf8'));
+  }
+  for (const ruta of fuentesAstro) {
+    const contenido = readFileSync(ruta, 'utf8');
+    const bloque = contenido.match(/<style>[\s\S]*?<\/style>/);
+    if (!bloque) continue;
+    revisarTexto(ruta.replace(/\\/g, '/'), bloque[0]);
+  }
+  return valores;
+}
+
+// Solo dos archivos de fuente se sirven, Regular y Bold: cualquier otro peso
+// lo sintetiza el navegador, y una negrita sintética no es la misma letra.
+const pesos = valoresDeclaracion(/\bfont-weight\s*:\s*([^;]+);/);
+const pesosInvalidos = pesos.filter((p) => p.valor !== '400' && p.valor !== '700');
+check(
+  'todo font-weight es 400 o 700 (únicas fuentes servidas)',
+  pesosInvalidos.length === 0,
+  pesosInvalidos.map((p) => `${p.ruta}: ${p.valor}`).join(' · '),
+);
+
 console.log('\nAlcance del CSS');
 // Los estilos de un .astro llevan alcance y no alcanzan a los elementos que
 // crea el script. La página se ve casi bien y nada avisa.

@@ -59,6 +59,23 @@
   --fs: clamp(13px, 1.55vw, 14.5px);
   --lh: 1.65;
 
+  /* Escala tipográfica: los tamaños quedan en em a propósito, porque hoy se
+     componen al anidarse (un em dentro de otro em multiplica). El banner
+     ASCII queda fuera: su clamp en px mantiene el dibujo dentro del ancho. */
+  --text-xs: 0.8em;
+  --text-sm: 0.9em;
+  --text-base: 1em;
+  --text-md: 1.05em;
+  --text-lg: clamp(1.15em, 2.4vw, 1.45em);
+  --text-xl: 1.5em;
+  --text-2xl: 2em;
+  --lh-tight: 1.25;
+  --lh-snug: 1.45;
+  --lh-loose: 1.85;
+  --tracking-tight: -0.025em;
+  --tracking-wide: 0.06em;
+  --tracking-wider: 0.14em;
+
   /* Lo pisa visualViewport cuando sube el teclado: dvh no siempre lo refleja
      y la statusline queda tapada. Ver Terminal.astro. */
   --vh: 100dvh;
