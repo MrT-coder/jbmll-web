@@ -1,0 +1,41 @@
+# El verificador solo protege el sitio si se ejecuta sin que nadie se acuerde.
+# Corre en cada propuesta de cambio y en cada integración a las ramas largas.
+name: Verificar
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+# Una propuesta que recibe varios envíos seguidos no necesita comprobar los
+# intermedios: solo el último dice la verdad sobre lo que se va a integrar.
+concurrency:
+  group: verificar-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # La versión sale de .nvmrc y no se escribe aquí: dos sitios donde
+      # apuntarla son dos sitios donde puede quedar desincronizada.
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `ci` y no `install`: respeta el archivo de bloqueo en vez de
+      # reinterpretar los rangos, que es como una dependencia distinta entra
+      # sin que nadie lo haya decidido.
+      - run: npm ci
+
+      # Un solo paso porque `ship` ya encadena las tres etapas en el orden que
+      # importa: tipos, construcción y las 125 comprobaciones sobre lo
+      # construido. Partirlo aquí duplicaría ese orden en un segundo sitio.
+      - run: npm run ship
