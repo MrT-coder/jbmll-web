@@ -41,6 +41,21 @@
      a --fg, sin sumar otro color. */
   --prose: #dcdfe6;
 
+  /* Escala de espaciado: cada paso es múltiplo de 4px (salvo el primero, a
+     mitad de paso, para los detalles más finos). ch y em quedan fuera a
+     propósito: alinean con la cuadrícula monoespaciada o con el tamaño de la
+     letra, no con un ritmo de separación fijo. */
+  --space-1: 0.125rem; /* 2px */
+  --space-2: 0.25rem; /* 4px */
+  --space-3: 0.5rem; /* 8px */
+  --space-4: 0.75rem; /* 12px */
+  --space-5: 1rem; /* 16px */
+  --space-6: 1.25rem; /* 20px */
+  --space-7: 1.5rem; /* 24px */
+  --space-8: 2.5rem; /* 40px */
+  --space-9: 4rem; /* 64px */
+  --space-10: 5rem; /* 80px */
+
   --fs: clamp(13px, 1.55vw, 14.5px);
   --lh: 1.65;
 
@@ -82,7 +97,7 @@ body {
   width: 100%;
   max-width: 96ch;
   margin: 0 auto;
-  padding: 0 clamp(0.8rem, 3vw, 1.6rem);
+  padding: 0 clamp(var(--space-4), 3vw, var(--space-7));
 }
 
 :focus-visible {
