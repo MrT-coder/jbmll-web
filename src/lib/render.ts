@@ -50,8 +50,15 @@ function panel(f: Fila): string {
     ? `<a class="go" href="${esc(destino)}">${esc(f.titulo)}</a>`
     : esc(f.titulo);
 
+  // Mismo patrón que el título de arriba: una tecnología sin página propia se
+  // pinta como texto, no como enlace. La generación de la página es la que
+  // manda, no el chip.
   const chips = f.st
-    .map((t) => `<li><a class="chip" href="/stack/${esc(slugTech(t))}">${esc(t)}</a></li>`)
+    .map((t) =>
+      t.href
+        ? `<li><a class="chip" href="${esc(t.href)}">${esc(t.tech)}</a></li>`
+        : `<li><span class="chip">${esc(t.tech)}</span></li>`,
+    )
     .join('');
 
   return `<article class="panel"${destino ? ' data-go="' + esc(destino) + '"' : ''}>

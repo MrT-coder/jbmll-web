@@ -14,6 +14,12 @@ export interface Seccion {
   n: number;
 }
 
+export interface Tech {
+  tech: string;
+  /** Ruta de la página de la tecnología, o null si no tiene una propia. */
+  href: string | null;
+}
+
 export interface Fila {
   slug: string;
   titulo: string;
@@ -22,7 +28,7 @@ export interface Fila {
   href: string | null;
   /** Enlace externo cuando la entrada vive fuera: un DOI, un repositorio. */
   externo?: { href: string; etiqueta: string };
-  st: string[];
+  st: Tech[];
   kw: string[];
   /** Línea corta bajo el título: fechas, editorial, estado. */
   meta?: string;

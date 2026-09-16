@@ -222,6 +222,14 @@ a.go:focus-visible {
   color: var(--fg);
 }
 
+/* Una tecnología sin página propia se pinta con la misma caja, pero sin
+   ninguna afordancia de enlace: sin subrayado, sin cursor de puntero, en
+   --muted. La forma dice «esto es un dato», no «esto lleva a algo». */
+span.chip {
+  color: var(--muted);
+  cursor: default;
+}
+
 .stack td.c {
   color: var(--green);
 }
