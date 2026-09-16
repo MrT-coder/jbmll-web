@@ -1,7 +1,7 @@
 /* Verifica el sitio compilado. Cada comprobación existe por un fallo real, y
  * todos fallaban en silencio. El detalle, en el README. */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, extname } from 'node:path';
 
 const DIST = 'dist';
 let fails = 0;
@@ -19,6 +19,19 @@ if (!existsSync(DIST)) {
   console.error('No hay dist/. Ejecute `npm run build` primero.');
   process.exit(1);
 }
+
+// El sitio tiene páginas de artículo y de tecnología que ninguna comprobación
+// anterior recorría: pasaban por no estar en la lista, no por estar bien.
+function listarHtml(dir) {
+  let out = [];
+  for (const nombre of readdirSync(dir)) {
+    const ruta = join(dir, nombre);
+    if (statSync(ruta).isDirectory()) out = out.concat(listarHtml(ruta));
+    else if (nombre.endsWith('.html')) out.push(ruta);
+  }
+  return out;
+}
+const paginasHtml = listarHtml(DIST);
 
 const html = readFileSync(join(DIST, 'index.html'), 'utf8');
 
@@ -188,6 +201,130 @@ const sobreMi = leer('sobre-mi.html');
 check(
   '/sobre-mi trae experiencia y stack sin JavaScript',
   sobreMi.includes('FirmaSeguraEc') && sobreMi.includes('Spring Boot'),
+);
+
+// El sitio se navega por enlace tanto como por comando: un href que apunta a
+// nada es invisible hasta que alguien hace clic. `build.format: 'file'` sirve
+// cada ruta como <ruta>.html salvo la raíz y los recursos estáticos, que ya
+// tienen su propia extensión y viven tal cual en dist/.
+const enlacesRotos = [];
+for (const archivo of paginasHtml) {
+  const contenido = readFileSync(archivo, 'utf8');
+  const hrefs = [...contenido.matchAll(/href="(\/[^"]*)"/g)].map((m) => m[1]);
+  for (const href of hrefs) {
+    if (href.startsWith('http')) continue; // externo: fuera del barrido
+    const sinAncla = href.split('#')[0];
+    if (!sinAncla) continue; // era solo un ancla, «#lo-que-sea»
+    const destino =
+      sinAncla === '/'
+        ? 'index.html'
+        : extname(sinAncla)
+          ? sinAncla.slice(1)
+          : sinAncla.slice(1) + '.html';
+    if (!existsSync(join(DIST, destino))) {
+      enlacesRotos.push(`${relative(DIST, archivo)} → ${href}`);
+    }
+  }
+}
+check(
+  'todo enlace interno resuelve',
+  enlacesRotos.length === 0,
+  `${enlacesRotos.length} rotos — ` +
+    [...new Set(enlacesRotos)].slice(0, 6).join(' · ') +
+    (enlacesRotos.length > 6 ? ' …' : ''),
+);
+
+console.log('\nAccesibilidad');
+// Estas cuatro comprobaciones vienen del barrido manual de axe-core y del
+// recorrido por teclado del QA de 2026-09-15: automatizan lo que ese barrido
+// encontró para que no vuelva a colarse en silencio.
+
+// `dist/index.html` sí tenía su h1, y esa fue la única página que se miraba.
+// Las otras tres compilaban igual de verdes sin ningún encabezado de primer
+// nivel: WCAG 1.3.1 y 2.4.6 exigen exactamente uno por documento.
+const sinUnH1 = paginasHtml
+  .map((ruta) => ({
+    ruta: relative(DIST, ruta),
+    n: (readFileSync(ruta, 'utf8').match(/<h1[\s>]/g) || []).length,
+  }))
+  .filter((p) => p.n !== 1);
+check(
+  'exactamente un h1 en cada página',
+  sinUnH1.length === 0,
+  sinUnH1.map((p) => `${p.ruta} (${p.n})`).join(', '),
+);
+
+// Fórmula de contraste de WCAG 2.1: cada canal sRGB (0-255) se normaliza a
+// 0-1, se linealiza (curva gamma ~2.4, con tramo lineal bajo 0.03928) y se
+// pondera 0.2126/0.7152/0.0722 para R/G/B — la luminancia relativa L. El
+// contraste entre dos colores es (L1+0.05)/(L2+0.05), con L1 el más claro.
+function luminanciaRelativa(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const linealizar = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * linealizar(r) + 0.7152 * linealizar(g) + 0.0722 * linealizar(b);
+}
+function contraste(hexA, hexB) {
+  const [claro, oscuro] = [luminanciaRelativa(hexA), luminanciaRelativa(hexB)].sort((a, b) => b - a);
+  return (claro + 0.05) / (oscuro + 0.05);
+}
+
+const tokensCss = readFileSync('src/styles/tokens.css', 'utf8');
+const leerToken = (nombre) =>
+  (tokensCss.match(new RegExp(`--${nombre}:\\s*(#[0-9a-fA-F]{6})`)) || [])[1] ?? '';
+const bg = leerToken('bg');
+for (const token of ['fg', 'muted', 'dim', 'prose']) {
+  const hex = leerToken(token);
+  const ratio = hex && bg ? contraste(hex, bg) : 0;
+  check(
+    `--${token} contra --bg ≥ 4.5:1 (WCAG 1.4.3 AA)`,
+    ratio >= 4.5,
+    `${hex || '¿?'} sobre ${bg || '¿?'}: ${ratio.toFixed(2)}:1`,
+  );
+}
+
+// Comprobar solo contra --bg deja un hueco: la barra de estado no vive sobre
+// --bg sino sobre --panel, que es más claro, y un token que pasa sobre el
+// fondo oscuro puede fallar ahí. Por ese hueco se coló el reloj a 4.18:1 el
+// 2026-09-15. Los tokens no se listan a mano: se leen de las propias reglas
+// .status, para que una regla nueva entre sola en la comprobación.
+const panel = leerToken('panel');
+const terminalAstro = readFileSync('src/components/Terminal.astro', 'utf8');
+const tokensSobrePanel = [
+  ...new Set(
+    (terminalAstro.match(/\.status[^{]*\{[^}]*\}/g) ?? [])
+      .flatMap((regla) => [...regla.matchAll(/color:\s*var\(--([a-z0-9-]+)\)/g)])
+      .map((m) => m[1]),
+  ),
+];
+for (const token of tokensSobrePanel) {
+  const hex = leerToken(token);
+  // Un token que no es un color literal de tokens.css no se puede medir aquí.
+  if (!hex) continue;
+  const ratio = panel ? contraste(hex, panel) : 0;
+  check(
+    `--${token} contra --panel ≥ 4.5:1 (barra de estado, WCAG 1.4.3 AA)`,
+    ratio >= 4.5,
+    `${hex} sobre ${panel || '¿?'}: ${ratio.toFixed(2)}:1`,
+  );
+}
+
+// Comprobación estructural por expresión regular: no sustituye una prueba real
+// de teclado en el navegador (foco, Shift+Tab, salida hacia los enlaces), solo
+// evita la regresión concreta de 2026-09-15: que el bloque de Tab vuelva a
+// llamar preventDefault() sin haber comprobado antes una guarda de salida.
+// Se lee el archivo acá y no del `tsScript` de más abajo porque esa constante
+// todavía no existe en este punto del script.
+const terminalTs = existsSync('src/scripts/terminal.ts')
+  ? readFileSync('src/scripts/terminal.ts', 'utf8')
+  : '';
+const desdeTab = terminalTs.slice(terminalTs.indexOf("if (ev.key === 'Tab')"));
+const bloqueTab = desdeTab.slice(0, desdeTab.indexOf("if (ev.key === 'ArrowUp'"));
+const idxReturn = bloqueTab.search(/\breturn\b/);
+const idxPreventDefault = bloqueTab.indexOf('ev.preventDefault()');
+check(
+  'Tab no se secuestra incondicionalmente',
+  idxPreventDefault === -1 || (idxReturn !== -1 && idxReturn < idxPreventDefault),
+  'preventDefault() se llama antes de comprobar ninguna guarda: Shift+Tab también queda atrapado',
 );
 
 // Una publicación sin cuerpo propio no genera página. Si la generara, sería un
