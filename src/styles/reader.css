@@ -14,10 +14,10 @@
 .lectura-t {
   max-width: 34ch;
   margin: 0;
-  font-size: 2em;
+  font-size: var(--text-2xl);
   font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.025em;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-tight);
   text-wrap: balance;
   color: var(--fg);
 }
@@ -28,8 +28,8 @@
   padding-bottom: var(--space-5);
   border-bottom: 1px solid var(--line);
   color: var(--dim);
-  font-size: 0.88em;
-  line-height: 1.7;
+  font-size: var(--text-sm);
+  line-height: var(--lh);
 }
 
 /* 64ch y no 68: un carácter monoespaciado ocupa más ancho visual que uno
@@ -39,8 +39,8 @@
 .prose {
   max-width: 64ch;
   margin: var(--space-8) 0 0;
-  font-size: 1.05em;
-  line-height: 1.85;
+  font-size: var(--text-md);
+  line-height: var(--lh-loose);
   /* Un punto por debajo del blanco de la terminal: así la negrita resalta
      subiendo a --fg, sin necesidad de sumarle otro color. */
   color: var(--prose);
@@ -90,21 +90,21 @@
    apagado en versalitas. */
 .prose h2,
 .prose h3 {
-  line-height: 1.25;
+  line-height: var(--lh-tight);
   font-weight: 700;
   text-wrap: balance;
 }
 
 .prose h2 {
-  font-size: 1.02em;
+  font-size: var(--text-md);
   color: var(--green);
 }
 
 .prose h3 {
-  font-size: 0.84em;
+  font-size: var(--text-xs);
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: var(--tracking-wider);
 }
 
 .prose a {
@@ -134,8 +134,8 @@
   background: var(--panel);
   padding: var(--space-5) var(--space-6);
   overflow-x: auto;
-  font-size: 0.92em;
-  line-height: 1.65;
+  font-size: var(--text-sm);
+  line-height: var(--lh);
 }
 
 .prose pre code {
@@ -180,7 +180,7 @@
 .eof-mark {
   margin: 0;
   color: var(--dim);
-  font-size: 0.86em;
+  font-size: var(--text-sm);
 }
 
 .eof-acts {
@@ -200,7 +200,7 @@
   border: 1px solid var(--line);
   color: var(--muted);
   text-decoration: none;
-  font-size: 0.9em;
+  font-size: var(--text-sm);
   transition:
     color 0.12s ease,
     border-color 0.12s ease,
@@ -219,7 +219,7 @@
   color: var(--dim);
   border: 1px solid var(--line);
   padding: 0 0.3em;
-  line-height: 1.4;
+  line-height: var(--lh-snug);
 }
 
 .eof-acts a:hover kbd,
@@ -234,7 +234,7 @@
   }
 
   .lectura-t {
-    font-size: 1.55em;
+    font-size: var(--text-xl);
   }
 }
 
@@ -242,8 +242,8 @@
    artículo entero: menos aire arriba y sin el ritmo de un texto largo. */
 .prose.intro {
   margin-top: var(--space-6);
-  font-size: 1em;
-  line-height: 1.75;
+  font-size: var(--text-base);
+  line-height: var(--lh-loose);
 }
 
 .prose.intro > * + * {
