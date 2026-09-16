@@ -27,3 +27,7 @@ Thumbs.db
 # Registros de npm y de las herramientas. Traen rutas absolutas de la máquina.
 *.log
 npm-debug.log*
+
+# Informes del gate de QA. Son evidencia local, no artefacto del proyecto.
+.qa/
+.playwright-cli/
