@@ -899,6 +899,19 @@ noTextual('.brain.err (símbolo del prompt)', colorTokenPara(terminalCssSrc, '.b
 const terminalTs = existsSync('src/scripts/terminal.ts')
   ? readFileSync('src/scripts/terminal.ts', 'utf8')
   : '';
+// Al cargar, la salida ya viene escrita por el servidor, así que desplazarse
+// al prompt deja a quien llega en la mitad del texto: en el inicio eran 251 px
+// hacia abajo. push() tiene que llevar el desplazamiento solo cuando ya hay
+// alguien escribiendo comandos, no durante el arranque. Comprobación
+// estructural: no sustituye la prueba en el navegador, solo evita que la
+// guarda desaparezca sin que nadie lo note.
+const cuerpoPush = (terminalTs.match(/const push = \([^)]*\) => \{([\s\S]*?)\n\};/) || [])[1] || '';
+check(
+  'el desplazamiento automático no corre durante el arranque',
+  /scrollTop/.test(cuerpoPush) && /\bif\s*\([^)]*\)/.test(cuerpoPush.slice(0, cuerpoPush.indexOf('scrollTop'))),
+  cuerpoPush.trim() || '(no se encontró push())',
+);
+
 const desdeTab = terminalTs.slice(terminalTs.indexOf("if (ev.key === 'Tab')"));
 const bloqueTab = desdeTab.slice(0, desdeTab.indexOf("if (ev.key === 'ArrowUp'"));
 const idxReturn = bloqueTab.search(/\breturn\b/);
