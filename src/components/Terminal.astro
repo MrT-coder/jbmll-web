@@ -200,11 +200,11 @@ const abiertosSsr = documento ? 1 : 0;
 </script>
 
 <style>
-  /* El comando que dejó la pantalla en este estado, mostrado ya ejecutado. */
-  .done .brain {
-    margin-right: 1ch;
-    color: var(--green);
-  }
+  /* El estilo de .done .brain vive en src/styles/terminal.css, sin ámbito:
+     terminal.ts repone esa línea al limpiar la pantalla en cada `cd`, y un
+     estilo con ámbito de componente no alcanza a un nodo creado por un
+     script —le falta el atributo data-astro-cid—, así que el glifo quedaba
+     pegado al comando. */
 
   /* La barra lateral y el contenido, uno al lado del otro. Sin flex-shrink: 0
      en .sidebar (ver sidebar.css) el navegador le quita ancho cuando falta

@@ -146,7 +146,7 @@ const HELP: [string, string][] = [
   ['stack', 'Con qué trabajo, contado desde los datos'],
   ['contacto', 'Dónde encontrarme'],
   ['pwd', 'Dónde estoy'],
-  ['c', 'Limpiar la pantalla'],
+  ['c', 'Limpiar la pantalla de esta sección'],
   ['help', 'Esto'],
 ];
 
@@ -177,8 +177,18 @@ function navegar(seccion: string, empujar = true): boolean {
   const meta = indice.secciones.find((s) => s.slug === seccion);
   if (seccion && meta?.tipo !== 'coleccion') return irFuera(url);
 
-  // La salida se AÑADE debajo, como en cualquier terminal. Reemplazar el bloque
-  // de arriba deja al usuario mirando un prompt donde no pasó nada.
+  // Cambiar de sección limpia la pantalla, como `clear && ls`. Antes la salida
+  // se añadía debajo, con el historial completo: tenía sentido cuando la
+  // pantalla era solo un historial, pero desde que el <title> y el h1 cambian
+  // por sección (abajo), la página afirma ser una sección y mostraba la
+  // anterior encima. El h1 se conserva —es el encabezado del documento, no
+  // salida— y la línea del comando se repone para que la pantalla quede igual
+  // que si el servidor la hubiera entregado así.
+  for (const nodo of [...scroll.children]) if (nodo !== nodoLead) nodo.remove();
+  const comando = seccion ? `cd ${seccion}` : 'ls';
+  const linea = el('div', 'out done');
+  linea.append(el('span', 'brain ok', BRAIN), el('span', 'typed', comando));
+  push(linea);
   push(fragmento(seccion ? renderEntradas(indice.entradas[seccion] ?? []) : renderSecciones(indice.secciones)));
 
   aqui = seccion;
@@ -302,9 +312,18 @@ function exec(raw: string): boolean {
     case 'c':
     case 'clear':
     case 'cls':
-      // En una terminal `clear` deja la pantalla vacía. Acá no: una pantalla
-      // negra sin nada no es una función, es un callejón sin salida para quien
-      // llegó a un sitio web. Vuelve al inicio, que es de donde se parte.
+      // Limpia la pantalla de esta sección y la deja como recién entregada:
+      // su encabezado, su comando y su salida. Antes volvía al inicio, y desde
+      // otra ruta con una recarga completa, así que en el inicio parecía no
+      // hacer nada y en una sección sacaba de donde estabas (lo reportó el
+      // dueño del sitio). Una pantalla vacía de verdad tampoco sirve: en un
+      // sitio web es un callejón sin salida. Donde no se puede volver a
+      // renderizar —una página de detalle, o sin índice— se cae al inicio.
+      //
+      // La guarda del detalle no es opcional: sin ella, `c` en
+      // /proyectos/<slug> pintaría la lista de proyectos dejando la URL del
+      // documento, y la pantalla diría una cosa y la barra de direcciones otra.
+      if (term.dataset.detalle !== '1' && indice) return navegar(aqui, false);
       return reiniciar();
 
     case 'g':
