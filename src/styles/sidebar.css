@@ -62,6 +62,24 @@
   color: var(--fg);
 }
 
+/* El dibujo hereda el color del enlace, así que el hover y el foco lo tiñen
+ * junto con él. letter-spacing vuelve a normal porque .sidebar-marca aplica
+ * --tracking-wide: con ese espacio extra las columnas se separan y las letras
+ * dejan de formarse. line-height ajustado para que las filas se toquen y los
+ * bloques se lean como trazos continuos, no como una reja. */
+.sidebar-marca-dibujo {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: normal;
+  line-height: var(--lh-tight);
+  /* La M necesita cinco columnas para no leerse como una H, y con eso el
+   * dibujo son 21 columnas: a tamaño completo roza el borde de la barra. Un
+   * paso menos de escala lo deja holgado sin perder nitidez, porque los
+   * bloques no tienen trazos finos que se empasten al reducirse. */
+  font-size: var(--text-xs);
+}
+
 .sidebar-workspaces,
 .sidebar-abiertos {
   padding: var(--space-5) var(--space-4);
