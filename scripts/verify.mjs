@@ -1562,7 +1562,17 @@ check(
   /connect-src[^;]*\bhttps:\/\/api\.github\.com\b/.test(cspAdmin),
   cspAdmin || '(sin CSP propia)',
 );
-check('la CSP del panel no depende de unpkg', cspAdmin !== '' && !/unpkg\.com/.test(cspAdmin));
+// La intención de esta comprobación es que el bundle del panel venga del
+// propio origen y no de un CDN, y eso lo decide script-src, no la CSP entera:
+// unpkg sí está permitido en connect-src, donde Sveltia consulta su versión
+// publicada (ver el comentario de public/_headers). Mirar la CSP completa
+// confundía las dos cosas y daba rojo por un permiso que sí queremos.
+const scriptSrcAdmin = (cspAdmin.match(/script-src([^;]*)/) || [])[1] || '';
+check(
+  'el panel no carga su bundle de un CDN: script-src solo permite el propio origen',
+  scriptSrcAdmin.trim() === "'self'",
+  scriptSrcAdmin.trim() || '(sin script-src)',
+);
 check('_headers también cubre /admin, sin barra ni comodín', /\n\/admin\n/.test(headersSrc));
 
 const bloqueSitio = (headersSrc.match(/\n\/\*\n([\s\S]*?)(?=\n\/\S|\n*$)/) || [])[1] || '';
