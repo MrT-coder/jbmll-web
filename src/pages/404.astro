@@ -11,6 +11,6 @@ import { renderSecciones } from '../lib/render';
 const indice = await getIndice();
 ---
 
-<Base title="No existe — JBMLL" description="Esa ruta no existe. Estas son las secciones que sí.">
+<Base title="No existe — JBMLL" description="Esa ruta no existe. Estas son las secciones que sí." indexable={false}>
   <Terminal lead="cat: no such file or directory" salida={renderSecciones(indice.secciones)} />
 </Base>

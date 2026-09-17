@@ -102,6 +102,22 @@ for (const ruta of paginasHtml) {
     canonicasMal.push(`${nombre} → ${canonica || '—'}${ogUrl !== canonica ? ` (og:url ${ogUrl || '—'})` : ''}`);
   }
 }
+// La página 404 se sirve en cualquier ruta inexistente: una canónica ahí le
+// propone al buscador una URL (/404) que no existe como documento. No declara
+// canónica ni og:url y pide no indexarse.
+const html404 = existsSync(join(DIST, '404.html')) ? readFileSync(join(DIST, '404.html'), 'utf8') : '';
+check(
+  '404 sin canónica y con noindex',
+  html404 !== '' &&
+    !/rel="canonical"/.test(html404) &&
+    !/property="og:url"/.test(html404) &&
+    /<meta\s+name="robots"\s+content="noindex"/.test(html404),
+);
+check(
+  'solo la 404 pide noindex',
+  paginasHtml.every((r) => relative(DIST, r).replace(/\\/g, '/') === '404.html' || !/name="robots"[^>]*noindex/.test(readFileSync(r, 'utf8'))),
+);
+
 check(
   'canónica y og:url de cada página coinciden con el sitemap',
   urlsMapa.size > 0 && canonicasRevisadas === urlsMapa.size && canonicasMal.length === 0,

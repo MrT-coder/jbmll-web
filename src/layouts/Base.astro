@@ -5,9 +5,12 @@ import '../styles/reader.css';
 interface Props {
   title: string;
   description: string;
+  /** false solo en la 404: se sirve en cualquier ruta inexistente, así que
+   * no tiene una URL propia que declarar ni debe indexarse. */
+  indexable?: boolean;
 }
 
-const { title, description } = Astro.props;
+const { title, description, indexable = true } = Astro.props;
 
 // Con build.format 'file' la ruta llega como /proyectos.html o /index.html,
 // pero Cloudflare Pages redirige esas URL a /proyectos y a /, que son las que
@@ -25,7 +28,7 @@ const canonical = new URL(ruta, Astro.site);
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta name="author" content="Josue Bladimir Morales Llanganate" />
-    <link rel="canonical" href={canonical} />
+    {indexable ? <link rel="canonical" href={canonical} /> : <meta name="robots" content="noindex" />}
 
     <meta name="theme-color" content="#06080F" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -37,7 +40,7 @@ const canonical = new URL(ruta, Astro.site);
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={canonical} />
+    {indexable && <meta property="og:url" content={canonical} />}
     <meta property="og:locale" content="es_EC" />
     <meta name="twitter:card" content="summary" />
   </head>
