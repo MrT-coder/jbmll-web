@@ -26,6 +26,7 @@ const { uso } = Astro.props;
     salida=""
     detalle
     documento={{ href: `/stack/${slugTech(uso.tech)}`, titulo: uso.tech, tipo: 'stack' }}
+    comando="stack"
   >
     <article class="lectura">
       <h1 class="lectura-t">{uso.tech}</h1>
@@ -38,6 +39,7 @@ const { uso } = Astro.props;
                 {f.titulo}
               </a>
               <span class="fuente-tipo">{f.tipo}</span>
+              <span class="fuente-detalle">{f.detalle}</span>
             </li>
           ))
         }
@@ -63,6 +65,17 @@ const { uso } = Astro.props;
 
   .fuente-tipo {
     float: right;
+    color: var(--dim);
+    font-size: var(--text-sm);
+  }
+
+  /* Sin esta línea la fila era un título y un enlace desnudos: no decía nada
+     que la lista de origen no dijera ya. clear: both para no quedar debajo
+     del flotante de .fuente-tipo, en la misma línea a la derecha. */
+  .fuente-detalle {
+    display: block;
+    clear: both;
+    margin-top: var(--space-1);
     color: var(--dim);
     font-size: var(--text-sm);
   }

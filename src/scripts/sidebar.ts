@@ -264,8 +264,11 @@ function abrir() {
   nodoSidebar.classList.add('abierta');
   nodoScrim.classList.add('abierta');
   botonAlterna.setAttribute('aria-expanded', 'true');
+  // El nombre accesible solo tiene sentido junto con el rol: un aria-label
+  // fijo en la plantilla, sin role, es un aria-prohibited-attr de axe.
   nodoSidebar.setAttribute('role', 'dialog');
   nodoSidebar.setAttribute('aria-modal', 'true');
+  nodoSidebar.setAttribute('aria-label', 'Menú');
   for (const el of elementosDeFondo()) el.setAttribute('inert', '');
   botonCerrar.focus();
 }
@@ -276,6 +279,7 @@ function cerrar() {
   botonAlterna.setAttribute('aria-expanded', 'false');
   nodoSidebar.removeAttribute('role');
   nodoSidebar.removeAttribute('aria-modal');
+  nodoSidebar.removeAttribute('aria-label');
   for (const el of elementosDeFondo()) el.removeAttribute('inert');
 }
 

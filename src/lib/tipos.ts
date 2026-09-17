@@ -41,7 +41,14 @@ export interface Fila {
 export interface UsoDeStack {
   tech: string;
   usos: number;
-  fuentes: { tipo: 'experiencia' | 'proyecto'; id: string; titulo: string }[];
+  fuentes: {
+    tipo: 'experiencia' | 'proyecto';
+    id: string;
+    titulo: string;
+    /** Línea corta bajo el título de la fuente: la descripción del proyecto,
+     * o el período del puesto cuando la fuente es una experiencia. */
+    detalle: string;
+  }[];
 }
 
 export interface Indice {

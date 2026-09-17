@@ -586,6 +586,49 @@ for (const [fila, sub] of [['ws', 'ws-sub'], ['ab', 'ab-sub']]) {
   }
 }
 
+console.log('\nContraste no textual en glifos decorativos (WCAG 1.4.11, guarda propia)');
+// .ws-glifo/.ab-glifo y el pre del banner llevan aria-hidden en la plantilla
+// (Sidebar.astro, Terminal.astro); .rule y .brain no lo llevan todavía, pero
+// tampoco transmiten información propia — repiten en símbolos lo que el texto
+// de al lado ya dice. axe no calcula contraste sobre ninguno de los cinco (el
+// glifo lo pinta un script, o su color depende de una clase de estado), así
+// que esta comprobación no reemplaza a axe: existe para que un cambio de
+// token futuro no los deje invisibles en silencio, no porque axe lo exija hoy.
+const sel = leerToken('sel');
+
+function colorTokenPara(cssTexto, selector) {
+  const reglas = [...cssTexto.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(([, listaSel]) =>
+    listaSel.split(',').map((s) => s.trim()).includes(selector),
+  );
+  const colores = reglas.flatMap(([, , cuerpo]) => [...cuerpo.matchAll(/(?:^|[;\s])color:\s*var\(--([a-z0-9-]+)\)/g)]);
+  return colores.at(-1)?.[1];
+}
+
+function noTextual(nombre, token, fondoNombre) {
+  const hex = token ? leerToken(token) : '';
+  const hexFondo = leerToken(fondoNombre);
+  const ratio = hex && hexFondo ? contraste(hex, hexFondo) : 0;
+  check(
+    `${nombre} ≥ 3:1 contra --${fondoNombre} (WCAG 1.4.11)`,
+    ratio >= 3,
+    `--${token ?? '¿?'} ${hex || '¿?'} sobre ${hexFondo || '¿?'}: ${ratio.toFixed(2)}:1`,
+  );
+}
+
+noTextual('.ws-glifo/.ab-glifo (estado base)', colorDe('.ws-glifo'), 'bg');
+noTextual('.ws-actual .ws-glifo/.ab-actual .ab-glifo (fila actual)', colorDe('.ws-actual .ws-glifo'), 'sel');
+noTextual('.ws-visitada .ws-glifo (visitado)', colorDe('.ws-visitada .ws-glifo'), 'bg');
+
+const terminalAstroCss = (
+  readFileSync('src/components/Terminal.astro', 'utf8').match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? ''
+).replace(/\/\*[\s\S]*?\*\//g, '');
+noTextual('.rule (separador del panel de arranque)', colorTokenPara(terminalAstroCss, '.info .rule'), 'bg');
+noTextual('.logo (banner pre)', colorTokenPara(terminalAstroCss, '.logo'), 'bg');
+
+const terminalCssSrc = readFileSync('src/styles/terminal.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+noTextual('.brain.ok (símbolo del prompt)', colorTokenPara(terminalCssSrc, '.brain.ok'), 'bg');
+noTextual('.brain.err (símbolo del prompt)', colorTokenPara(terminalCssSrc, '.brain.err'), 'bg');
+
 // Comprobación estructural por expresión regular: no sustituye una prueba real
 // de teclado en el navegador (foco, Shift+Tab, salida hacia los enlaces), solo
 // evita la regresión concreta de 2026-09-15: que el bloque de Tab vuelva a
@@ -630,6 +673,38 @@ check(
 const soloUno = stack.filter((s) => s.usos < 2).length;
 check('ninguna página para las de un solo uso', soloUno > 0 && paginasStack.length < stack.length);
 
+console.log('\nStack: contexto de cada fuente y comando de la terminal');
+// El QA de 2026-09-17 encontró dos fallos en /stack/<tech>: cada fuente era un
+// enlace desnudo sin decir nada que la lista de origen no dijera ya, y la
+// terminal mostraba «cd sobre-mi» — la sección que sidebar.ts usa para marcar
+// el padre en la barra lateral, no la página en la que realmente se está.
+const stackDirDist = join(DIST, 'stack');
+const sinDetalleEnFuente = [];
+const conCdSobreMi = [];
+for (const nombre of paginasStack) {
+  const contenido = readFileSync(join(stackDirDist, nombre), 'utf8');
+  // Astro marca con data-astro-cid-* cada etiqueta de un componente con
+  // <style>: los selectores no pueden asumir el atributo exacto que trae cada
+  // etiqueta, solo que existe alguno.
+  const bloqueFuentes = contenido.match(/<ul class="fuentes"[^>]*>[\s\S]*?<\/ul>/)?.[0] ?? '';
+  const filas = bloqueFuentes.match(/<li[^>]*>[\s\S]*?<\/li>/g) ?? [];
+  const filasSinDetalle = filas.filter((li) => !/class="fuente-detalle"[^>]*>\s*\S/.test(li));
+  if (filas.length > 0 && filasSinDetalle.length > 0) sinDetalleEnFuente.push(`${nombre} (${filasSinDetalle.length})`);
+
+  const lineaComando = contenido.match(/<div class="out done"[^>]*>[\s\S]*?<\/div>/)?.[0] ?? '';
+  if (/<span class="typed"[^>]*>cd sobre-mi<\/span>/.test(lineaComando)) conCdSobreMi.push(nombre);
+}
+check(
+  'cada fuente de una página de stack trae su línea de contexto',
+  paginasStack.length > 0 && sinDetalleEnFuente.length === 0,
+  sinDetalleEnFuente.join(', '),
+);
+check(
+  'ninguna página de stack muestra «cd sobre-mi» como comando ejecutado',
+  paginasStack.length > 0 && conCdSobreMi.length === 0,
+  conCdSobreMi.join(', '),
+);
+
 // El número que se ve y el número al que se llama tienen que ser el mismo.
 // Escribirlos por separado es cómo dejan de serlo.
 const contacto = leer('contacto.html');
@@ -640,6 +715,22 @@ check(
   'el número visible es el número del enlace',
   wa.length > 0 && wa === visible.replace(/\s/g, ''),
   `enlace ${wa} · visible ${visible}`,
+);
+
+console.log('\nContacto: el texto de cada enlace no repite su propia etiqueta');
+// El enlace de LinkedIn mostraba «linkedin», la misma palabra que ya está en
+// la celda de la izquierda: no aporta nada que la etiqueta no dijera ya, a
+// diferencia de github, que sí muestra el destino (github.com/<usuario>).
+const filasContacto = [
+  ...contacto.matchAll(/<td class="n">([^<]*)<\/td>\s*<td class="d">\s*<a[^>]*>([^<]*)<\/a>/g),
+];
+const enlacesRedundantes = filasContacto.filter(
+  ([, etiqueta, texto]) => etiqueta.trim().toLowerCase() === texto.trim().toLowerCase(),
+);
+check(
+  'ningún texto de enlace de contacto repite su propia etiqueta',
+  filasContacto.length > 0 && enlacesRedundantes.length === 0,
+  enlacesRedundantes.map(([, etiqueta]) => etiqueta).join(', '),
 );
 
 console.log('\nStack visual');
@@ -1083,6 +1174,45 @@ check(
   'todo acceso a sessionStorage en sidebar.ts va dentro de un try',
   totalSessionStorageSidebar > 0 && totalSessionStorageSidebar === sessionStorageEnTry,
   `${sessionStorageEnTry} de ${totalSessionStorageSidebar} dentro de un try`,
+);
+
+console.log('\nSidebar: nombre accesible solo con role (axe aria-prohibited-attr)');
+// axe marca aria-prohibited-attr cuando un aria-label es estático sobre un
+// elemento sin role: no hay «rol + nombre» que anunciar si no hay rol. El
+// nombre solo tiene sentido mientras sidebar.ts declara role="dialog" para la
+// cortina móvil (ver abrir()/cerrar() más abajo).
+const sidebarConAriaEstatico = paginasHtml.filter((ruta) => {
+  const etiqueta = readFileSync(ruta, 'utf8').match(/<div id="sidebar"[^>]*>/)?.[0] ?? '';
+  return /\s(aria-label|aria-labelledby)=/.test(etiqueta);
+});
+check(
+  'ningún #sidebar servido lleva aria-label/aria-labelledby estático',
+  sidebarConAriaEstatico.length === 0,
+  sidebarConAriaEstatico.map((r) => relative(DIST, r)).join(', '),
+);
+
+// Comprobación estructural sobre el fuente .ts, no una prueba de navegador:
+// aquí no corre ningún script, solo se ata que aria-label se declare junto con
+// role/aria-modal en el mismo bloque de apertura, y se retire junto con ellos
+// en el mismo bloque de cierre — para que nunca quede el nombre sin el rol.
+const bloqueAbrirSidebar = sidebarTs.slice(
+  sidebarTs.indexOf('function abrir('),
+  sidebarTs.indexOf('function cerrar('),
+);
+const bloqueCerrarSidebar = sidebarTs.slice(
+  sidebarTs.indexOf('function cerrar('),
+  sidebarTs.indexOf('function estaAbierta('),
+);
+check(
+  'abrir() declara aria-label junto con role="dialog"',
+  /setAttribute\('role',\s*'dialog'\)/.test(bloqueAbrirSidebar) &&
+    /setAttribute\('aria-label',\s*'Menú'\)/.test(bloqueAbrirSidebar),
+);
+check(
+  'cerrar() retira aria-label junto con role/aria-modal',
+  /removeAttribute\('role'\)/.test(bloqueCerrarSidebar) &&
+    /removeAttribute\('aria-modal'\)/.test(bloqueCerrarSidebar) &&
+    /removeAttribute\('aria-label'\)/.test(bloqueCerrarSidebar),
 );
 
 console.log('\nBarra lateral (retoque visual)');

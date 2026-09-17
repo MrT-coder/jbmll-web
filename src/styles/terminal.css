@@ -38,6 +38,10 @@
 }
 .list td.d {
   color: var(--muted);
+  /* linkedin.com/in/<usuario> mide ~58 caracteres: sin esto no rompe línea y
+     desborda el ancho de la celda en un viewport angosto (390px, QA
+     2026-09-17). */
+  overflow-wrap: anywhere;
 }
 
 .inputline {
