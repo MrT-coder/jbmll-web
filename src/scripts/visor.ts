@@ -106,3 +106,10 @@ visor.addEventListener('click', (ev) => {
 // nativo del teclado— evita que un PDF de más de 1 MB siga cargado en memoria
 // entre una apertura y la siguiente.
 visor.addEventListener('close', () => cuerpo.replaceChildren());
+
+// Un .ts sin import ni export es un script global para TypeScript, y sus
+// variables conviven con las de los otros scripts del sitio: `botonCerrar` ya
+// existía en sidebar.ts y chocaban (ts2451, lo vio el CI y no el build). Esto
+// lo convierte en módulo, que es lo que ya es en tiempo de ejecución, y le
+// devuelve su propio ámbito.
+export {};

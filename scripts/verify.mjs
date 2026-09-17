@@ -922,6 +922,19 @@ check(
   cuerpoPush.trim() || '(no se encontró push())',
 );
 
+// Un .ts sin import ni export es, para TypeScript, un script global: sus
+// variables comparten ámbito con las de los demás y dos scripts que declaren
+// el mismo nombre no compilan (ts2451). Pasó entre visor.ts y sidebar.ts con
+// `botonCerrar`, y lo vio el CI, no el build: acá se ataja antes.
+const scriptsSueltos = readdirSync('src/scripts')
+  .filter((n) => n.endsWith('.ts'))
+  .filter((n) => !/^\s*(import|export)\b/m.test(readFileSync(join('src/scripts', n), 'utf8')));
+check(
+  'cada script del sitio es un módulo, no un script global',
+  scriptsSueltos.length === 0,
+  scriptsSueltos.join(', ') + ' — sin import ni export comparten ámbito global',
+);
+
 const desdeTab = terminalTs.slice(terminalTs.indexOf("if (ev.key === 'Tab')"));
 const bloqueTab = desdeTab.slice(0, desdeTab.indexOf("if (ev.key === 'ArrowUp'"));
 const idxReturn = bloqueTab.search(/\breturn\b/);
