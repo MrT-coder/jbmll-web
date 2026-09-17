@@ -73,3 +73,5 @@ buscadores.
 Reemplacé el selector de mapas de pago por uno basado en Leaflet y OpenStreetMap,
 que no necesita clave de API. Eliminó un costo recurrente y, con él, una clave
 que administrar y que se puede filtrar.
+
+Un [enlace roto](/ruta-que-no-existe) a propósito.
