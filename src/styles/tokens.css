@@ -41,6 +41,18 @@
      a --fg, sin sumar otro color. */
   --prose: #dcdfe6;
 
+  /* Mapa de calor del stack: rampa secuencial de un solo matiz para el nivel
+     de uso de cada tecnología (ver renderStack() en src/lib/render.ts). El
+     contraste de --fg sobre cada paso ya está comprobado: 16.30, 13.66,
+     10.84, 7.93 y 5.73 — los cinco pasan WCAG AA para texto normal. El paso
+     más oscuro mide apenas 1.13:1 contra --bg, así que cada celda necesita su
+     propio borde (--line) o la cuadrícula se funde con la página. */
+  --nivel-1: #121922;
+  --nivel-2: #1d2933;
+  --nivel-3: #293a45;
+  --nivel-4: #384f5c;
+  --nivel-5: #476574;
+
   /* Escala de espaciado: cada paso es múltiplo de 4px (salvo el primero, a
      mitad de paso, para los detalles más finos). ch y em quedan fuera a
      propósito: alinean con la cuadrícula monoespaciada o con el tamaño de la

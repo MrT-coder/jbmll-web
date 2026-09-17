@@ -234,10 +234,6 @@ span.chip {
   cursor: default;
 }
 
-.stack td.c {
-  color: var(--green);
-}
-
 /* ── ListView ───────────────────────────────────────────────────────────────
    La respuesta de PSReadLine al «no sé qué escribir»: las opciones aparecen
    mientras se teclea, en vez de esconderse detrás de Tab. Quien no conoce la
@@ -268,13 +264,106 @@ span.chip {
   color: var(--cyan);
 }
 
-/* La barra mide usos contados. No es una escala de dominio: ese número no
-   existe en ningún dato. */
-.stack td.bar {
-  color: var(--green);
-  letter-spacing: -0.1em;
-  padding-right: 1.2ch;
+/* ── Stack: mapa de calor ─────────────────────────────────────────────────
+   Ver renderStack() en src/lib/render.ts para el porqué: una cuadrícula que
+   no crece hacia abajo, donde el color codifica los usos y el número también
+   va escrito, porque el color nunca puede ser la única forma de leerlo. */
+
+.stack-heat {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18ch, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stack-celda {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  overflow: hidden;
+  /* El nivel más oscuro mide apenas 1.13:1 contra --bg (ver tokens.css): sin
+     este borde la cuadrícula se funde con la página. */
+  border: 1px solid var(--line);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+a.stack-celda:hover,
+a.stack-celda:focus-visible {
+  border-color: var(--cyan);
+}
+
+/* Mismo criterio que span.chip: una tecnología sin página propia se pinta
+   igual, pero sin ninguna afordancia de enlace. */
+div.stack-celda {
+  cursor: default;
+}
+
+/* El nombre se envuelve en vez de recortarse con puntos suspensivos: «GitHub
+ * Actions» aparecía como «GitHub Act…» y compactar no puede significar
+ * esconder el dato. La celda crece una línea; la cuadrícula iguala el alto de
+ * su fila, así que el efecto es el mismo para toda la fila y nunca desborda. */
+.stack-nombre {
+  overflow-wrap: anywhere;
+}
+
+/* El número queda pegado al borde derecho de su celda y nunca se envuelve: es
+   la lectura exacta del color, tiene que verse entera. */
+.stack-usos {
+  margin-left: auto;
+  padding-left: var(--space-2);
   white-space: nowrap;
+}
+
+.stack-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.stack-leyenda li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stack-swatch {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  border: 1px solid var(--line);
+}
+
+/* El texto de la leyenda va en un token de texto, nunca en el color de la
+   propia serie: ese color ya lo lleva el recuadro de al lado. */
+.stack-leyenda-t {
+  color: var(--dim);
+}
+
+/* Los cinco pasos de la rampa, compartidos por cada celda y por su recuadro en
+   la leyenda. Nada de estilo en línea: la CSP del sitio es style-src 'self' y
+   bloquea cualquier atributo style=. */
+.nivel-1 {
+  background: var(--nivel-1);
+}
+.nivel-2 {
+  background: var(--nivel-2);
+}
+.nivel-3 {
+  background: var(--nivel-3);
+}
+.nivel-4 {
+  background: var(--nivel-4);
+}
+.nivel-5 {
+  background: var(--nivel-5);
 }
 
 /* ── Visor de certificados ────────────────────────────────────────────────
