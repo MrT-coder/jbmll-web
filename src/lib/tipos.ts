@@ -12,6 +12,10 @@ export interface Seccion {
   tipo: TipoDeSeccion;
   /** Cuántas entradas tiene. Las páginas no cuentan nada. */
   n: number;
+  /** El <title> de su página. */
+  titulo: string;
+  /** El h1 de su página. Puede traer HTML de confianza, como el del inicio. */
+  lead: string;
 }
 
 export interface Tech {
@@ -44,6 +48,8 @@ export interface Indice {
   secciones: Seccion[];
   entradas: Record<string, Fila[]>;
   stack: UsoDeStack[];
+  /** El <title> y el h1 del inicio: la única sección que no vive en SECCIONES. */
+  inicio: { titulo: string; lead: string };
 }
 
 // ── Barra lateral ────────────────────────────────────────────────────────────

@@ -59,6 +59,11 @@ const comando = seccion ? `cd ${seccion}` : 'ls';
 const abiertosSsr = documento ? 1 : 0;
 ---
 
+<!-- Primero en el orden de tabulación: sin él, quien navega con teclado
+     atraviesa toda la barra lateral en cada página antes de llegar al
+     contenido. #term ya lleva tabindex="-1", así que recibe el foco. -->
+<a class="saltar" href="#term">saltar al contenido</a>
+
 <div class="shell">
   <Sidebar actual={seccion} detalle={detalle} documento={documento} />
 

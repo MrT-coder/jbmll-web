@@ -16,6 +16,11 @@ const stClock = document.getElementById('st-clock');
 // se lee, para completar comandos y para que un clic sobre un enlace de
 // workspace navegue sin recargar en vez de repetir la petición al servidor.
 const workspaces = document.getElementById('sidebar-workspaces');
+// El h1 de la pantalla montada. `navegar()` lo reescribe con el lead del
+// destino para que el encabezado no se quede con el de la página anterior
+// (WCAG 2.4.2 / 1.3.1). No todas las páginas lo montan igual, así que se
+// tolera que falte.
+const nodoLead = document.querySelector<HTMLHeadingElement>('h1.lead');
 
 // Si falta el andamiaje, no hay terminal que arrancar. Fallar acá es mejor que
 // dejar media interfaz montada respondiendo a medias.
@@ -175,6 +180,19 @@ function navegar(seccion: string, empujar = true): boolean {
   // lateral sin que este módulo tenga que conocerla.
   term.dataset.detalle = '';
   if (stPath) stPath.textContent = seccion ? `~/${seccion}` : '~/';
+
+  // El <title> y el h1 no vienen fijos en el marcado de esta pantalla: sin
+  // esto, `cd proyectos` dejaba la pestaña y el encabezado del inicio después
+  // de navegar sin recargar (hallazgo U2 del QA, WCAG 2.4.2 / 1.3.1). El
+  // destino es el inicio o la sección que se acaba de renderizar arriba.
+  const datos = seccion ? meta : indice.inicio;
+  if (datos) {
+    document.title = datos.titulo;
+    // El lead es contenido propio, como la salida de render.ts: ya viene de
+    // confianza y no de algo que haya escrito quien visita el sitio.
+    if (nodoLead) nodoLead.innerHTML = datos.lead;
+  }
+
   if (empujar) history.pushState({ seccion }, '', url);
   return true;
 }

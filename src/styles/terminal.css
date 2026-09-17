@@ -272,3 +272,32 @@ span.chip {
   padding-right: 1.2ch;
   white-space: nowrap;
 }
+
+/* ── Saltar al contenido ────────────────────────────────────────────────────
+   Escondido como .sr-only mientras no tiene el foco, para que siga en el
+   árbol de accesibilidad y en el orden de tabulación. Con el foco aparece
+   arriba a la izquierda, por encima de la barra lateral y su cortina en
+   móvil (z-index 20 y 19). */
+
+.saltar {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.saltar:focus {
+  position: fixed;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 30;
+  width: auto;
+  height: auto;
+  clip-path: none;
+  padding: var(--space-2) var(--space-3);
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--blue);
+}

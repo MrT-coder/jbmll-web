@@ -550,6 +550,42 @@ for (const token of tokensSobrePanel) {
   );
 }
 
+// El mismo hueco, en la barra lateral: el subtítulo de cada fila se mide sobre
+// --bg, pero la fila actual se pinta sobre --sel y la fila bajo el puntero o
+// con foco sobre --panel, los dos más claros. El QA de 2026-09-17 midió el
+// subtítulo de la fila actual a 3.11:1. El color efectivo es el de la regla
+// más específica que exista para ese estado; si no hay, el de la regla base.
+// Sin comentarios: el que precede a una regla quedaría pegado a su selector.
+const sidebarCss = readFileSync('src/styles/sidebar.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+const colorDe = (selector) => {
+  const reglas = [...sidebarCss.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(([, sel]) =>
+    sel.split(',').map((s) => s.trim()).includes(selector),
+  );
+  const colores = reglas.flatMap(([, , cuerpo]) => [...cuerpo.matchAll(/(?:^|[;\s])color:\s*var\(--([a-z0-9-]+)\)/g)]);
+  return colores.at(-1)?.[1];
+};
+for (const [fila, sub] of [['ws', 'ws-sub'], ['ab', 'ab-sub']]) {
+  // Cada estado lista sus selectores del más al menos específico: la fila
+  // actual bajo el puntero conserva --sel, y ahí la regla de :hover ganaría a
+  // la de la fila actual si esta no la nombrara también.
+  for (const [estado, selectores, fondo] of [
+    ['actual', [`.${fila}-actual .${sub}`], 'sel'],
+    ['actual bajo el puntero', [`.${fila}-actual:hover .${sub}`, `.${fila}-item:hover .${sub}`], 'sel'],
+    ['bajo el puntero', [`.${fila}-item:hover .${sub}`], 'panel'],
+    ['con foco', [`.${fila}-item:focus-visible .${sub}`], 'panel'],
+  ]) {
+    const token = [...selectores, `.${sub}`].map(colorDe).find(Boolean);
+    const hex = token ? leerToken(token) : '';
+    const hexFondo = leerToken(fondo);
+    const ratio = hex && hexFondo ? contraste(hex, hexFondo) : 0;
+    check(
+      `.${sub} en fila ${estado} contra --${fondo} ≥ 4.5:1 (barra lateral, WCAG 1.4.3 AA)`,
+      ratio >= 4.5,
+      `--${token ?? '¿?'} ${hex || '¿?'} sobre ${hexFondo || '¿?'}: ${ratio.toFixed(2)}:1`,
+    );
+  }
+}
+
 // Comprobación estructural por expresión regular: no sustituye una prueba real
 // de teclado en el navegador (foco, Shift+Tab, salida hacia los enlaces), solo
 // evita la regresión concreta de 2026-09-15: que el bloque de Tab vuelva a
@@ -796,6 +832,115 @@ check(
   'la barra lateral no puede encogerse',
   /\.sidebar[^{]*\{[^}]*flex:\s*0\s+0/.test(css),
   'sin flex: 0 0 la barra se encoge junto con el contenido',
+);
+
+console.log('\nSaltar al contenido (WCAG 2.4.1)');
+// El QA de 2026-09-17 contó hasta 13 enlaces de la barra lateral antes del
+// contenido en cada página. El primer elemento enfocable del <body> tiene que
+// ser el enlace que lo salta, su destino tiene que existir y poder recibir el
+// foco (un <main> sin tabindex no lo recibe en todos los navegadores), y el
+// enlace tiene que verse al enfocarlo: uno invisible con foco es una trampa.
+const sinSalto = paginasHtml
+  .map((ruta) => {
+    const doc = readFileSync(ruta, 'utf8');
+    const cuerpo = doc.slice(doc.indexOf('<body'));
+    const primero = cuerpo.match(/<(a|button|input|select|textarea)\b[^>]*>/)?.[0] ?? '';
+    const destino = primero.match(/href="#([^"]+)"/)?.[1];
+    const ok = destino && new RegExp(`id="${destino}"[^>]*tabindex="-1"|tabindex="-1"[^>]*id="${destino}"`).test(doc);
+    return ok ? null : `${relative(DIST, ruta)} (${primero || 'sin enfocables'})`;
+  })
+  .filter(Boolean);
+check('el primer enfocable de cada página salta al contenido', sinSalto.length === 0, sinSalto.join(' · '));
+check(
+  'el enlace de salto se ve al recibir el foco',
+  /\.saltar:focus[^{]*\{[^}]*(clip-path:\s*none|position:\s*(static|fixed))/.test(css),
+  'falta una regla .saltar:focus que lo saque de su escondite',
+);
+
+// En una pantalla táctil sin teclado, «q volver a proyectos» promete una tecla
+// que no existe (QA 2026-09-17). La consulta es la misma con la que
+// terminal.ts decide TOUCH: si divergen, una pantalla ve la pista y no tiene
+// el atajo, o al revés.
+const bloquesTactiles = [...css.matchAll(/@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*\{([\s\S]*?\})\s*\}/g)].map(
+  (m) => m[1],
+);
+check(
+  'las pistas de teclado se ocultan en pantallas táctiles',
+  bloquesTactiles.some((b) => /\.eof-acts kbd\s*\{[^}]*display:\s*none/.test(b)),
+  'falta .eof-acts kbd { display: none } bajo (hover: none) and (pointer: coarse)',
+);
+check(
+  'terminal.ts detecta lo táctil con la misma consulta',
+  /matchMedia\('\(hover: none\) and \(pointer: coarse\)'\)/.test(terminalTs),
+);
+
+console.log('\nTítulo y encabezado (WCAG 2.4.2 / 1.3.1)');
+// El QA de 2026-09-17 (hallazgo U2) encontró que `cd proyectos` no cambiaba ni
+// el <title> ni el <h1>: la pestaña y el encabezado se quedaban con los de la
+// portada. La causa era que cada página escribía su título y su lead a mano;
+// ahora salen todos de SECCIONES/INICIO en content.ts, y esto comprueba que
+// el HTML servido y el índice que consume la navegación sin recargar cuentan
+// la misma historia.
+
+check(
+  'el índice trae título y lead para el inicio',
+  typeof indice.inicio?.titulo === 'string' &&
+    indice.inicio.titulo.length > 0 &&
+    typeof indice.inicio?.lead === 'string' &&
+    indice.inicio.lead.length > 0,
+);
+
+const seccionesSinTituloOLead = (indice.secciones || []).filter((s) => !s.titulo || !s.lead);
+check(
+  'el índice trae título y lead para cada sección',
+  Array.isArray(indice.secciones) && indice.secciones.length > 0 && seccionesSinTituloOLead.length === 0,
+  seccionesSinTituloOLead.map((s) => s.slug).join(', '),
+);
+
+function tituloDe(contenido) {
+  return (contenido.match(/<title>([^<]*)<\/title>/) || [])[1] ?? '';
+}
+function leadDe(contenido) {
+  const m = contenido.match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
+  return m ? m[1] : '';
+}
+
+const PAGINAS_CON_TITULO_Y_LEAD = [
+  ['index.html', indice.inicio],
+  ['proyectos.html', (indice.secciones || []).find((s) => s.slug === 'proyectos')],
+  ['publicaciones.html', (indice.secciones || []).find((s) => s.slug === 'publicaciones')],
+  ['sobre-mi.html', (indice.secciones || []).find((s) => s.slug === 'sobre-mi')],
+  ['contacto.html', (indice.secciones || []).find((s) => s.slug === 'contacto')],
+];
+
+const tituloMal = [];
+const leadMal = [];
+for (const [archivo, esperado] of PAGINAS_CON_TITULO_Y_LEAD) {
+  const contenido = leer(archivo);
+  const tituloEsperado = esperado?.titulo ?? '';
+  const leadEsperado = esperado?.lead ?? '';
+  const tituloReal = tituloDe(contenido);
+  const leadReal = leadDe(contenido);
+  if (!tituloEsperado || tituloReal !== tituloEsperado) {
+    tituloMal.push(`${archivo}: "${tituloReal}" ≠ "${tituloEsperado}"`);
+  }
+  if (!leadEsperado || leadReal !== leadEsperado) {
+    leadMal.push(`${archivo}: "${leadReal}" ≠ "${leadEsperado}"`);
+  }
+}
+check('<title> de cada página coincide con el título del índice', tituloMal.length === 0, tituloMal.join(' · '));
+check('el h1 de cada página coincide con el lead del índice', leadMal.length === 0, leadMal.join(' · '));
+
+// Comprobación estructural por expresión regular: no sustituye una prueba real
+// de teclado/lector de pantalla en el navegador, solo evita que `navegar()`
+// vuelva a dejar el <title> y el <h1> de la página anterior tras `cd
+// <sección>` o el botón «atrás» (el hallazgo U2 de arriba).
+const desdeNavegar = tsScript.slice(tsScript.indexOf('function navegar('));
+const cuerpoNavegar = desdeNavegar.slice(0, desdeNavegar.indexOf('\nfunction fragmento'));
+check(
+  'navegar() actualiza document.title y el h1 tras renderizar',
+  /document\.title\s*=/.test(cuerpoNavegar) && /\.innerHTML\s*=/.test(cuerpoNavegar),
+  'sin esto, cd <sección> deja la pestaña y el encabezado de la página anterior',
 );
 
 console.log('\nBarra lateral');
