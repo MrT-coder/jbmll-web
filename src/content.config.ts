@@ -1,4 +1,5 @@
 import { defineCollection, z } from 'astro:content';
+import type { ZodType } from 'zod';
 import { glob, file } from 'astro/loaders';
 
 // Astro 7 usa la Content Layer y busca este archivo en src/content.config.ts.
@@ -29,8 +30,8 @@ const mes = z
  * ausente significan lo mismo, así que se normalizan antes de validar en vez
  * de pedirle a quien edita que recuerde borrar la clave a mano.
  */
-const opcional = <T extends z.ZodTypeAny>(esquema: T) =>
-  z.preprocess((v) => (v === '' || v === null ? undefined : v), esquema.optional());
+const opcional = <T extends ZodType>(esquema: T) =>
+  z.preprocess((v: unknown) => (v === '' || v === null ? undefined : v), esquema.optional());
 
 const experiencia = defineCollection({
   loader: base('experiencia'),
