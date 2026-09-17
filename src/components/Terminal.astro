@@ -2,7 +2,6 @@
 import '../styles/terminal.css';
 import bannerRaw from '../data/banner.txt?raw';
 import { SECCIONES } from '../lib/content';
-import { esc } from '../lib/render';
 import Sidebar from './Sidebar.astro';
 import Statusline from './Statusline.astro';
 import type { DocumentoAbierto } from '../lib/tipos';
@@ -22,9 +21,22 @@ interface Props {
   /** El documento propio, en una página de detalle. La barra lateral lo sirve
    * como el único «leyendo» en abiertos, sin depender de JavaScript. */
   documento?: DocumentoAbierto | null;
+  /** Sustituye el comando por defecto (`cd <sección>`) cuando ese cálculo no
+   * describe la página: una de /stack/<tech> monta `seccion="sobre-mi"` solo
+   * para que la barra lateral marque ese workspace como padre, y `cd sobre-mi`
+   * ahí sería un comando falso. Sin ella, el comportamiento no cambia. */
+  comando?: string;
 }
 
-const { seccion = null, salida = '', boot = false, lead, detalle = false, documento = null } = Astro.props;
+const {
+  seccion = null,
+  salida = '',
+  boot = false,
+  lead,
+  detalle = false,
+  documento = null,
+  comando: comandoProp,
+} = Astro.props;
 
 // Los espacios finales son parte del dibujo y los editores los borran, así que
 // el ancho se restituye acá. El \r se limpia por finales de línea de Windows.
@@ -50,8 +62,10 @@ const BOOT = [
 const ruta = seccion ? `~/${seccion}` : '~/';
 
 // El comando que dejó la pantalla así. Se muestra ejecutado, no se ejecuta:
-// quien llega desde un buscador ve la terminal en el estado de esa URL.
-const comando = seccion ? `cd ${seccion}` : 'ls';
+// quien llega desde un buscador ve la terminal en el estado de esa URL. Una
+// página puede imponer el suyo con `comando` cuando `cd <sección>` no la
+// describe (ver el comentario de la prop, arriba).
+const comando = comandoProp ?? (seccion ? `cd ${seccion}` : 'ls');
 
 // El valor sin JavaScript para la statusline: el servidor solo conoce el
 // documento propio de esta página, si lo hay. sidebar.ts lo corrige apenas
@@ -215,7 +229,10 @@ const abiertosSsr = documento ? 1 : 0;
     color: var(--cyan);
   }
   .info .rule {
-    color: var(--line);
+    /* --line mide 1.41:1 sobre --bg (QA 2026-09-17): muy por debajo de las
+       3:1 de WCAG 1.4.11 para un separador no textual. --dim, ya usado en
+       texto atenuado, sí las cumple. */
+    color: var(--dim);
     margin-bottom: var(--space-2);
   }
   .info dl {

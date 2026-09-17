@@ -32,7 +32,10 @@ const ETIQUETA_TIPO: Record<TipoDocumentoAbierto, string> = {
 
 <button id="sidebar-scrim" class="sidebar-scrim" type="button" tabindex="-1" aria-hidden="true"></button>
 
-<div id="sidebar" class="sidebar" aria-label="Menú">
+<!-- Sin aria-label fijo: un nombre accesible estático sobre un elemento sin
+     role es un aria-prohibited-attr de axe. sidebar.ts lo pone junto con
+     role="dialog" solo mientras la cortina móvil está abierta (ver abrir()/cerrar()). -->
+<div id="sidebar" class="sidebar">
   <button id="sidebar-cerrar" class="sidebar-cerrar" type="button" aria-label="Cerrar menú">
     <span aria-hidden="true">✕</span>
   </button>

@@ -49,7 +49,9 @@ export function enlacesDeContacto(): Enlace[] {
     {
       etiqueta: 'linkedin',
       href: `https://www.linkedin.com/in/${perfil.linkedin}`,
-      texto: 'linkedin',
+      // Igual que github: el texto visible es el destino, no una repetición
+      // de la etiqueta de la fila.
+      texto: `linkedin.com/in/${perfil.linkedin}`,
     },
     {
       etiqueta: 'orcid',

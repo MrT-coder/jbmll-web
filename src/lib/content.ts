@@ -80,7 +80,7 @@ export async function getStack(): Promise<UsoDeStack[]> {
 
   const sumar = (
     tech: string,
-    fuente: { tipo: 'experiencia' | 'proyecto'; id: string; titulo: string },
+    fuente: { tipo: 'experiencia' | 'proyecto'; id: string; titulo: string; detalle: string },
   ) => {
     const actual = acc.get(tech) ?? { tech, usos: 0, fuentes: [] };
     actual.usos += 1;
@@ -91,13 +91,20 @@ export async function getStack(): Promise<UsoDeStack[]> {
   for (const e of experiencia) {
     if (e.data.proyecto) continue;
     for (const tech of e.data.st) {
-      sumar(tech, { tipo: 'experiencia', id: e.id, titulo: `${e.data.puesto} · ${e.data.organizacion}` });
+      sumar(tech, {
+        tipo: 'experiencia',
+        id: e.id,
+        titulo: `${e.data.puesto} · ${e.data.organizacion}`,
+        // Mismo formato que el `periodo()` de sobre-mi.astro: sin fecha de fin,
+        // el puesto sigue vigente.
+        detalle: `${e.data.inicio} — ${e.data.fin ?? 'presente'}`,
+      });
     }
   }
 
   for (const p of proyectos) {
     for (const tech of p.data.st) {
-      sumar(tech, { tipo: 'proyecto', id: p.id, titulo: p.data.titulo });
+      sumar(tech, { tipo: 'proyecto', id: p.id, titulo: p.data.titulo, detalle: p.data.desc });
     }
   }
 
