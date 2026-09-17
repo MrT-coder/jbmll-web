@@ -78,39 +78,56 @@ export function renderEntradas(filas: Fila[]): string {
 
 /**
  * El número y su evidencia van juntos siempre. Un stack que solo muestra
- * cuentas es un stack que hay que creer; este se puede comprobar.
+ * cuentas es un stack que hay que creer; este se puede comprobar (la
+ * evidencia vive en la página de cada tecnología, enlazada desde su celda).
+ *
+ * Es una cuadrícula, no una lista de filas: 29 tecnologías con una barra cada
+ * una crecían 29 filas hacia abajo sin decir nada que valiera la pena — 24
+ * tenían 1 uso y 5 tenían 2, así que casi todas las barras medían lo mismo.
+ * Acá el color codifica el número de usos, pero nunca es la única forma de
+ * leerlo: el número también queda escrito dentro de la celda (WCAG 1.4.1, «no
+ * solo color»). El nivel es absoluto —`min(usos, 5)`—, no relativo al máximo
+ * de hoy: así el mapa no se recolorea entero la próxima vez que se agregue un
+ * proyecto, y una celda con 2 usos ya se pinta en su lugar final de la escala.
  */
 export function renderStack(stack: UsoDeStack[], minimoParaPagina = 2): string {
-  // La barra mide usos contados, no dominio autodeclarado. Un porcentaje de
-  // «nivel» no sale de ningún dato: lo pone quien escribe y nadie puede
-  // comprobarlo. Esto sí — cada barra enlaza a dónde se usó.
-  const tope = Math.max(1, ...stack.map((s) => s.usos));
-
-  const filas = stack
+  const celdas = stack
     .map((s) => {
+      const nivel = Math.min(s.usos, 5);
       const conPagina = s.usos >= minimoParaPagina;
-      const url = `/stack/${esc(slugTech(s.tech))}`;
-      const nombre = conPagina
-        ? `<a class="go" href="${url}">${esc(s.tech)}</a>`
-        : esc(s.tech);
+      const nombre = esc(s.tech);
+      const texto = `${s.usos} ${s.usos === 1 ? 'uso' : 'usos'}`;
 
       // aria-hidden: el icono es decorativo y su nombre ya está al lado. Un
       // lector de pantalla leería el codepoint del Área de Uso Privado, que no
       // significa nada.
       const icono = `<span class="ico" aria-hidden="true">${esc(iconoDe(s.tech))}</span>`;
-      const barra = '█'.repeat(Math.max(1, Math.round((s.usos / tope) * 8)));
-      const fuentes = s.fuentes.map((f) => esc(f.titulo)).join(' · ');
+      const contenido = `${icono}<span class="stack-nombre">${nombre}</span><span class="stack-usos">${texto}</span>`;
 
-      return `<tr>
-    <td class="n">${icono}${nombre}</td>
-    <td class="bar" title="${s.usos} ${s.usos === 1 ? 'uso' : 'usos'}">${barra}</td>
-    <td class="c">${s.usos}</td>
-    <td class="d">${fuentes}</td>
-  </tr>`;
+      // Mismo criterio que panel()/chip: una tecnología sin página propia se
+      // pinta como texto, no como enlace. El nombre accesible del enlace lleva
+      // el número adentro para que no haga falta ver el color de fondo para
+      // saber cuántos usos tiene.
+      const celda = conPagina
+        ? `<a class="stack-celda nivel-${nivel}" href="/stack/${esc(slugTech(s.tech))}" aria-label="${nombre}, ${texto}">${contenido}</a>`
+        : `<div class="stack-celda nivel-${nivel}">${contenido}</div>`;
+
+      return `<li>${celda}</li>`;
     })
     .join('\n');
 
-  return `<table class="list stack">\n${filas}\n</table>`;
+  // La leyenda no es decorativa: sin ella el color no dice nada para quien no
+  // memorizó la escala. Su texto va en un token de texto, nunca en el color de
+  // la propia serie — el mismo criterio que un gráfico normal.
+  const leyenda = [1, 2, 3, 4, 5]
+    .map((n) => {
+      const etiqueta = n === 5 ? '5+' : String(n);
+      const texto = `${etiqueta} ${n === 1 ? 'uso' : 'usos'}`;
+      return `<li><span class="stack-swatch nivel-${n}" aria-hidden="true"></span><span class="stack-leyenda-t">${texto}</span></li>`;
+    })
+    .join('');
+
+  return `<ul class="stack-heat">\n${celdas}\n</ul>\n<ul class="stack-leyenda">${leyenda}</ul>`;
 }
 
 /**

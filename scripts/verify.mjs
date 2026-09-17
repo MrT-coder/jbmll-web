@@ -501,9 +501,10 @@ console.log('\nEscala tipográfica');
 // dentro del ancho, no es texto que deba medirse en em.
 const BANNER_EXCEPCIONES = [/^\.logo$/];
 
-// La barra de uso se dibuja pegando glifos █: el letter-spacing negativo es un
-// truco de empaquetado de caracteres, no una decisión sobre texto legible.
-const GLIFO_EXCEPCIONES = [/^\.stack td\.bar$/];
+// Ninguna regla de este sitio necesita hoy una excepción de letter-spacing:
+// se deja el mecanismo listo (así lo usaba la barra del stack, con glifos █
+// pegados) para el día que alguna vuelva a necesitarlo.
+const GLIFO_EXCEPCIONES = [];
 
 const RAW_FONT_SIZE = /\bfont-size\s*:\s*([^;]+);/;
 const RAW_LINE_HEIGHT = /\bline-height\s*:\s*([^;]+);/;
@@ -1089,22 +1090,119 @@ check(
 console.log('\nStack visual');
 const sm = leer('sobre-mi.html');
 
-// La barra mide usos contados. Un porcentaje de dominio no sale de ningún dato:
-// lo pone quien escribe y nadie puede comprobarlo.
-const barras = [...sm.matchAll(/<td class="bar"[^>]*title="(\d+) usos?"[^>]*>(█+)</g)].map(
-  (m) => ({ usos: Number(m[1]), largo: m[2].length }),
-);
-check('el stack se dibuja con barras', barras.length > 0, `${barras.length} filas`);
-check(
-  'la barra es proporcional a los usos contados',
-  barras.length > 0 &&
-    barras.every((b) => b.largo >= 1) &&
-    new Set(barras.map((b) => `${b.usos}:${b.largo}`)).size ===
-      new Set(barras.map((b) => b.usos)).size,
-  'a igual número de usos, igual largo de barra',
-);
 // Si alguna vez aparece un porcentaje, es que el número se inventó.
 check('sin porcentajes de dominio', !/\b\d{1,3}\s*%/.test(sm), 'ese número no sale de ningún dato');
+
+console.log('\nStack: mapa de calor');
+// El mapa de calor reemplaza las 29 filas con barra por una cuadrícula donde
+// el color codifica los usos. Sin el número escrito dentro de la celda, ese
+// color sería la única forma de leerlo — justo lo que WCAG 1.4.1 prohíbe.
+const bloqueHeat = sm.match(/<ul class="stack-heat">[\s\S]*?<\/ul>/)?.[0] ?? '';
+const celdasHtml = [...bloqueHeat.matchAll(/<li>([\s\S]*?)<\/li>/g)].map((m) => m[1]);
+check('el mapa de calor se pinta como lista', celdasHtml.length > 0, `${celdasHtml.length} celdas`);
+check(
+  'cada tecnología del índice tiene exactamente una celda',
+  celdasHtml.length === stack.length,
+  `${celdasHtml.length} celdas ≠ ${stack.length} tecnologías`,
+);
+
+// El color nunca es la única forma de leer el número: tiene que estar también
+// como texto dentro de la celda.
+const celdasSinNumero = celdasHtml.filter((c) => !/<span class="stack-usos">\d+ usos?<\/span>/.test(c));
+check(
+  'ninguna celda depende solo del color: el número también va como texto',
+  celdasSinNumero.length === 0,
+  `${celdasSinNumero.length} sin número`,
+);
+
+// El número escrito en cada celda tiene que coincidir con stack.json: dos
+// fuentes del mismo dato que se puedan desincronizar es peor que una sola.
+// Mismo esc() que src/lib/render.ts: el nombre en el HTML sale escapado y hay
+// que escapar igual el de stack.json antes de comparar.
+function esc(s) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+const celdasDatos = [
+  ...bloqueHeat.matchAll(/<span class="stack-nombre">([^<]*)<\/span><span class="stack-usos">(\d+) usos?<\/span>/g),
+].map(([, nombre, usos]) => ({ nombre, usos: Number(usos) }));
+const conteoEsperado = new Map(stack.map((s) => [esc(s.tech), s.usos]));
+const celdasDesalineadas = celdasDatos.filter(({ nombre, usos }) => conteoEsperado.get(nombre) !== usos);
+check(
+  'el número de cada celda coincide con stack.json',
+  celdasDatos.length === stack.length && celdasDesalineadas.length === 0,
+  celdasDesalineadas.map((c) => c.nombre).join(', '),
+);
+
+// Solo una tecnología con página propia (2+ usos, ver MINIMO_PARA_PAGINA_DE_STACK
+// en src/lib/content.ts) es un enlace; el resto es una celda sin afordancia.
+// El nombre accesible de cada enlace lleva el número adentro: no hace falta
+// ver el color de fondo para saber cuántos usos tiene.
+const enlacesCelda = [
+  ...bloqueHeat.matchAll(/<a class="stack-celda nivel-\d" href="[^"]+" aria-label="([^"]+)">/g),
+].map((m) => m[1]);
+check(
+  'las tecnologías con página propia son enlaces en el mapa de calor',
+  enlacesCelda.length === conPagina.length,
+  `${enlacesCelda.length} enlaces ≠ ${conPagina.length} con página`,
+);
+check(
+  'el nombre accesible de cada enlace incluye el número de usos',
+  enlacesCelda.length > 0 && enlacesCelda.every((label) => /\d+ usos?/.test(label)),
+);
+
+console.log('\nStack: escala de color');
+const NIVELES = [1, 2, 3, 4, 5];
+const nivelesFaltantes = NIVELES.filter(
+  (n) => !new RegExp(`--nivel-${n}:\\s*#[0-9a-fA-F]{6}`).test(tokensSrc),
+);
+check('los cinco tokens --nivel-* existen en tokens.css', nivelesFaltantes.length === 0, nivelesFaltantes.join(', '));
+
+const fgToken = leerToken('fg');
+for (const n of NIVELES) {
+  const hexNivel = leerToken(`nivel-${n}`);
+  const ratioNivel = hexNivel && fgToken ? contraste(fgToken, hexNivel) : 0;
+  check(
+    `--fg sobre --nivel-${n} ≥ 4.5:1 (WCAG 1.4.3 AA)`,
+    ratioNivel >= 4.5,
+    `${fgToken || '¿?'} sobre ${hexNivel || '¿?'}: ${ratioNivel.toFixed(2)}:1`,
+  );
+}
+
+// Ni un nivel de más que nadie pueda alcanzar (.nivel-6...) ni uno de menos
+// que el CSS use sin declararlo en tokens.css.
+const nivelesEnCss = new Set([...css.matchAll(/\.nivel-(\d+)\b/g)].map((m) => Number(m[1])));
+check(
+  'el CSS usa exactamente los niveles que declara (nada de .nivel-6, ninguno sin usar)',
+  [...nivelesEnCss].every((n) => NIVELES.includes(n)) && NIVELES.every((n) => nivelesEnCss.has(n)),
+  `en CSS: ${[...nivelesEnCss].sort().join(', ')}`,
+);
+
+// El nivel más oscuro mide 1.13:1 contra --bg: sin borde propio, esa celda
+// desaparece contra la página.
+check(
+  'cada celda del mapa de calor lleva un borde visible',
+  /\.stack-celda\s*\{[^}]*border:\s*1px solid var\(--line\)/.test(css),
+);
+
+const bloqueLeyenda = sm.match(/<ul class="stack-leyenda">[\s\S]*?<\/ul>/)?.[0] ?? '';
+const pasosLeyenda = [...bloqueLeyenda.matchAll(/nivel-(\d)/g)].map((m) => Number(m[1]));
+check(
+  'la leyenda muestra los cinco pasos de la escala',
+  NIVELES.every((n) => pasosLeyenda.includes(n)) && pasosLeyenda.length === 5,
+  `pasos encontrados: ${pasosLeyenda.join(', ')}`,
+);
+check('la leyenda marca el último paso como «5+»', /5\+/.test(bloqueLeyenda));
+// El texto de la leyenda no puede ir en el color de la propia serie: ese color
+// ya lo lleva el recuadro de al lado.
+check(
+  'el texto de la leyenda usa un token de texto, no el de la serie',
+  /\.stack-leyenda-t\s*\{[^}]*color:\s*var\(--(dim|muted|fg|prose)\)/.test(css),
+);
 
 // Los iconos son caracteres de la fuente empaquetada, no imágenes: no tocan
 // img-src, escalan y heredan el color del texto.
@@ -1206,7 +1304,27 @@ console.log('\nAlcance del CSS en set:html');
 // Lo que se inserta con set:html no recibe la marca de alcance de Astro, igual
 // que lo que crea el script. Sus estilos tienen que estar sin alcance o la
 // página se ve casi bien y nada avisa.
-const INYECTADAS = ['panel', 'panel-t', 'panel-d', 'chips', 'chip', 'panels', 'row-go'];
+const INYECTADAS = [
+  'panel',
+  'panel-t',
+  'panel-d',
+  'chips',
+  'chip',
+  'panels',
+  'row-go',
+  'stack-heat',
+  'stack-celda',
+  'stack-nombre',
+  'stack-usos',
+  'stack-leyenda',
+  'stack-leyenda-t',
+  'stack-swatch',
+  'nivel-1',
+  'nivel-2',
+  'nivel-3',
+  'nivel-4',
+  'nivel-5',
+];
 for (const cls of INYECTADAS) {
   const suelta = new RegExp('\\.' + cls + '(?![\\w-])(?!\\[data-astro-cid)');
   check(
@@ -1716,6 +1834,21 @@ check('sin estilos en línea', !/<style[\s>]/.test(html));
 // el estilo simplemente no se aplica. Es más fácil de colar que un <style>.
 const atributos = html.match(/\sstyle="[^"]*"/g) || [];
 check('sin atributos style=', atributos.length === 0, atributos.join(' '));
+
+// La comprobación de arriba solo mira index.html. El mapa de calor del stack
+// pinta sus niveles con clases (.nivel-1…5) precisamente porque un atributo
+// style= también lo bloquea style-src y no deja rastro visible: el barrido
+// tiene que cubrir todas las páginas del sitio, no solo la de inicio.
+const atributosStyleSitio = [];
+for (const archivo of paginasHtml) {
+  const encontrados = readFileSync(archivo, 'utf8').match(/\sstyle="[^"]*"/g) || [];
+  if (encontrados.length > 0) atributosStyleSitio.push(`${relative(DIST, archivo).replace(/\\/g, '/')}: ${encontrados.length}`);
+}
+check(
+  'sin atributos style= en ninguna página del sitio',
+  atributosStyleSitio.length === 0,
+  atributosStyleSitio.join(' · '),
+);
 check('script servido como archivo', /<script[^>]+src="\/_astro\/[^"]+\.js"/.test(html));
 
 // La versión exacta del framework es una pista gratis para quien busca un CVE.
