@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- El panel no es contenido del sitio: nadie debe llegar aquí desde un
+         buscador. robots.txt lo refuerza a nivel de rastreo (Disallow: /admin/)
+         y esta etiqueta lo refuerza a nivel de indexación. -->
+    <meta name="robots" content="noindex" />
+    <title>Panel de administración — JBMLL</title>
+  </head>
+  <body>
+    <!-- Sveltia CMS se monta solo, directo sobre <body>: no necesita un
+         contenedor con id propio. El bundle se sirve desde el propio origen
+         (scripts/copiar-admin.mjs lo copia aquí antes de cada build), nunca
+         desde unpkg, para poder declarar una CSP con script-src 'self'. -->
+    <script src="/admin/sveltia-cms.js"></script>
+  </body>
+</html>

@@ -1,0 +1,276 @@
+# Configuración de Sveltia CMS. Cada colección de aquí espeja una colección de
+# src/content.config.ts: mismos nombres de campo, misma obligatoriedad, mismos
+# valores de enum. scripts/verify.mjs lo comprueba leyendo ambos archivos, así
+# que un cambio en el esquema de Zod que no se refleje aquí queda en rojo.
+
+backend:
+  name: github
+  repo: MrT-coder/jbmll-web
+  branch: main
+  # Decisión del dueño del sitio: solo "Sign In Using Access Token" (token
+  # personal de GitHub), sin flujo OAuth ni worker de autenticación. Restringir
+  # los métodos permitidos, y no solo confiar en que nadie use el otro botón,
+  # es lo que deja quitar de la CSP los hosts que el flujo OAuth necesitaría
+  # (github.com, api.netlify.com): ver public/_headers.
+  auth_methods: [token]
+
+# Los medios se guardan en el propio repositorio, junto al código.
+media_folder: public/media
+public_folder: /media
+
+# Sin esto, Sveltia sobrescribe en tiempo de ejecución el <title> de
+# public/admin/index.html con su propio nombre genérico ("Sveltia CMS").
+app_title: Panel de administración — JBMLL
+
+collections:
+  # --- Colecciones de carpeta (Markdown + frontmatter) ---------------------
+
+  - name: experiencia
+    label: Experiencia
+    label_singular: Experiencia
+    folder: src/content/experiencia
+    create: true
+    delete: true
+    extension: md
+    format: yaml-frontmatter
+    # Slug editable en la creación: pasa a ser el nombre del archivo tal cual
+    # se escribe, sin que el CMS lo derive de un título (ninguno de los
+    # campos de esta colección hace de título único).
+    slug: '{{fields._slug}}'
+    fields:
+      - { name: puesto, label: Puesto, widget: string }
+      - { name: organizacion, label: Organización, widget: string }
+      - { name: ubicacion, label: Ubicación, widget: string }
+      - {
+          name: modalidad,
+          label: Modalidad,
+          widget: select,
+          options: [presencial, remoto, híbrido],
+          required: false,
+        }
+      - {
+          name: inicio,
+          label: Inicio,
+          widget: string,
+          pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+          hint: 'AAAA o AAAA-MM',
+        }
+      - {
+          name: fin,
+          label: Fin,
+          widget: string,
+          required: false,
+          pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+          hint: 'AAAA o AAAA-MM. Vacío significa "hasta hoy".',
+        }
+      - { name: proyecto, label: Proyecto relacionado, widget: string, required: false }
+      - { name: st, label: Stack, widget: list, required: false, default: [] }
+      - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
+
+  - name: proyectos
+    label: Proyectos
+    label_singular: Proyecto
+    folder: src/content/proyectos
+    create: true
+    delete: true
+    extension: md
+    format: yaml-frontmatter
+    slug: '{{fields._slug}}'
+    fields:
+      - { name: titulo, label: Título, widget: string }
+      - { name: desc, label: Descripción, widget: text }
+      - {
+          name: estado,
+          label: Estado,
+          widget: select,
+          options: [produccion, activo, tesis, archivado],
+        }
+      - { name: organizacion, label: Organización, widget: string, required: false }
+      - {
+          name: fecha,
+          label: Fecha,
+          widget: string,
+          pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+          hint: 'AAAA o AAAA-MM',
+        }
+      - { name: st, label: Stack, widget: list, min: 1 }
+      - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
+      - { name: repo, label: Repositorio, widget: string, type: url, required: false }
+      - { name: demo, label: Demo, widget: string, type: url, required: false }
+      - { name: destacado, label: Destacado, widget: boolean, default: false }
+      - { name: borrador, label: Borrador, widget: boolean, default: false }
+
+  - name: publicaciones
+    label: Publicaciones
+    label_singular: Publicación
+    folder: src/content/publicaciones
+    create: true
+    delete: true
+    extension: md
+    format: yaml-frontmatter
+    slug: '{{fields._slug}}'
+    fields:
+      - { name: titulo, label: Título, widget: string }
+      - { name: autores, label: Autores, widget: list, min: 1 }
+      - { name: anio, label: Año, widget: number, value_type: int }
+      - {
+          name: tipo,
+          label: Tipo,
+          widget: select,
+          options: [journal, conference, preprint, capitulo],
+        }
+      - { name: venue, label: Venue, widget: string }
+      - { name: serie, label: Serie, widget: string, required: false }
+      - { name: editorial, label: Editorial, widget: string, required: false }
+      - { name: paginas, label: Páginas, widget: string, required: false }
+      - { name: doi, label: DOI, widget: string, required: false }
+      - { name: url, label: URL, widget: string, type: url, required: false }
+      - { name: proyecto, label: Proyecto relacionado, widget: string, required: false }
+      - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
+      - { name: borrador, label: Borrador, widget: boolean, default: false }
+
+  - name: educacion
+    label: Educación
+    label_singular: Educación
+    folder: src/content/educacion
+    create: true
+    delete: true
+    extension: md
+    format: yaml-frontmatter
+    slug: '{{fields._slug}}'
+    fields:
+      - { name: titulo, label: Título, widget: string }
+      - { name: institucion, label: Institución, widget: string }
+      - { name: ubicacion, label: Ubicación, widget: string }
+      - {
+          name: inicio,
+          label: Inicio,
+          widget: string,
+          pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+          hint: 'AAAA o AAAA-MM',
+        }
+      - {
+          name: fin,
+          label: Fin,
+          widget: string,
+          required: false,
+          pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+          hint: 'AAAA o AAAA-MM',
+        }
+      - { name: registro, label: Número de registro, widget: string, required: false }
+
+  # --- Páginas: colección de archivos, sin creación (son exactamente dos) --
+  # Sveltia no tiene una opción `create` para colecciones de archivos: la
+  # lista de archivos ya es fija por diseño (cada entrada declara su propio
+  # `file`), así que no hay nada que deshabilitar aparte.
+  - name: paginas
+    label: Páginas
+    label_singular: Página
+    files:
+      - name: sobre-mi
+        label: Sobre mí
+        file: src/content/paginas/sobre-mi.md
+        fields:
+          - { name: titulo, label: Título, widget: string }
+          - { name: desc, label: Descripción, widget: text }
+          # La prosa vive fuera del frontmatter, en el cuerpo del Markdown.
+          # No es una clave del esquema de Zod (que solo valida titulo/desc):
+          # scripts/verify.mjs excluye "body" a propósito al comparar campos.
+          - { name: body, label: Contenido, widget: markdown }
+      - name: contacto
+        label: Contacto
+        file: src/content/paginas/contacto.md
+        fields:
+          - { name: titulo, label: Título, widget: string }
+          - { name: desc, label: Descripción, widget: text }
+          - { name: body, label: Contenido, widget: markdown }
+
+  # --- Certificaciones: una lista completa dentro de un solo YAML ----------
+  # El archivo es un arreglo YAML en la raíz, sin clave que lo envuelva. La
+  # opción `root: true` de un campo `list` es justo para esto (ver
+  # https://sveltiacms.app/en/docs/fields/list#top-level-list): el campo
+  # "certificaciones" no aparece en el archivo final, su lista sí.
+  - name: certificaciones
+    label: Certificaciones
+    label_singular: Certificación
+    files:
+      - name: certificaciones
+        label: Certificaciones y cursos
+        file: src/content/certificaciones.yaml
+        format: yaml
+        fields:
+          - name: certificaciones
+            label: Certificaciones
+            label_singular: Certificación
+            widget: list
+            root: true
+            summary: '{{nombre}}'
+            fields:
+              - { name: id, label: ID, widget: string }
+              - { name: nombre, label: Nombre, widget: string }
+              - { name: emisor, label: Emisor, widget: string, required: false }
+              - {
+                  name: fecha,
+                  label: Fecha,
+                  widget: string,
+                  required: false,
+                  pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+                  hint: 'AAAA o AAAA-MM. Vacío si el CV no trae fecha.',
+                }
+              - {
+                  name: horas,
+                  label: Horas,
+                  widget: number,
+                  value_type: int,
+                  min: 1,
+                  required: false,
+                }
+              - { name: credencial, label: Credencial, widget: string, required: false }
+              - { name: url, label: URL, widget: string, type: url, required: false }
+              - {
+                  name: tipo,
+                  label: Tipo,
+                  widget: select,
+                  options: [certificacion, curso],
+                  default: certificacion,
+                }
+
+# --- Perfil: entrada única, con el objeto envuelto en la clave "perfil" ----
+# src/content/perfil.yaml no tiene los campos en la raíz: los tiene bajo una
+# única clave de nivel superior, "perfil:" (ver el comentario en ese YAML). Un
+# campo widget: object con ese mismo nombre reproduce exactamente esa forma;
+# no existe una opción `root` para objetos como la hay para listas, así que
+# esta es la forma documentada de anidarlo.
+singletons:
+  - name: perfil
+    label: Perfil
+    file: src/content/perfil.yaml
+    format: yaml
+    fields:
+      - name: perfil
+        label: Perfil
+        widget: object
+        fields:
+          - { name: nombre, label: Nombre, widget: string }
+          - { name: marca, label: Marca, widget: string }
+          - { name: titular, label: Titular, widget: string }
+          - { name: ubicacion, label: Ubicación, widget: string }
+          - { name: disponibilidad, label: Disponibilidad, widget: string }
+          - { name: correo, label: Correo, widget: string, type: email }
+          - {
+              name: telefono,
+              label: Teléfono,
+              widget: string,
+              pattern: ['^\+\d{6,15}$', 'Formato E.164, por ejemplo +593958774749'],
+              hint: 'Formato E.164 (+ y de 6 a 15 dígitos, sin separadores)',
+            }
+          - { name: github, label: Usuario de GitHub, widget: string }
+          - { name: linkedin, label: Usuario de LinkedIn, widget: string }
+          - {
+              name: orcid,
+              label: ORCID,
+              widget: string,
+              pattern:
+                ['^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$', 'Formato ORCID, por ejemplo 0009-0004-2687-2314'],
+              hint: 'Formato 0000-0000-0000-0000',
+            }
