@@ -1,4 +1,6 @@
 ---
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import '../styles/terminal.css';
 import bannerRaw from '../data/banner.txt?raw';
 import { SECCIONES } from '../lib/content';
@@ -26,6 +28,10 @@ interface Props {
    * para que la barra lateral marque ese workspace como padre, y `cd sobre-mi`
    * ahí sería un comando falso. Sin ella, el comportamiento no cambia. */
   comando?: string;
+  /** Foto del perfil para el bloque de arranque, estilo neofetch. Viene de
+   * perfil.yaml (campo opcional `foto`); ausente, el arranque cae al banner
+   * ASCII de siempre. */
+  foto?: { src: string; alt: string } | null;
 }
 
 const {
@@ -36,6 +42,7 @@ const {
   detalle = false,
   documento = null,
   comando: comandoProp,
+  foto = null,
 } = Astro.props;
 
 // Los espacios finales son parte del dibujo y los editores los borran, así que
@@ -46,6 +53,46 @@ const rows = bannerRaw
   .split('\n');
 const width = Math.max(...rows.map((r) => r.length));
 const banner = rows.map((r) => r.padEnd(width)).join('\n');
+
+// Lee el tamaño real de la foto desde sus propios bytes (marcador SOF del
+// JPEG): public/ no pasa por el pipeline de imágenes de Astro (astro:assets
+// no sirve archivos de public/ tal cual), así que sin esto el <img> tendría
+// que asumir un tamaño fijo y dejaría de ser el real en cuanto el dueño
+// reemplace la foto desde /admin. Solo cubre JPEG porque es el único formato
+// que produce este flujo hoy: uno distinto rompe el build con un error
+// explícito en vez de servir un width/height inventado.
+function tamanoJpeg(ruta: string): { width: number; height: number } {
+  const buf = readFileSync(ruta);
+  let i = 2;
+  while (i < buf.length) {
+    if (buf[i] !== 0xff) {
+      i++;
+      continue;
+    }
+    const marcador = buf[i + 1];
+    if (marcador === 0xd8 || marcador === 0xd9) {
+      i += 2;
+      continue;
+    }
+    if (marcador >= 0xd0 && marcador <= 0xd7) {
+      i += 2;
+      continue;
+    }
+    const largo = buf.readUInt16BE(i + 2);
+    const esSOF =
+      (marcador >= 0xc0 && marcador <= 0xc3) ||
+      (marcador >= 0xc5 && marcador <= 0xc7) ||
+      (marcador >= 0xc9 && marcador <= 0xcb) ||
+      (marcador >= 0xcd && marcador <= 0xcf);
+    if (esSOF) return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+    i += 2 + largo;
+  }
+  throw new Error(`No se encontró el marcador SOF de JPEG en ${ruta}`);
+}
+
+// process.cwd() es la raíz del repo durante `astro build`/`astro dev`, igual
+// que asume scripts/verify.mjs con sus propias rutas relativas.
+const fotoTam = foto ? tamanoJpeg(join(process.cwd(), 'public', foto.src)) : null;
 
 // Área de Uso Privado de Unicode: solo existe gracias a la fuente empaquetada.
 const BRAIN = '';
@@ -100,7 +147,18 @@ const abiertosSsr = documento ? 1 : 0;
         {
           boot && (
             <div class="fetch">
-              <pre class="logo" aria-hidden="true">{banner}</pre>
+              {foto && fotoTam ? (
+                <img
+                  class="foto"
+                  src={foto.src}
+                  alt={foto.alt}
+                  width={fotoTam.width}
+                  height={fotoTam.height}
+                  decoding="async"
+                />
+              ) : (
+                <pre class="logo" aria-hidden="true">{banner}</pre>
+              )}
               <div class="info">
                 <p class="title">
                   <span class="u">josue</span><span class="at">@</span><span class="h">jbmll-web</span>
@@ -208,6 +266,30 @@ const abiertosSsr = documento ? 1 : 0;
     font-size: clamp(7.5px, 1.28vw, 12px);
     color: var(--green);
   }
+  /* max-width y no width: sin una propiedad `width` propia, el navegador
+     usa el tamaño intrínseco de la imagen (los atributos width/height de la
+     etiqueta, ver el bloque de arranque arriba) como su ancho por defecto, y
+     max-width solo puede achicarlo. Así escala con la cuadrícula tipográfica
+     hasta 12ch, pero nunca la agranda más allá de su tamaño real — sin
+     necesitar ese número (que depende del archivo que suba el dueño) dentro
+     de una regla CSS estática, algo que la CSP del sitio no permite inyectar
+     en línea (style-src 'self', sin 'unsafe-inline': ver public/_headers). */
+  .foto {
+    flex: 0 0 auto;
+    display: block;
+    /* 24ch iguala la altura del bloque de datos de al lado, que es la
+       proporción del neofetch que inspira este bloque; a 12ch la foto queda
+       chica y el panel se ve desequilibrado. El atributo width del archivo
+       sigue siendo el techo: si la foto es más chica que 24ch, manda ella. */
+    max-width: 24ch;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border: 1px solid var(--line);
+    /* Ajuste sutil para que la foto no desentone de la paleta de la terminal,
+       sin perder que se reconozca a quien retrata. */
+    filter: saturate(1.05) contrast(1.05);
+  }
   /* Sin min-width el panel se aprieta hasta ser ilegible en vez de bajar. */
   .info {
     flex: 1 1 26ch;
@@ -308,12 +390,19 @@ const abiertosSsr = documento ? 1 : 0;
     .shell {
       flex-direction: column;
     }
+    /* flex-direction y no flex-wrap solo: el banner ASCII es tan ancho que ya
+       se apilaba solo por desbordar la fila, pero la foto (acotada a 12ch) sí
+       cabría junto al panel de info sin este empujón explícito. */
     .fetch {
+      flex-direction: column;
       gap: var(--space-6);
     }
     .logo {
       align-self: center;
       font-size: clamp(7.5px, 2.6vw, 12px);
+    }
+    .foto {
+      align-self: center;
     }
     .lead {
       font-size: var(--text-md);

@@ -19,3 +19,10 @@ perfil:
   github: MrT-coder
   linkedin: josue-bladimir-morales-llanganate-20086636b
   orcid: 0009-0004-2687-2314
+
+  # Opcional: sin ella, el bloque de arranque de la portada cae al banner
+  # ASCII (ver Terminal.astro). `src` vive bajo /media/, que es el único
+  # `public_folder` que declara public/admin/config.yml para el CMS.
+  foto:
+    src: /media/FOTO_INGE_PUNK.jpg
+    alt: 'Retrato ilustrado estilo cyberpunk de un hombre joven de cabello oscuro peinado hacia un costado, con traje oscuro y corbata verde azulada, bajo luces de neón rosadas y azules, sobre un fondo de ciudad nocturna con letreros verticales luminosos.'

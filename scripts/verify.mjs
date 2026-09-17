@@ -234,7 +234,15 @@ console.log('\nBanner');
 const banner = readFileSync('src/data/banner.txt', 'utf8').replace(/\n+$/, '').split('\n');
 const anchos = new Set(banner.map((r) => r.length));
 check('banner alineado', anchos.size === 1, 'anchos distintos: ' + [...anchos].join(', '));
-check('banner en el HTML', html.includes('█'));
+// La foto reemplaza al banner en el bloque de arranque cuando perfil.yaml
+// trae `foto` (ver Terminal.astro); sin ella, el propio componente cae al
+// banner y esta comprobación sigue teniendo sentido tal como estaba.
+const fotoYaml = perfilYamlData.foto;
+if (fotoYaml && fotoYaml.src) {
+  skip('banner en el HTML', 'perfil.yaml trae foto: el arranque muestra la foto en vez del banner ASCII');
+} else {
+  check('banner en el HTML', html.includes('█'));
+}
 
 console.log('\nCSS');
 const cssFiles = existsSync(join(DIST, '_astro'))
@@ -248,6 +256,115 @@ const usadas = new Set([...css.matchAll(/var\((--[\w-]+)/g)].map((m) => m[1]));
 const definidas = new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map((m) => m[1]));
 const fantasma = [...usadas].filter((v) => !definidas.has(v));
 check('sin variables fantasma', fantasma.length === 0, fantasma.join(', '));
+
+console.log('\nFoto de perfil (bloque de arranque)');
+// Mismo criterio que arriba: sin `foto` en perfil.yaml, el arranque cae al
+// banner y estas comprobaciones no tienen nada que probar — quedan omitidas,
+// no en rojo ni en verde por accidente.
+//
+// El tamaño real se lee del propio JPEG (marcador SOF) en vez de confiar en
+// el width/height que puso el HTML: comparar el HTML contra sí mismo no
+// probaría nada.
+function tamanoJpeg(ruta) {
+  const buf = readFileSync(ruta);
+  let i = 2;
+  while (i < buf.length) {
+    if (buf[i] !== 0xff) {
+      i++;
+      continue;
+    }
+    const marcador = buf[i + 1];
+    if (marcador === 0xd8 || marcador === 0xd9) {
+      i += 2;
+      continue;
+    }
+    if (marcador >= 0xd0 && marcador <= 0xd7) {
+      i += 2;
+      continue;
+    }
+    const largo = buf.readUInt16BE(i + 2);
+    const esSOF =
+      (marcador >= 0xc0 && marcador <= 0xc3) ||
+      (marcador >= 0xc5 && marcador <= 0xc7) ||
+      (marcador >= 0xc9 && marcador <= 0xcb) ||
+      (marcador >= 0xcd && marcador <= 0xcf);
+    if (esSOF) return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+    i += 2 + largo;
+  }
+  return null;
+}
+
+const NOMBRES_CHECK_FOTO = [
+  'la home trae exactamente una <img>',
+  'el alt de la foto no está vacío',
+  'width y height están presentes, son numéricos y coinciden (foto cuadrada)',
+  'el archivo de la foto existe en dist/',
+  'la foto pesa menos de 200 KB',
+  'la ruta de la foto en el HTML coincide con perfil.yaml',
+  'width/height del HTML coinciden con el tamaño real del archivo',
+  'el CSS de .foto no fija width (solo max-width): nunca se agranda más allá de su tamaño real',
+];
+if (!fotoYaml || !fotoYaml.src) {
+  for (const nombre of NOMBRES_CHECK_FOTO) skip(nombre, 'perfil.yaml no trae foto: el arranque usa el banner ASCII');
+} else {
+  const imgs = [...html.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]);
+  check('la home trae exactamente una <img>', imgs.length === 1, `${imgs.length} encontradas`);
+  const imgTag = imgs[0] || '';
+  const altHome = (imgTag.match(/\salt="([^"]*)"/) || [])[1] ?? '';
+  const widthHome = Number((imgTag.match(/\swidth="(\d+)"/) || [])[1] ?? NaN);
+  const heightHome = Number((imgTag.match(/\sheight="(\d+)"/) || [])[1] ?? NaN);
+  check('el alt de la foto no está vacío', altHome.trim().length > 0);
+  check(
+    'width y height están presentes, son numéricos y coinciden (foto cuadrada)',
+    Number.isFinite(widthHome) && Number.isFinite(heightHome) && widthHome === heightHome,
+    `width="${widthHome}" height="${heightHome}"`,
+  );
+
+  const fotoDistPath = join(DIST, fotoYaml.src.replace(/^\//, ''));
+  const fotoExiste = existsSync(fotoDistPath);
+  check('el archivo de la foto existe en dist/', fotoExiste, fotoDistPath);
+  const pesoFoto = fotoExiste ? statSync(fotoDistPath).size : Infinity;
+  check(
+    'la foto pesa menos de 200 KB',
+    pesoFoto < 200 * 1024,
+    Number.isFinite(pesoFoto) ? (pesoFoto / 1024).toFixed(1) + ' KB' : 'no existe',
+  );
+
+  const srcHome = (imgTag.match(/\ssrc="([^"]*)"/) || [])[1] ?? '';
+  check(
+    'la ruta de la foto en el HTML coincide con perfil.yaml',
+    srcHome === fotoYaml.src,
+    `html "${srcHome}" ≠ yaml "${fotoYaml.src}"`,
+  );
+
+  const tamReal = fotoExiste ? tamanoJpeg(fotoDistPath) : null;
+  check(
+    'width/height del HTML coinciden con el tamaño real del archivo',
+    !!tamReal && widthHome === tamReal.width && heightHome === tamReal.height,
+    tamReal
+      ? `html ${widthHome}x${heightHome} ≠ archivo ${tamReal.width}x${tamReal.height}`
+      : 'no se pudo leer el marcador SOF del JPEG',
+  );
+
+  // La CSP del sitio no admite atributos style= ni <style> en línea (ver
+  // Terminal.astro), así que el tope no puede llevar el ancho real inyectado:
+  // en vez de eso, la regla evita `width` y solo declara `max-width` en ch —
+  // sin `width` propio, el navegador usa el tamaño intrínseco (los atributos
+  // width/height ya comprobados arriba) como ancho por defecto, y max-width
+  // únicamente puede achicarlo, nunca agrandarlo.
+  // Astro añade [data-astro-cid-...] al selector con alcance de componente, y
+  // el CSS de producción sale minificado: la búsqueda tolera ambas cosas.
+  const reglaFoto = (css.match(/\.foto(?:\[[^\]]*\])?\s*\{[^}]*\}/) || [''])[0];
+  const maxWidthCh = /max-width\s*:\s*[\d.]+ch/.test(reglaFoto);
+  // Lookbehind negativo: excluye el "width:" que ya trae "max-width:" o
+  // "min-width:", sin tocar un "width:" propio si alguna vez se cuela uno.
+  const sinWidthPropio = !/(?<!-)\bwidth\s*:/.test(reglaFoto);
+  check(
+    'el CSS de .foto no fija width (solo max-width): nunca se agranda más allá de su tamaño real',
+    reglaFoto !== '' && maxWidthCh && sinWidthPropio,
+    reglaFoto || '(sin regla .foto en el CSS)',
+  );
+}
 
 console.log('\nEscala de espaciado');
 // Un rem o px suelto en margin/padding/gap/inset es la escala arbitraria que
