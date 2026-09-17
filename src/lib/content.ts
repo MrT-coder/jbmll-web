@@ -142,12 +142,56 @@ function techDe(tech: string, conPagina: Set<string>): Tech {
 // La proyección plana que consume el renderizador. Se define aquí, junto a los
 // datos, porque decidir qué entra en la vista es decidir sobre los datos.
 
-export const SECCIONES: { slug: string; desc: string; tipo: TipoDeSeccion }[] = [
-  { slug: 'sobre-mi', desc: 'quién soy y con qué trabajo', tipo: 'pagina' },
-  { slug: 'proyectos', desc: 'lo que he construido', tipo: 'coleccion' },
-  { slug: 'publicaciones', desc: 'producción académica, con DOI', tipo: 'coleccion' },
-  { slug: 'contacto', desc: 'dónde encontrarme', tipo: 'pagina' },
+// El título de pestaña y el lead del inicio vivían escritos a mano en
+// index.astro. `navegar()` necesita esa misma pareja para reponerlos al
+// volver a `~` sin recargar, así que salen de aquí y no de la página.
+export const INICIO = {
+  titulo: 'Josue Bladimir Morales Llanganate — JBMLL',
+  lead: 'Soy <strong>Josue Bladimir Morales Llanganate</strong> (<span class="sig">JBMLL</span>), desarrollador backend.',
+};
+
+export const SECCIONES: { slug: string; desc: string; tipo: TipoDeSeccion; titulo: string; lead: string }[] = [
+  {
+    slug: 'sobre-mi',
+    desc: 'quién soy y con qué trabajo',
+    tipo: 'pagina',
+    titulo: 'Sobre mí — JBMLL',
+    // El mismo nombre que ya usa el perfil: no se vuelve a escribir a mano.
+    lead: perfil.nombre,
+  },
+  {
+    slug: 'proyectos',
+    desc: 'lo que he construido',
+    tipo: 'coleccion',
+    titulo: 'Proyectos — JBMLL',
+    lead: 'Lo que he construido.',
+  },
+  {
+    slug: 'publicaciones',
+    desc: 'producción académica, con DOI',
+    tipo: 'coleccion',
+    titulo: 'Publicaciones — JBMLL',
+    lead: 'Producción académica, con DOI.',
+  },
+  {
+    slug: 'contacto',
+    desc: 'dónde encontrarme',
+    tipo: 'pagina',
+    titulo: 'Contacto — JBMLL',
+    lead: 'Dónde encontrarme.',
+  },
 ];
+
+/**
+ * El título y el lead de una sección, por slug. Única puerta para que las
+ * páginas dejen de escribir esa pareja a mano: un slug que no existe es un
+ * error de quien programa, no algo que la página deba tolerar en silencio.
+ */
+export function seccionDe(slug: string): { titulo: string; lead: string } {
+  const s = SECCIONES.find((sec) => sec.slug === slug);
+  if (!s) throw new Error(`seccionDe: no existe la sección «${slug}»`);
+  return s;
+}
 
 // ── Barra lateral ────────────────────────────────────────────────────────────
 // Un único origen para la lista de workspaces: la barra lateral y cualquier
@@ -244,7 +288,7 @@ export async function getIndice(): Promise<Indice> {
     n: entradas[s.slug]?.length ?? 0,
   }));
 
-  return { secciones, entradas, stack };
+  return { secciones, entradas, stack, inicio: INICIO };
 }
 
 /**

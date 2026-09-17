@@ -228,6 +228,15 @@
   border-color: var(--green);
 }
 
+/* Sin teclado, la tecla es una promesa que no se cumple: el enlace se queda y
+ * la pista se va. display: none no vacía textContent, que es de donde
+ * terminal.ts lee la tecla. La consulta es la misma que usa para TOUCH. */
+@media (hover: none) and (pointer: coarse) {
+  .eof-acts kbd {
+    display: none;
+  }
+}
+
 @media (max-width: 660px) {
   .lectura {
     padding-top: var(--space-7);

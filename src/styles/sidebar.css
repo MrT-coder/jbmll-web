@@ -172,6 +172,25 @@
   font-size: var(--text-xs);
 }
 
+/* --dim solo alcanza 4.5:1 sobre --bg. Sobre --panel (fila bajo el puntero o
+ * con foco) daba 4.18:1 y sobre --sel (fila actual) 3.11:1, así que el
+ * subtítulo sube un paso en cada fondo. La fila actual nombra también :hover
+ * porque ahí conserva --sel, y la regla de :hover le ganaría por
+ * especificidad. */
+.ws-item:hover .ws-sub,
+.ab-item:hover .ab-sub,
+.ws-item:focus-visible .ws-sub,
+.ab-item:focus-visible .ab-sub {
+  color: var(--muted);
+}
+
+.ws-actual .ws-sub,
+.ab-actual .ab-sub,
+.ws-actual:hover .ws-sub,
+.ab-actual:hover .ab-sub {
+  color: var(--prose);
+}
+
 .ab-vacio {
   padding: var(--space-2);
   color: var(--dim);

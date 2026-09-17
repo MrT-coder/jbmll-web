@@ -1,18 +1,17 @@
 ---
 import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
-import { getIndice } from '../lib/content';
+import { getIndice, seccionDe } from '../lib/content';
 import { renderEntradas } from '../lib/render';
 
 const indice = await getIndice();
 const filas = indice.entradas.publicaciones;
-
-const LEAD = 'Producción académica, con DOI.';
+const { titulo, lead } = seccionDe('publicaciones');
 ---
 
 <Base
-  title="Publicaciones — JBMLL"
+  title={titulo}
   description="Producción académica revisada por pares, con su DOI y el enlace al editor."
 >
-  <Terminal seccion="publicaciones" lead={LEAD} salida={renderEntradas(filas)} />
+  <Terminal seccion="publicaciones" lead={lead} salida={renderEntradas(filas)} />
 </Base>

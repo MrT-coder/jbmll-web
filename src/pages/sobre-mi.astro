@@ -11,6 +11,7 @@ import {
   getStack,
   getTechsConPagina,
   MINIMO_PARA_PAGINA_DE_STACK,
+  seccionDe,
 } from '../lib/content';
 import { renderStack, slugTech } from '../lib/render';
 import { iconoDe } from '../data/iconos';
@@ -27,6 +28,7 @@ const [pagina, experiencia, educacion, certificaciones, stack, conPagina] = awai
 
 // La prosa la escribe el Markdown; los bloques de abajo salen de los datos.
 const Prosa = pagina ? (await render(pagina)).Content : null;
+const { titulo, lead } = seccionDe('sobre-mi');
 
 // Experiencia, certificaciones y educación son colecciones separadas en los
 // datos y bloques de una sola página en la vista. El día que crezcan se
@@ -35,12 +37,12 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
 ---
 
 <Base
-  title="Sobre mí — JBMLL"
+  title={titulo}
   description={`${perfil.titular}. Experiencia, formación, certificaciones y el stack calculado desde los datos.`}
 >
   <Terminal seccion="sobre-mi" salida="">
     <section class="bloque">
-      <h1 class="out lead">{perfil.nombre}</h1>
+      <h1 class="out lead">{lead}</h1>
       <p class="out note"># {perfil.titular} · {perfil.ubicacion}</p>
       {Prosa && <div class="prose intro"><Prosa /></div>}
     </section>
