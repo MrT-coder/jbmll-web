@@ -63,6 +63,14 @@
 .typed {
   white-space: pre;
 }
+
+/* El comando ya ejecutado que encabeza cada pantalla. Sin ámbito porque
+   terminal.ts repone esta línea al limpiar la pantalla en cada `cd`: un estilo
+   con ámbito de componente no alcanza a un nodo que crea un script. */
+.done .brain {
+  margin-right: 1ch;
+  color: var(--green);
+}
 .caret {
   display: inline-block;
   width: 0.58em;
@@ -178,12 +186,16 @@ a.go:focus-visible {
   padding: var(--space-5);
 }
 
+/* En flujo y no en absoluto. Encajado en el borde con position: absolute, un
+ * título de una línea quedaba perfecto, pero uno de dos —el de la publicación
+ * en /publicaciones— crecía por fuera del alto que el panel reservaba: tapaba
+ * la línea del comando de arriba y su propio subtítulo de abajo. En flujo, el
+ * margen negativo deja la primera línea sobre el borde, que es el efecto que
+ * se buscaba, y el panel crece con las que sigan. */
 .panel-t {
-  position: absolute;
-  top: 0;
-  left: 0.9ch;
-  transform: translateY(-50%);
-  margin: 0;
+  width: fit-content;
+  max-width: calc(100% - 1.8ch);
+  margin: calc(-1 * var(--space-5) - 0.6em) 0 var(--space-3) 0.9ch;
   padding: 0 0.8ch;
   background: var(--bg);
   font-size: var(--text-base);
