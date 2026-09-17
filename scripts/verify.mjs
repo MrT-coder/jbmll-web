@@ -78,6 +78,36 @@ check('canónica, robots y sitemap en el mismo dominio', canon && canon === robo
   'sitemap ' + (mapa || '—'),
 ].join(' · '));
 
+// Con build.format 'file' la URL de cada página termina en .html, pero
+// Cloudflare Pages responde a esa ruta con un 308 hacia la versión sin
+// extensión, que es la que lista el sitemap. Una canónica con .html le da al
+// buscador tres URL para el mismo documento: la declarada, la redirigida y la
+// del mapa. Cada página indexable debe declarar exactamente la URL del sitemap.
+const sinBarraFinal = (u) => u.replace(/\/$/, '');
+const urlsMapa = new Set(
+  readdirSync(DIST)
+    .filter((n) => /^sitemap-\d+\.xml$/.test(n))
+    .flatMap((n) => [...readFileSync(join(DIST, n), 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => sinBarraFinal(m[1]))),
+);
+const canonicasMal = [];
+let canonicasRevisadas = 0;
+for (const ruta of paginasHtml) {
+  const nombre = relative(DIST, ruta).replace(/\\/g, '/');
+  if (nombre === '404.html') continue;
+  const contenido = readFileSync(ruta, 'utf8');
+  const canonica = contenido.match(/rel="canonical"[^>]*href="([^"]+)"/)?.[1] || '';
+  const ogUrl = contenido.match(/property="og:url"[^>]*content="([^"]+)"/)?.[1] || '';
+  canonicasRevisadas++;
+  if (!urlsMapa.has(sinBarraFinal(canonica)) || ogUrl !== canonica) {
+    canonicasMal.push(`${nombre} → ${canonica || '—'}${ogUrl !== canonica ? ` (og:url ${ogUrl || '—'})` : ''}`);
+  }
+}
+check(
+  'canónica y og:url de cada página coinciden con el sitemap',
+  urlsMapa.size > 0 && canonicasRevisadas === urlsMapa.size && canonicasMal.length === 0,
+  canonicasMal.length ? canonicasMal.join(' · ') : `${canonicasRevisadas} páginas, ${urlsMapa.size} en el sitemap`,
+);
+
 console.log('\nTipografía');
 // Área de Uso Privado: sin la fuente empaquetada es un cuadrado vacío.
 check('cerebro U+EE9C presente', html.includes(''));
