@@ -5,16 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
+    "predev": "node scripts/copiar-admin.mjs",
+    "prebuild": "node scripts/copiar-admin.mjs",
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
     "verify": "node scripts/verify.mjs",
-    "ship": "astro check && astro build && node scripts/verify.mjs"
+    "ship": "astro check && npm run build && node scripts/verify.mjs"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@astrojs/sitemap": "^3.7.3",
+    "@sveltia/cms": "0.214.1",
     "astro": "^7.2.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "yaml": "2.9.0"
   }
 }

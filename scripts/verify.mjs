@@ -2,6 +2,7 @@
  * todos fallaban en silencio. El detalle, en el README. */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 
 const DIST = 'dist';
 let fails = 0;
@@ -31,7 +32,14 @@ function listarHtml(dir) {
   }
   return out;
 }
-const paginasHtml = listarHtml(DIST);
+// El panel de administración (Sveltia CMS) no es una página del sitio: no
+// lleva sidebar, ni h1 de artículo, ni skip link, no entra al sitemap y su
+// propio noindex es intencional en vez de una regresión. Se excluye aquí, una
+// sola vez, de las comprobaciones pensadas para las páginas del sitio; sus
+// propias comprobaciones viven en la sección «Panel de administración (CMS)»
+// más abajo.
+const ADMIN_HTML = join(DIST, 'admin', 'index.html');
+const paginasHtml = listarHtml(DIST).filter((r) => r !== ADMIN_HTML);
 
 const html = readFileSync(join(DIST, 'index.html'), 'utf8');
 
@@ -1369,6 +1377,206 @@ check('src/data/perfil.ts no repite el teléfono del perfil', sinLiteral(telefon
 check('src/data/perfil.ts no repite el usuario de GitHub del perfil', sinLiteral(githubYaml));
 check('src/data/perfil.ts no repite el usuario de LinkedIn del perfil', sinLiteral(linkedinYaml));
 check('src/data/perfil.ts no repite el ORCID del perfil', sinLiteral(orcidYaml));
+
+console.log('\nPanel de administración (CMS)');
+// Sveltia CMS vive en public/admin/ y se sirve tal cual desde dist/admin/: es
+// HTML y YAML estáticos, sin paso de compilación propio. Estas comprobaciones
+// se escribieron antes de crear los archivos (TDD): corridas contra un dist/
+// sin /admin/ fallaban todas, y solo entonces se implementó el panel.
+const adminHtmlPath = join(DIST, 'admin', 'index.html');
+const adminHtmlExiste = existsSync(adminHtmlPath);
+check('dist/admin/index.html existe', adminHtmlExiste);
+const adminHtml = adminHtmlExiste ? readFileSync(adminHtmlPath, 'utf8') : '';
+check('el panel pide noindex', /<meta\s+name="robots"\s+content="noindex"/.test(adminHtml));
+
+// Mismo criterio que «Blindaje» más arriba, aplicado a esta página aparte: un
+// script en línea sin src, o cualquier estilo en línea, rompería la CSP
+// propia del panel (script-src/style-src sin 'unsafe-inline' para script).
+const adminInlineScripts = (adminHtml.match(/<script(?![^>]*\ssrc=)[^>]*>/g) || []).filter(
+  (t) => !/type="application\/(ld\+json|json)"/.test(t),
+);
+check(
+  'el panel no lleva scripts en línea',
+  adminHtmlExiste && adminInlineScripts.length === 0,
+  adminInlineScripts.join(' '),
+);
+check('el panel no lleva <style>', adminHtmlExiste && !/<style[\s>]/.test(adminHtml));
+const adminAtributosStyle = adminHtml.match(/\sstyle="[^"]*"/g) || [];
+check(
+  'el panel no lleva atributos style=',
+  adminHtmlExiste && adminAtributosStyle.length === 0,
+  adminAtributosStyle.join(' '),
+);
+
+// El bundle de Sveltia lo copia scripts/copiar-admin.mjs antes del build
+// (hook prebuild/predev): si ese paso no corrió, el <script src="..."> del
+// panel apunta a un archivo que no existe en dist/.
+const adminBundleSrc = (adminHtml.match(/<script\s+src="([^"]+)"/) || [])[1] || '';
+check(
+  'el panel referencia un bundle propio, no unpkg ni ningún otro CDN',
+  adminBundleSrc.startsWith('/admin/'),
+  adminBundleSrc || '(sin script)',
+);
+check(
+  'el bundle referenciado existe en dist/',
+  adminBundleSrc !== '' && existsSync(join(DIST, adminBundleSrc.replace(/^\//, ''))),
+  adminBundleSrc,
+);
+
+const adminConfigPath = join(DIST, 'admin', 'config.yml');
+const adminConfigExiste = existsSync(adminConfigPath);
+check('dist/admin/config.yml existe', adminConfigExiste);
+const cmsConfig = adminConfigExiste ? parseYaml(readFileSync(adminConfigPath, 'utf8')) : {};
+
+check('el backend del CMS es github', cmsConfig.backend?.name === 'github');
+check('el repositorio es MrT-coder/jbmll-web', cmsConfig.backend?.repo === 'MrT-coder/jbmll-web');
+check('la rama es main', cmsConfig.backend?.branch === 'main');
+check(
+  'solo se permite iniciar sesión con token (sin worker de OAuth)',
+  Array.isArray(cmsConfig.backend?.auth_methods) &&
+    cmsConfig.backend.auth_methods.length === 1 &&
+    cmsConfig.backend.auth_methods[0] === 'token',
+);
+
+// --- Cada colección de content.config.ts tiene su espejo en el CMS --------
+// No hay forma de importar Zod desde un script plano de Node para leer los
+// esquemas de verdad, así que esto lee el FUENTE de content.config.ts con
+// expresiones regulares: busca el bloque `schema: z.object({ ... })` de cada
+// colección (contando llaves, para no cortarlo a mitad — una `{` de un
+// cuantificador de regex como `{4}` siempre trae su `}` en la misma línea, así
+// que el conteo total no se desalinea) y de ahí extrae los nombres de campo de
+// nivel superior. Funciona porque en este archivo cada campo de cada esquema
+// se escribe en su propia línea indentada exactamente 4 espacios —
+// `    <nombre>: z.algo(...)` o `    <nombre>: mes` (el validador de mes
+// compartido no empieza con `z.`, así que la búsqueda se ata a la columna, no
+// al prefijo) — y ninguno de los siete esquemas anida un z.object() dentro de
+// otro: si eso cambiara, esta comprobación tendría que cambiar con ello. Es
+// una lectura posicional del código fuente, no un analizador real de
+// TypeScript/Zod.
+const configTs = readFileSync('src/content.config.ts', 'utf8');
+
+function nombresDeEsquema(nombreConst) {
+  const inicioConst = configTs.search(new RegExp(`const ${nombreConst} = defineCollection\\(`));
+  if (inicioConst === -1) return null;
+  const marcaSchema = 'schema: z.object({';
+  const idx = configTs.indexOf(marcaSchema, inicioConst);
+  if (idx === -1) return null;
+  const inicioLlave = idx + marcaSchema.length - 1;
+  let profundidad = 0;
+  let fin = -1;
+  for (let i = inicioLlave; i < configTs.length; i++) {
+    if (configTs[i] === '{') profundidad++;
+    else if (configTs[i] === '}') {
+      profundidad--;
+      if (profundidad === 0) {
+        fin = i;
+        break;
+      }
+    }
+  }
+  if (fin === -1) return null;
+  const bloque = configTs.slice(inicioLlave, fin + 1);
+  return [...bloque.matchAll(/^ {4}(\w+):/gm)].map((m) => m[1]);
+}
+
+// Nombre de constante en content.config.ts → cómo llegar hasta el arreglo de
+// nombres de campo del CMS que hay que comparar contra ese esquema. Tres
+// colecciones necesitan «desenvolver» un nivel antes de comparar: ver los
+// comentarios de cada una.
+const COLECCIONES_CMS = [
+  { astro: 'experiencia', campos: () => cmsConfig.collections?.find((c) => c.name === 'experiencia')?.fields?.map((f) => f.name) },
+  { astro: 'proyectos', campos: () => cmsConfig.collections?.find((c) => c.name === 'proyectos')?.fields?.map((f) => f.name) },
+  { astro: 'publicaciones', campos: () => cmsConfig.collections?.find((c) => c.name === 'publicaciones')?.fields?.map((f) => f.name) },
+  { astro: 'educacion', campos: () => cmsConfig.collections?.find((c) => c.name === 'educacion')?.fields?.map((f) => f.name) },
+  {
+    // Colección de archivos: sus dos entradas comparten el mismo conjunto de
+    // campos de frontmatter. "body" es el contenido Markdown fuera del
+    // frontmatter — no es una clave del esquema de Zod — así que se excluye a
+    // propósito de la comparación.
+    astro: 'paginas',
+    campos: () => {
+      const archivos = cmsConfig.collections?.find((c) => c.name === 'paginas')?.files || [];
+      const conjuntos = archivos.map((a) => (a.fields || []).map((f) => f.name).filter((n) => n !== 'body'));
+      if (conjuntos.length === 0) return null;
+      const mismos = conjuntos.every(
+        (c) => JSON.stringify([...c].sort()) === JSON.stringify([...conjuntos[0]].sort()),
+      );
+      return mismos ? conjuntos[0] : ['(los archivos de "paginas" no comparten los mismos campos)'];
+    },
+  },
+  {
+    // El archivo es un arreglo YAML en la raíz, sin clave que lo envuelva: los
+    // campos que hay que comparar son los del campo `list` con `root: true`,
+    // no el nombre de ese campo.
+    astro: 'certificaciones',
+    campos: () => {
+      const archivo = cmsConfig.collections?.find((c) => c.name === 'certificaciones')?.files?.[0];
+      const listaRaiz = archivo?.fields?.find((f) => f.widget === 'list' && f.root === true);
+      return listaRaiz?.fields?.map((f) => f.name);
+    },
+  },
+  {
+    // perfil.yaml envuelve sus campos en una sola clave de nivel superior
+    // ("perfil:"), reproducida con un campo widget:object del mismo nombre:
+    // los campos que hay que comparar son sus subcampos, no "perfil" mismo.
+    astro: 'perfil',
+    campos: () => {
+      const singleton = cmsConfig.singletons?.find((s) => s.name === 'perfil');
+      const objeto = singleton?.fields?.find((f) => f.name === 'perfil' && f.widget === 'object');
+      return objeto?.fields?.map((f) => f.name);
+    },
+  },
+];
+
+// export const collections = { paginas, experiencia, ... }; — la lista real de
+// colecciones que Astro compila, para no dar por hecho a mano cuáles son
+// «todas».
+const exportBloque = (configTs.match(/export const collections = \{([\s\S]*?)\};/) || [])[1] || '';
+const coleccionesAstro = [...exportBloque.matchAll(/(\w+)/g)].map((m) => m[1]);
+
+const sinEspejo = coleccionesAstro.filter((c) => !COLECCIONES_CMS.some((m) => m.astro === c));
+check('toda colección de content.config.ts tiene su espejo en el CMS', sinEspejo.length === 0, sinEspejo.join(', '));
+
+for (const { astro, campos } of COLECCIONES_CMS) {
+  const esperados = nombresDeEsquema(astro);
+  const reales = adminConfigExiste ? campos() : null;
+  const ok =
+    Array.isArray(esperados) &&
+    Array.isArray(reales) &&
+    JSON.stringify([...esperados].sort()) === JSON.stringify([...reales].sort());
+  check(
+    `"${astro}": los campos del CMS son los mismos que los del esquema`,
+    ok,
+    `esquema: ${(esperados || []).join(', ') || '¿?'} · cms: ${(reales || []).join(', ') || '¿?'}`,
+  );
+}
+
+console.log('\nPanel de administración: cabeceras');
+const headersSrc = readFileSync('public/_headers', 'utf8');
+const bloqueAdmin = (headersSrc.match(/\n\/admin\/\*\n([\s\S]*?)(?=\n\/\S|\n*$)/) || [])[1] || '';
+check('_headers trae un bloque /admin/*', bloqueAdmin !== '');
+check('el bloque /admin/* desprende la CSP heredada', /^\s*!\s*Content-Security-Policy\s*$/m.test(bloqueAdmin));
+const cspAdmin = (bloqueAdmin.match(/^\s*Content-Security-Policy:\s*(.+)$/m) || [])[1] || '';
+check(
+  'la CSP del panel declara connect-src con la API de GitHub',
+  /connect-src[^;]*\bhttps:\/\/api\.github\.com\b/.test(cspAdmin),
+  cspAdmin || '(sin CSP propia)',
+);
+check('la CSP del panel no depende de unpkg', cspAdmin !== '' && !/unpkg\.com/.test(cspAdmin));
+check('_headers también cubre /admin, sin barra ni comodín', /\n\/admin\n/.test(headersSrc));
+
+const bloqueSitio = (headersSrc.match(/\n\/\*\n([\s\S]*?)(?=\n\/\S|\n*$)/) || [])[1] || '';
+const cspSitio = (bloqueSitio.match(/^\s*Content-Security-Policy:\s*(.+)$/m) || [])[1] || '';
+check(
+  'la CSP del resto del sitio sigue con script-src \'self\' y sin unsafe-inline',
+  /script-src[^;]*'self'/.test(cspSitio) && !/script-src[^;]*unsafe-inline/.test(cspSitio),
+  cspSitio || '(sin CSP)',
+);
+
+console.log('\nPanel de administración: rastreo e indexación');
+const robotsTxt = readFileSync('public/robots.txt', 'utf8');
+check('robots.txt no permite rastrear /admin/', /^Disallow:\s*\/admin\/\s*$/m.test(robotsTxt));
+check('el panel no aparece en el sitemap generado', !sitemap.includes('/admin'));
 
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';

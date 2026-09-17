@@ -37,3 +37,34 @@
 
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
+
+# El panel de administración (Sveltia CMS, autohospedado desde /admin/, ver
+# public/admin/) no puede vivir bajo la CSP del resto del sitio: necesita
+# cargar sus tipografías e íconos desde cdn.jsdelivr.net, hablar con
+# api.github.com y mostrar el avatar de quien inició sesión, que GitHub sirve
+# desde avatars.githubusercontent.com. Sin unpkg, porque el bundle se sirve
+# desde el propio origen (scripts/copiar-admin.mjs). Sin los hosts de OAuth
+# (github.com, api.netlify.com): el backend solo permite "Sign In Using
+# Access Token" (auth_methods: [token] en config.yml), así que ese flujo
+# nunca corre.
+#
+# Cuando una petición calza con más de una regla, Cloudflare Pages combina las
+# cabeceras repetidas con una coma en vez de reemplazarlas, así que la CSP del
+# sitio (arriba) y esta se sumarían en una sola cabecera contradictoria. `!
+# Content-Security-Policy` desprende la heredada antes de declarar la propia.
+# (Docs: https://developers.cloudflare.com/pages/configuration/headers/).
+# Sin verificar todavía si desprender y volver a declarar en el mismo bloque
+# funciona como documentan: queda por confirmar en el despliegue de vista
+# previa de esta PR.
+/admin/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://avatars.githubusercontent.com; font-src 'self' https://cdn.jsdelivr.net; connect-src 'self' blob: data: https://api.github.com; media-src blob:; frame-src blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Robots-Tag: noindex
+
+# `/admin/*` no calza con la ruta exacta `/admin`, sin barra final. Se repite
+# el mismo bloque para esa ruta puntual, por si Cloudflare Pages la sirve sin
+# redirigir antes a `/admin/`.
+/admin
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https://avatars.githubusercontent.com; font-src 'self' https://cdn.jsdelivr.net; connect-src 'self' blob: data: https://api.github.com; media-src blob:; frame-src blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Robots-Tag: noindex
