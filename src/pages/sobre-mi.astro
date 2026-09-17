@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
+import Visor from '../components/Visor.astro';
 import { render } from 'astro:content';
 import {
   getPagina,
@@ -13,7 +14,7 @@ import {
   MINIMO_PARA_PAGINA_DE_STACK,
   seccionDe,
 } from '../lib/content';
-import { renderStack, slugTech } from '../lib/render';
+import { renderStack, slugTech, rutaMedia } from '../lib/render';
 import { iconoDe } from '../data/iconos';
 
 const [perfil, pagina, experiencia, educacion, certificaciones, stack, conPagina] = await Promise.all([
@@ -108,7 +109,7 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
 
     <section class="bloque" id="certificaciones">
       <h2 class="bloque-t">certificaciones y cursos</h2>
-      <table class="list">
+      <table class="list list-certs">
         <tbody>
           {
             certificaciones.map((c) => (
@@ -118,11 +119,38 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
                 <td class="d">
                   {[c.data.emisor, c.data.horas && `${c.data.horas} h`].filter(Boolean).join(' · ')}
                 </td>
+                <td class="acc">
+                  {c.data.archivo && (
+                    <a
+                      class="go visor-abrir"
+                      href={rutaMedia(c.data.archivo)}
+                      target="_blank"
+                      rel="noopener"
+                      aria-label={`ver el certificado ${c.data.nombre}`}
+                      data-nombre={c.data.nombre}
+                    >
+                      [ver]
+                    </a>
+                  )}
+                  {c.data.url && (
+                    <a
+                      class="go"
+                      href={c.data.url}
+                      target="_blank"
+                      rel="noopener"
+                      aria-label={`verificar el certificado ${c.data.nombre}`}
+                    >
+                      [verificar]
+                    </a>
+                  )}
+                  {c.data.credencial && <span class="cred">{c.data.credencial}</span>}
+                </td>
               </tr>
             ))
           }
         </tbody>
       </table>
+      <Visor />
     </section>
   </Terminal>
 </Base>
@@ -165,5 +193,50 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
     margin: var(--space-1) 0 0;
     color: var(--dim);
     font-size: var(--text-sm);
+  }
+
+  /* [ver]/[verificar] y la credencial, en la misma celda: flex y no una lista,
+     porque no siempre están los tres — una certificación puede traer solo uno
+     o ninguno. */
+  .acc {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+
+  /* Discreta a propósito: el id de credencial no es información que alguien
+     lea primero, es una prueba que queda ahí para quien la necesite. */
+  .cred {
+    color: var(--dim);
+    font-size: var(--text-xs);
+  }
+
+  /* Cuatro columnas no caben en un teléfono: a 390px los nombres largos se
+     partían carácter por carácter («Fund acio n Carl»). Solo esta tabla se
+     apila —.list también arma la de contacto y la de stack, que sí caben—, y
+     cada certificación pasa a ser un bloque con su nombre, su fecha, su
+     emisor y sus enlaces uno debajo del otro. Mismo punto de quiebre que el
+     resto del sitio. */
+  @media (max-width: 660px) {
+    .list-certs tr {
+      display: grid;
+      gap: var(--space-1);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    /* Apilada, la alineación de una columna deja de tener sentido: cada dato
+       arranca donde arranca el nombre. */
+    .list-certs td {
+      padding: 0;
+      text-align: left;
+    }
+
+    /* Una certificación sin emisor o sin enlaces dejaba una fila en blanco
+       dentro de su bloque, que se leía como un dato que falta cargar. */
+    .list-certs td:empty {
+      display: none;
+    }
   }
 </style>

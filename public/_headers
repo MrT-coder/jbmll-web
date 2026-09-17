@@ -7,7 +7,11 @@
   # No hay 'unsafe-inline' en script-src porque el script del sitio es un
   # archivo aparte. Si algún día vuelve un script en línea, esto lo rompe: esa
   # rotura es la señal, no el estorbo.
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  # El visor de certificados incrusta un PDF propio con <object> (ver
+  # src/components/Visor.astro); sin el permiso que agrega la línea de abajo,
+  # default-src 'none' lo bloquea y el panel se abre vacío. Se concede solo al
+  # propio origen — nada de blob:, data: ni un origen ajeno.
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
 
   # Sin preload: la lista de HSTS del navegador es prácticamente irreversible y
   # se entra ahí a propósito, no de paso.

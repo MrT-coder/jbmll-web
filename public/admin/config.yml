@@ -228,6 +228,13 @@ collections:
               - { name: credencial, label: Credencial, widget: string, required: false }
               - { name: url, label: URL, widget: string, type: url, required: false }
               - {
+                  name: archivo,
+                  label: Archivo (PDF o imagen del certificado),
+                  widget: file,
+                  required: false,
+                  accept: '.pdf,.png,.jpg,.jpeg,.webp,.avif',
+                }
+              - {
                   name: tipo,
                   label: Tipo,
                   widget: select,

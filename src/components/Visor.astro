@@ -1,0 +1,130 @@
+---
+// El visor: un panel flotante para abrir un certificado sin salir de la
+// página — el equivalente en el sitio de `tmux display-popup` o una ventana
+// flotante de Zellij. El marcado vive una sola vez aquí, vacío y cerrado por
+// defecto; scripts/visor.ts lo llena y lo abre al pulsar un enlace [ver].
+//
+// Es un <dialog> nativo a propósito: showModal() da gratis el atrapado de
+// foco, el cierre con Escape y la devolución del foco a quien lo abrió.
+// Reimplementar cualquiera de los tres a mano es exactamente cómo se cuelan
+// los bugs de accesibilidad que el elemento ya resuelve.
+---
+
+<dialog id="visor" class="visor" aria-labelledby="visor-titulo">
+  <div class="visor-barra">
+    <p id="visor-titulo" class="visor-titulo"></p>
+    <button type="button" id="visor-cerrar" class="visor-cerrar" aria-label="Cerrar el visor">
+      <span aria-hidden="true">✕</span>
+    </button>
+  </div>
+  <div id="visor-cuerpo" class="visor-cuerpo"></div>
+  <p class="visor-pie"><kbd>Esc</kbd> cerrar</p>
+</dialog>
+
+<script>
+  // En su propio módulo, igual que la terminal y la barra lateral, para que
+  // `tsc` lo revise: un script suelto dentro de un .astro no lo comprueba
+  // nadie.
+  import '../scripts/visor';
+</script>
+
+<style>
+  /* El navegador no deja rediseñar su propia barra de herramientas de PDF (el
+     toolbar de Chromium, el visor pdf.js de Firefox): el marco que sí se
+     controla —borde, barra de título, pie— lleva la estética de la terminal
+     en vez de pelear con lo que no se puede tocar. */
+  .visor {
+    padding: 0;
+    border: 1px solid var(--line2);
+    background: var(--panel);
+    color: var(--fg);
+    width: min(92vw, 100ch);
+    /* Sin alto fijo: con uno, un certificado horizontal dejaba el panel medio
+       vacío arriba y abajo —muy visible en un teléfono—. Ahora el panel se
+       ajusta a lo que muestra y solo el PDF, que no tiene alto propio que
+       medir, impone el suyo (ver .visor-cuerpo object en terminal.css). */
+    max-height: min(88vh, 900px);
+  }
+
+  /* display sale de acá y no de .visor sola a propósito: en la cascada, una
+     regla de autor (esta) gana siempre a la hoja del navegador
+     (dialog:not([open]) { display: none }) sin importar la especificidad —
+     el origen decide antes que ella. Un display: flex incondicional en
+     .visor dejaría el panel «cerrado» ocupando su sitio, visible y vacío, en
+     vez de ausente: [open] es la condición exacta bajo la que showModal()
+     deja el atributo puesto. */
+  .visor[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* color-mix() sobre --bg y no un color nuevo: la cortina de fondo es el
+     mismo fondo de la terminal, solo que translúcido. */
+  .visor::backdrop {
+    background: color-mix(in srgb, var(--bg) 80%, transparent);
+  }
+
+  .visor-barra {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--line2);
+    background: var(--bg);
+  }
+
+  .visor-titulo {
+    margin: 0;
+    font-weight: 700;
+    font-size: var(--text-sm);
+    color: var(--fg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .visor-cerrar {
+    flex: 0 0 auto;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    line-height: var(--lh-tight);
+    padding: var(--space-1) var(--space-3);
+    cursor: pointer;
+  }
+
+  .visor-cerrar:hover,
+  .visor-cerrar:focus-visible {
+    color: var(--fg);
+    border-color: var(--red);
+  }
+
+  .visor-cuerpo {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: var(--space-4);
+    display: flex;
+  }
+
+  /* El <object>/<img> del certificado los crea scripts/visor.ts, no esta
+     plantilla: sus reglas no pueden vivir aquí con alcance de componente (no
+     alcanzarían al elemento en tiempo de ejecución) y viven, sin alcance, en
+     src/styles/terminal.css junto al resto de lo que crea un script. */
+
+  .visor-pie {
+    margin: 0;
+    padding: var(--space-2) var(--space-4);
+    border-top: 1px solid var(--line);
+    color: var(--dim);
+    font-size: var(--text-xs);
+  }
+
+  .visor-pie kbd {
+    font: inherit;
+    color: var(--dim);
+    border: 1px solid var(--line);
+    padding: 0 0.3em;
+  }
+</style>
