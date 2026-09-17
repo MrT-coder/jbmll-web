@@ -1,5 +1,19 @@
 /* Verifica el sitio compilado. Cada comprobación existe por un fallo real, y
- * todos fallaban en silencio. El detalle, en el README. */
+ * todos fallaban en silencio. El detalle, en el README.
+ *
+ * Regla: ninguna comprobación nombra contenido concreto — un título, un
+ * nombre de proyecto, un usuario, una tecnología, un slug de entrada, una
+ * fecha, un conteo de entradas. El contenido lo edita un CMS (Sveltia, en
+ * /admin) que commitea directo a `main`, y Cloudflare construye esa misma
+ * rama: un cambio legítimo de contenido (renombrar un proyecto, agregar el
+ * cuerpo de una publicación, quitar una tecnología, cambiar el nombre del
+ * dueño del sitio) no puede romper el build. Todo se deriva en su lugar de
+ * `src/content/*.md`, de `src/content/perfil.yaml` o de lo que el propio
+ * build ya generó en `dist/` — nunca de un literal escrito a mano. Las
+ * excepciones son explícitas y llevan su propio comentario: los slugs de
+ * sección (vienen de `SECCIONES` en `src/lib/content.ts`, que es código, no
+ * contenido del CMS) y algún dato de infraestructura fija (el repositorio
+ * que declara `config.yml`, que tampoco lo edita el CMS). */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
 import { parse as parseYaml } from 'yaml';
@@ -15,6 +29,11 @@ const check = (name, cond, detail = '') => {
     console.log('  FALLA ' + name + (detail ? ' — ' + detail : ''));
   }
 };
+
+// Una comprobación que necesita dos entradas hermanas (anterior/siguiente) no
+// tiene nada que probar con menos de dos: en vez de fallar por falta de
+// contenido o pasar en silencio, queda explícita en la salida como omitida.
+const skip = (name, motivo) => console.log('  ok    ' + name + ' — omitida: ' + motivo);
 
 if (!existsSync(DIST)) {
   console.error('No hay dist/. Ejecute `npm run build` primero.');
@@ -43,6 +62,68 @@ const paginasHtml = listarHtml(DIST).filter((r) => r !== ADMIN_HTML);
 
 const html = readFileSync(join(DIST, 'index.html'), 'utf8');
 
+// ── Contenido fuente, leído una sola vez ────────────────────────────────────
+// Lo que sigue relee las mismas fuentes que el sitio (src/content/*.md y
+// perfil.yaml) para derivar lo que antes estaba escrito a mano. No es un
+// duplicado de src/lib/content.ts: ese módulo importa `astro:content`, que
+// solo existe dentro de Astro, así que aquí se reproduce la misma lectura con
+// `fs` — igual que ya hacía el resto del archivo con content.config.ts y con
+// el propio perfil.yaml.
+function leerFrontmatter(ruta) {
+  const texto = readFileSync(ruta, 'utf8');
+  const m = texto.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!m) return { data: {}, body: '' };
+  return { data: parseYaml(m[1]) ?? {}, body: (m[2] ?? '').trim() };
+}
+function listarColeccionMd(dir) {
+  return existsSync(dir)
+    ? readdirSync(dir)
+        .filter((f) => f.endsWith('.md'))
+        .map((f) => {
+          const { data, body } = leerFrontmatter(join(dir, f));
+          return { id: f.replace(/\.md$/, ''), data, body };
+        })
+    : [];
+}
+const tieneCuerpoFuente = (entrada) => entrada.body.length > 0;
+
+// Mismo orden que getProyectos()/getPublicaciones() en src/lib/content.ts:
+// más reciente primero, sin contar los borradores.
+const proyectosSrc = listarColeccionMd('src/content/proyectos')
+  .filter((p) => !p.data.borrador)
+  .sort((a, b) => String(b.data.fecha ?? '').localeCompare(String(a.data.fecha ?? '')));
+const publicacionesSrc = listarColeccionMd('src/content/publicaciones')
+  .filter((p) => !p.data.borrador)
+  .sort((a, b) => Number(b.data.anio ?? 0) - Number(a.data.anio ?? 0));
+
+// Mismo orden que getExperiencia(): sin fecha de fin primero (sigue vigente),
+// luego por fecha de inicio descendente. Una entrada que solo enlaza a un
+// proyecto (`proyecto:`) no declara su propio stack — igual que en getStack().
+const experienciaSrc = listarColeccionMd('src/content/experiencia').sort((a, b) => {
+  if (!a.data.fin && b.data.fin) return -1;
+  if (a.data.fin && !b.data.fin) return 1;
+  return String(b.data.inicio ?? '').localeCompare(String(a.data.inicio ?? ''));
+});
+const experienciaConStack = experienciaSrc.find(
+  (e) => !e.data.proyecto && Array.isArray(e.data.st) && e.data.st.length > 0,
+);
+
+const perfilYamlData = parseYaml(readFileSync('src/content/perfil.yaml', 'utf8'))?.perfil ?? {};
+const nombreEsperado = perfilYamlData.nombre ?? '';
+const githubEsperado = perfilYamlData.github ?? '';
+
+// El slug de sección es código (SECCIONES en src/lib/content.ts), no algo que
+// edite el CMS: se relee del fuente en vez de retipearlo, para que agregar o
+// quitar una sección no desalinee estas comprobaciones en silencio.
+function leerSlugsDeSecciones() {
+  const src = readFileSync('src/lib/content.ts', 'utf8');
+  const inicio = src.indexOf('export const SECCIONES');
+  const fin = src.indexOf('\n];', inicio);
+  if (inicio === -1 || fin === -1) return [];
+  return [...src.slice(inicio, fin).matchAll(/slug:\s*'([^']+)'/g)].map((m) => m[1]);
+}
+const SECCIONES_SLUGS = leerSlugsDeSecciones();
+
 console.log('\nDocumento');
 check('doctype', html.trimStart().toLowerCase().startsWith('<!doctype html>'));
 check('lang declarado', /<html[^>]+lang="es"/.test(html));
@@ -60,7 +141,11 @@ const h1txt = (h1s[0] || '').replace(/<[^>]+>/g, '');
 // Astro recorta el espacio al final de línea: un salto junto a una etiqueta
 // pega las palabras. Se lee bien en el código y se ve mal en pantalla.
 const h1limpio = h1txt.replace(/\s+/g, ' ').trim();
-check('h1 con el nombre completo', h1limpio.includes('Josue Bladimir Morales Llanganate'), h1limpio);
+check(
+  'h1 con el nombre completo',
+  nombreEsperado.length > 0 && h1limpio.includes(nombreEsperado),
+  `"${h1limpio}" ≠ contiene "${nombreEsperado || '(perfil.yaml sin nombre)'}"`,
+);
 // Se ata a la forma del fallo y no al texto: una minúscula seguida de mayúscula
 // o de un paréntesis es una palabra pegada. Atarlo a una frase concreta lo
 // convierte en una prueba que hay que reescribir cada vez que cambia la copia.
@@ -384,7 +469,11 @@ const handles = new Set(
   [...(html + '\n' + js).matchAll(/github\.com\/([\w-]+)/g)].map((m) => m[1]),
 );
 check('un solo usuario de GitHub', handles.size === 1, [...handles].join(', '));
-check('usuario de GitHub correcto', handles.has('MrT-coder'), [...handles].join(', '));
+check(
+  'usuario de GitHub correcto',
+  githubEsperado.length > 0 && handles.has(githubEsperado),
+  `${[...handles].join(', ')} ≠ "${githubEsperado || '(perfil.yaml sin github)'}"`,
+);
 
 console.log('\nDatos');
 // El stack es la promesa del sitio: cada tecnología enlaza a la evidencia de
@@ -435,22 +524,29 @@ const leer = (f) => (existsSync(join(DIST, f)) ? readFileSync(join(DIST, f), 'ut
 // buscador es contenido duplicado, y ningún enlace roto se detecta jamás.
 check('404.html generada', existsSync(join(DIST, '404.html')), 'sin ella toda ruta inventada responde 200');
 
-const SECCIONES = ['sobre-mi', 'proyectos', 'publicaciones', 'contacto'];
-for (const sec of SECCIONES) {
+for (const sec of SECCIONES_SLUGS) {
   check(`/${sec} generada`, existsSync(join(DIST, `${sec}.html`)));
 }
 
 // Sin JavaScript la página tiene que traer su contenido. Es la diferencia entre
-// una página que un buscador lee y una que ve vacía.
+// una página que un buscador lee y una que ve vacía. «panel» es la clase que
+// render.ts pone en cada tarjeta (ver `panel()` en src/lib/render.ts): es
+// marcado del sitio, no contenido del CMS, así que sí puede nombrarse aquí.
 const proyectos = leer('proyectos.html');
 check(
   '/proyectos trae su contenido sin JavaScript',
-  proyectos.includes('estudio jurídico') && proyectos.includes('panel'),
+  proyectosSrc.length > 0 &&
+    proyectosSrc.every((p) => proyectos.includes(p.data.titulo)) &&
+    proyectos.includes('panel'),
+  proyectosSrc.length === 0 ? 'no hay proyectos para probar esta comprobación' : '',
 );
 const sobreMi = leer('sobre-mi.html');
 check(
   '/sobre-mi trae experiencia y stack sin JavaScript',
-  sobreMi.includes('FirmaSeguraEc') && sobreMi.includes('Spring Boot'),
+  !!experienciaConStack &&
+    sobreMi.includes(experienciaConStack.data.organizacion) &&
+    experienciaConStack.data.st.some((t) => sobreMi.includes(t)),
+  experienciaConStack ? '' : 'no hay ninguna experiencia con stack propio para probar esta comprobación',
 );
 
 // El sitio se navega por enlace tanto como por comando: un href que apunta a
@@ -657,15 +753,71 @@ check(
 );
 
 // Una publicación sin cuerpo propio no genera página. Si la generara, sería un
-// título repetido compitiendo con el original del editor.
+// título repetido compitiendo con el original del editor (ver tieneCuerpo() en
+// src/lib/content.ts y el filtro en publicaciones/[slug].astro). La regla se
+// deriva de src/content/publicaciones/*.md, no de una publicación concreta:
+// funciona igual si el CMS agrega, quita o le pone cuerpo a cualquier entrada.
 const sitemap = leer('sitemap-0.xml');
 const publicaciones = leer('publicaciones.html');
-check(
-  'la publicación sin cuerpo no tiene página',
-  !existsSync(join(DIST, 'publicaciones', 'xr-salento-2026-tea.html')),
+
+const publicacionesConCuerpo = publicacionesSrc.filter(tieneCuerpoFuente);
+const publicacionesSinCuerpo = publicacionesSrc.filter((p) => !tieneCuerpoFuente(p));
+
+const sinCuerpoConPagina = publicacionesSinCuerpo.filter((p) =>
+  existsSync(join(DIST, 'publicaciones', `${p.id}.html`)),
 );
-check('esa publicación tampoco está en el sitemap', !sitemap.includes('xr-salento'));
-check('pero sí aparece en su índice, con su DOI', publicaciones.includes('doi.org'));
+check(
+  'ninguna publicación sin cuerpo genera página propia',
+  sinCuerpoConPagina.length === 0,
+  publicacionesSinCuerpo.length === 0
+    ? 'no hay publicaciones sin cuerpo en este build'
+    : sinCuerpoConPagina.map((p) => p.id).join(', '),
+);
+
+const conCuerpoSinPagina = publicacionesConCuerpo.filter(
+  (p) => !existsSync(join(DIST, 'publicaciones', `${p.id}.html`)),
+);
+check(
+  'toda publicación con cuerpo genera su página propia',
+  conCuerpoSinPagina.length === 0,
+  publicacionesConCuerpo.length === 0
+    ? 'no hay publicaciones con cuerpo en este build'
+    : conCuerpoSinPagina.map((p) => p.id).join(', '),
+);
+
+const sinCuerpoEnSitemap = publicacionesSinCuerpo.filter((p) => sitemap.includes(p.id));
+check(
+  'las publicaciones sin cuerpo no están en el sitemap',
+  sinCuerpoEnSitemap.length === 0,
+  publicacionesSinCuerpo.length === 0
+    ? 'no hay publicaciones sin cuerpo en este build'
+    : sinCuerpoEnSitemap.map((p) => p.id).join(', '),
+);
+
+const conCuerpoFueraDeSitemap = publicacionesConCuerpo.filter((p) => !sitemap.includes(p.id));
+check(
+  'las publicaciones con cuerpo sí están en el sitemap',
+  conCuerpoFueraDeSitemap.length === 0,
+  publicacionesConCuerpo.length === 0
+    ? 'no hay publicaciones con cuerpo en este build'
+    : conCuerpoFueraDeSitemap.map((p) => p.id).join(', '),
+);
+
+// El DOI solo aparece como enlace en el índice para una publicación SIN
+// página propia (panel() en src/lib/render.ts prioriza el enlace a la página
+// propia sobre el enlace externo): una con cuerpo lo muestra en su propia
+// página, no en la fila del índice. Por eso esta comprobación se limita a las
+// publicaciones sin cuerpo, no a todas.
+const publicacionesSinDoiEnIndice = publicacionesSinCuerpo
+  .filter((p) => p.data.doi)
+  .filter((p) => !publicaciones.includes(`doi.org/${p.data.doi}`));
+check(
+  'toda publicación sin página propia muestra su DOI en el índice',
+  publicacionesSinDoiEnIndice.length === 0,
+  publicacionesSinCuerpo.some((p) => p.data.doi)
+    ? publicacionesSinDoiEnIndice.map((p) => p.id).join(', ')
+    : 'no hay publicaciones sin cuerpo con doi en este build',
+);
 
 // Una página de tecnología con un solo uso no dice nada que la lista de origen
 // no diga ya.
@@ -794,8 +946,15 @@ check(
 );
 
 console.log('\nLector');
-const art = leer('proyectos/estudio-juridico.html');
-check('la página de artículo se genera', art.length > 0);
+// «El primer proyecto» sirve para probar cualquier propiedad estructural de
+// una página de detalle: cuál sea no importa, solo que exista.
+const primerProyecto = proyectosSrc[0];
+const art = primerProyecto ? leer(`proyectos/${primerProyecto.id}.html`) : '';
+check(
+  'la página de artículo se genera',
+  proyectosSrc.length > 0 && art.length > 0,
+  proyectosSrc.length === 0 ? 'no hay proyectos en este build' : '',
+);
 
 // El cuerpo lo procesa Astro al compilar. Si apareciera un analizador de
 // Markdown en el cliente, serían kilobytes enviados para hacer dos veces algo
@@ -833,11 +992,22 @@ check(
 
 // Llegar al final y no tener a dónde ir es cuando alguien cierra la pestaña.
 check('el artículo enlaza a su colección', art.includes('href="/proyectos"'));
-const otro = leer('proyectos/apoyo-terapeutico-tea.html');
-check(
-  'los artículos se enlazan entre sí',
-  art.includes('/proyectos/apoyo-terapeutico-tea') && otro.includes('/proyectos/estudio-juridico'),
-);
+// Anterior/siguiente son las dos primeras entradas de la colección ya
+// ordenada, igual que vecinos() en src/lib/content.ts: la de índice 0 no tiene
+// anterior, pero sí siguiente; la de índice 1 enlaza de vuelta a la 0. Con
+// menos de dos proyectos no hay par que comprobar.
+if (proyectosSrc.length >= 2) {
+  const [p0, p1] = proyectosSrc;
+  const html0 = leer(`proyectos/${p0.id}.html`);
+  const html1 = leer(`proyectos/${p1.id}.html`);
+  check(
+    'los artículos se enlazan entre sí (anterior/siguiente)',
+    html0.includes(`/proyectos/${p1.id}`) && html1.includes(`/proyectos/${p0.id}`),
+    `${p0.id} ↔ ${p1.id}`,
+  );
+} else {
+  skip('los artículos se enlazan entre sí (anterior/siguiente)', 'hay menos de dos proyectos para comparar');
+}
 
 console.log('\nAlcance del CSS en set:html');
 // Lo que se inserta con set:html no recibe la marca de alcance de Astro, igual
@@ -866,8 +1036,9 @@ check(
 );
 check(
   'las entradas del índice son las mismas del sitio',
-  (indice.entradas?.proyectos || []).length === 2 &&
-    (indice.entradas?.publicaciones || []).length === 1,
+  (indice.entradas?.proyectos || []).length === proyectosSrc.length &&
+    (indice.entradas?.publicaciones || []).length === publicacionesSrc.length,
+  `índice: ${indice.entradas?.proyectos?.length ?? 0} proyectos, ${indice.entradas?.publicaciones?.length ?? 0} publicaciones · fuente: ${proyectosSrc.length} proyectos, ${publicacionesSrc.length} publicaciones`,
 );
 
 // El prototipo tenía href reales y ningún pushState: navegar dejaba la URL en
@@ -1048,7 +1219,7 @@ console.log('\nBarra lateral');
 // porque se escribió en rojo antes de implementar la barra, siguiendo TDD.
 
 const navSidebarSrc = '<nav[^>]*aria-label="Workspaces"[^>]*>[\\s\\S]*?<\\/nav>';
-const WORKSPACES_ESPERADOS = ['/', '/sobre-mi', '/proyectos', '/publicaciones', '/contacto'];
+const WORKSPACES_ESPERADOS = ['/', ...SECCIONES_SLUGS.map((s) => `/${s}`)];
 
 function navsDeWorkspaces(contenido) {
   return contenido.match(new RegExp(navSidebarSrc, 'g')) || [];
@@ -1089,16 +1260,22 @@ function actualesDe(navHtml) {
 
 // El workspace actual: exactamente uno por página, y el correcto. Las páginas
 // de detalle marcan `location` sobre el workspace padre, no `page`: no son la
-// raíz de la sección, son un documento dentro de ella.
+// raíz de la sección, son un documento dentro de ella. Los dos casos de
+// detalle son «cualquier proyecto» y «cualquier tecnología con página propia»:
+// cuál sea no importa, solo que exista al menos uno de cada tipo.
+const primerProyectoArchivo = primerProyecto ? `proyectos/${primerProyecto.id}.html` : null;
+const primeraPaginaStack = paginasStack.length > 0 ? `stack/${[...paginasStack].sort()[0]}` : null;
 const CASOS_ACTUAL = [
   ['index.html', '/', 'page'],
   ['sobre-mi.html', '/sobre-mi', 'page'],
   ['proyectos.html', '/proyectos', 'page'],
-  ['proyectos/estudio-juridico.html', '/proyectos', 'location'],
-  ['stack/postgresql.html', '/sobre-mi', 'location'],
+  ...(primerProyectoArchivo ? [[primerProyectoArchivo, '/proyectos', 'location']] : []),
+  ...(primeraPaginaStack ? [[primeraPaginaStack, '/sobre-mi', 'location']] : []),
   ['publicaciones.html', '/publicaciones', 'page'],
   ['contacto.html', '/contacto', 'page'],
 ];
+if (!primerProyectoArchivo) skip('workspace actual en una página de detalle de proyecto', 'no hay proyectos en este build');
+if (!primeraPaginaStack) skip('workspace actual en una página de detalle de tecnología', 'ninguna tecnología tiene página propia en este build');
 const actualMal = [];
 for (const [archivo, hrefEsperado, tipoEsperado] of CASOS_ACTUAL) {
   const actuales = actualesDe(navWorkspacesDe(archivo));
@@ -1122,7 +1299,7 @@ function abiertosDe(archivo) {
   return (leer(archivo).match(new RegExp(abiertosListaSrc)) || [])[0] || '';
 }
 
-const CASOS_DETALLE = ['proyectos/estudio-juridico.html', 'stack/postgresql.html'];
+const CASOS_DETALLE = [primerProyectoArchivo, primeraPaginaStack].filter(Boolean);
 const detalleMal = CASOS_DETALLE.filter((a) => {
   const bloque = abiertosDe(a);
   const items = (bloque.match(/<li/g) || []).length;
@@ -1131,7 +1308,7 @@ const detalleMal = CASOS_DETALLE.filter((a) => {
 check(
   'una página de detalle se sirve como el único «leyendo» en abiertos',
   detalleMal.length === 0,
-  detalleMal.join(', '),
+  CASOS_DETALLE.length === 0 ? 'no hay ninguna página de detalle en este build' : detalleMal.join(', '),
 );
 
 const CASOS_SECCION = ['index.html', 'sobre-mi.html', 'proyectos.html', 'publicaciones.html', 'contacto.html'];
@@ -1429,7 +1606,14 @@ check('dist/admin/config.yml existe', adminConfigExiste);
 const cmsConfig = adminConfigExiste ? parseYaml(readFileSync(adminConfigPath, 'utf8')) : {};
 
 check('el backend del CMS es github', cmsConfig.backend?.name === 'github');
-check('el repositorio es MrT-coder/jbmll-web', cmsConfig.backend?.repo === 'MrT-coder/jbmll-web');
+// El nombre del repositorio ("jbmll-web") es infraestructura fija, no lo edita
+// el CMS: se deja literal. El usuario sí es un dato del perfil y se deriva.
+const repoEsperado = `${githubEsperado}/jbmll-web`;
+check(
+  `el repositorio es ${repoEsperado || '(perfil.yaml sin github)'}`,
+  githubEsperado.length > 0 && cmsConfig.backend?.repo === repoEsperado,
+  cmsConfig.backend?.repo ?? '(sin repo)',
+);
 check('la rama es main', cmsConfig.backend?.branch === 'main');
 check(
   'solo se permite iniciar sesión con token (sin worker de OAuth)',
