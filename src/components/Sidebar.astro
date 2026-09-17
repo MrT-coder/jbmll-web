@@ -1,5 +1,6 @@
 ---
 import '../styles/sidebar.css';
+import marcaRaw from '../data/marca.txt?raw';
 import { WORKSPACES, subtituloDeWorkspace, getIndice } from '../lib/content';
 import type { DocumentoAbierto, TipoDocumentoAbierto } from '../lib/tipos';
 
@@ -16,6 +17,16 @@ interface Props {
 }
 
 const { actual = null, detalle = false, documento = null } = Astro.props;
+
+// Los espacios del final de cada fila son parte del dibujo y los editores los
+// borran, así que el ancho se restituye acá — igual que con el banner en
+// Terminal.astro. El \r se limpia por finales de línea de Windows.
+const filasMarca = marcaRaw
+  .replace(/\r/g, '')
+  .replace(/\n+$/, '')
+  .split('\n');
+const anchoMarca = Math.max(...filasMarca.map((f) => f.length));
+const marca = filasMarca.map((f) => f.padEnd(anchoMarca)).join('\n');
 
 const indice = await getIndice();
 
@@ -40,7 +51,15 @@ const ETIQUETA_TIPO: Record<TipoDocumentoAbierto, string> = {
     <span aria-hidden="true">✕</span>
   </button>
 
-  <a class="sidebar-marca" href="/" aria-label="Volver al inicio">JBMLL</a>
+  <!-- La marca, dibujada: desde que la foto ocupa el bloque de arranque, este
+       es el único lugar del sitio donde el nombre aparece en bloques. El
+       dibujo es decoración —el nombre lo dice aria-label— así que va oculto
+       al lector de pantalla para que no lea las filas carácter por carácter.
+       El ancho (19 columnas) cabe en los 24ch de la barra: lo comprueba
+       scripts/verify.mjs. -->
+  <a class="sidebar-marca" href="/" aria-label="JBMLL, volver al inicio">
+    <pre class="sidebar-marca-dibujo" aria-hidden="true">{marca}</pre>
+  </a>
 
   <nav id="sidebar-workspaces" class="sidebar-workspaces" aria-label="Workspaces">
     <h2 class="sidebar-subt">workspaces</h2>

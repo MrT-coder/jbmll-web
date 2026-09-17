@@ -244,6 +244,46 @@ if (fotoYaml && fotoYaml.src) {
   check('banner en el HTML', html.includes('█'));
 }
 
+// La marca de la barra lateral, desde que la foto ocupa el bloque de arranque:
+// es el único lugar donde queda el nombre dibujado, así que se comprueba que
+// esté, que quepa y que no se lea dos veces. El ancho de la barra son 24ch
+// (src/styles/sidebar.css) menos su relleno a los lados, y el dibujo se pinta
+// a --text-xs (0.8em): el presupuesto es (24 - 2) / 0.8 ≈ 27 columnas. Por
+// encima, el dibujo se corta o fuerza una barra de desplazamiento. La medida
+// de verdad la da el navegador; esto solo ataja el desborde evidente.
+const hayMarca = existsSync('src/data/marca.txt');
+check('existe el dibujo de la marca', hayMarca, 'falta src/data/marca.txt');
+const marca = hayMarca ? readFileSync('src/data/marca.txt', 'utf8').replace(/\n+$/, '').split('\n') : [''];
+const anchosMarca = new Set(marca.map((r) => r.length));
+const marcaHtml = (html.match(/<a[^>]*class="sidebar-marca"[\s\S]*?<\/a>/) || [])[0] || '';
+// Sin el archivo estas tres no pueden afirmar nada: un dibujo vacío tiene
+// todas sus filas del mismo ancho, cabe en cualquier barra y está contenido
+// en cualquier HTML. Sin esta guarda daban verde justo cuando falta.
+if (!hayMarca) {
+  skip('marca alineada', 'no hay src/data/marca.txt que medir');
+  skip('la marca cabe en la barra lateral', 'no hay src/data/marca.txt que medir');
+  skip('la barra lateral dibuja la marca', 'no hay src/data/marca.txt que buscar en el HTML');
+} else {
+  check('marca alineada', anchosMarca.size === 1, 'anchos distintos: ' + [...anchosMarca].join(', '));
+  check(
+    'la marca cabe en la barra lateral',
+    [...anchosMarca][0] <= 27,
+    `${[...anchosMarca][0]} columnas; el presupuesto es 27`,
+  );
+  check('la barra lateral dibuja la marca', marcaHtml.includes(marca[marca.length - 1]), marcaHtml.slice(0, 80));
+}
+// El dibujo no es texto: sin aria-hidden un lector de pantalla leería las
+// filas de bloques carácter por carácter, y sin nombre accesible el enlace
+// quedaría anunciado como «enlace» y nada más.
+check('el dibujo de la marca queda oculto al lector de pantalla', /<pre[^>]*aria-hidden="true"/.test(marcaHtml));
+check('el enlace de la marca conserva su nombre accesible', /aria-label="[^"]+"/.test(marcaHtml));
+// letter-spacing hereda de .sidebar-marca (--tracking-wide) y separaría las
+// columnas del dibujo, que dejarían de formar las letras.
+check(
+  'el dibujo de la marca no arrastra letter-spacing',
+  /\.sidebar-marca-dibujo[^{]*\{[^}]*letter-spacing:\s*normal/.test(readFileSync('src/styles/sidebar.css', 'utf8')),
+);
+
 console.log('\nCSS');
 const cssFiles = existsSync(join(DIST, '_astro'))
   ? readdirSync(join(DIST, '_astro')).filter((f) => f.endsWith('.css'))
@@ -1541,9 +1581,14 @@ check(
   'sin la clase, .sidebar-workspaces { padding: ... } nunca se aplica y la fila queda pegada al borde',
 );
 
+// Desde que la marca es un dibujo, «JBMLL» ya no es el texto del enlace sino
+// su nombre accesible: lo que esta comprobación protege es que la marca siga
+// existiendo, nombrando al sitio y llevando al inicio, no la forma de
+// escribirla.
 check(
   'la marca JBMLL vuelve a estar en la barra lateral, enlazada al inicio',
-  /<a class="sidebar-marca"[^>]*href="\/"[^>]*>JBMLL<\/a>/.test(html),
+  /<a class="sidebar-marca"[^>]*href="\/"/.test(marcaHtml) && /aria-label="[^"]*JBMLL/.test(marcaHtml),
+  marcaHtml.slice(0, 100),
 );
 
 // La marca vive fuera del nav[aria-label="Workspaces"]: si estuviera dentro,
