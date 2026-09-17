@@ -1,0 +1,21 @@
+# El perfil: único y no listado, así que una sola entrada («perfil») basta.
+# Lo edita un CMS basado en Git (Sveltia, en una PR futura); los cálculos que
+# sí son código — el teléfono legible, los enlaces de contacto — viven en
+# src/data/perfil.ts y no aquí.
+perfil:
+  nombre: Josue Bladimir Morales Llanganate
+  marca: JBMLL
+  titular: Desarrollador Backend Java
+  ubicacion: Salcedo, Cotopaxi, Ecuador
+  disponibilidad: Disponible para remoto
+
+  correo: juniorbmorales@gmail.com
+
+  # En formato E.164 y sin separadores: es lo que espera wa.me y lo que evita
+  # que el enlace y el número visible se separen. El formato legible se
+  # calcula desde este mismo valor en src/data/perfil.ts, no se escribe aparte.
+  telefono: '+593958774749'
+
+  github: MrT-coder
+  linkedin: josue-bladimir-morales-llanganate-20086636b
+  orcid: 0009-0004-2687-2314

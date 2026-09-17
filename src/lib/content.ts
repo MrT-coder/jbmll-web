@@ -1,5 +1,5 @@
-import { getCollection, type CollectionEntry } from 'astro:content';
-import { perfil, enlacesDeContacto } from '../data/perfil';
+import { getCollection, getEntry, type CollectionEntry } from 'astro:content';
+import { enlacesDeContacto } from '../data/perfil';
 import type { Fila, Indice, Seccion, Tech, TipoDeSeccion, UsoDeStack, Workspace } from './tipos';
 import { slugTech } from './render';
 
@@ -12,6 +12,7 @@ export type Proyecto = CollectionEntry<'proyectos'>;
 export type Publicacion = CollectionEntry<'publicaciones'>;
 export type Educacion = CollectionEntry<'educacion'>;
 export type Certificacion = CollectionEntry<'certificaciones'>;
+export type Perfil = CollectionEntry<'perfil'>['data'];
 
 // Más reciente primero. El orden lexicográfico de AAAA-MM ya es el cronológico.
 const porFecha = (a: string, b: string) => b.localeCompare(a);
@@ -114,12 +115,18 @@ export async function getStack(): Promise<UsoDeStack[]> {
 }
 
 /**
- * El perfil pasa por la misma puerta que el resto. Hoy sale de un módulo; en
- * cuanto el contenido viva en D1 saldrá de ahí, y quien lo lee no cambia.
+ * El perfil pasa por la misma puerta que el resto. Vive en
+ * src/content/perfil.yaml —única entrada de esa colección, id «perfil»— para
+ * que un CMS basado en Git lo edite sin tocar TypeScript; los cálculos que sí
+ * son código se quedan en src/data/perfil.ts.
  */
-export function getPerfil() {
-  return { ...perfil, contacto: enlacesDeContacto() };
+export async function getPerfil() {
+  const entrada = await getEntry('perfil', 'perfil');
+  if (!entrada) throw new Error('getPerfil: falta la entrada «perfil» en src/content/perfil.yaml');
+  return { ...entrada.data, contacto: enlacesDeContacto(entrada.data) };
 }
+
+type PerfilConContacto = Awaited<ReturnType<typeof getPerfil>>;
 
 /** Una tecnología solo merece página propia si hay algo que listar en ella. */
 export const MINIMO_PARA_PAGINA_DE_STACK = 2;
@@ -149,55 +156,64 @@ function techDe(tech: string, conPagina: Set<string>): Tech {
 // La proyección plana que consume el renderizador. Se define aquí, junto a los
 // datos, porque decidir qué entra en la vista es decidir sobre los datos.
 
-// El título de pestaña y el lead del inicio vivían escritos a mano en
-// index.astro. `navegar()` necesita esa misma pareja para reponerlos al
-// volver a `~` sin recargar, así que salen de aquí y no de la página.
-export const INICIO = {
-  titulo: 'Josue Bladimir Morales Llanganate — JBMLL',
-  lead: 'Soy <strong>Josue Bladimir Morales Llanganate</strong> (<span class="sig">JBMLL</span>), desarrollador backend.',
-};
-
-export const SECCIONES: { slug: string; desc: string; tipo: TipoDeSeccion; titulo: string; lead: string }[] = [
-  {
-    slug: 'sobre-mi',
-    desc: 'quién soy y con qué trabajo',
-    tipo: 'pagina',
-    titulo: 'Sobre mí — JBMLL',
-    // El mismo nombre que ya usa el perfil: no se vuelve a escribir a mano.
-    lead: perfil.nombre,
-  },
-  {
-    slug: 'proyectos',
-    desc: 'lo que he construido',
-    tipo: 'coleccion',
-    titulo: 'Proyectos — JBMLL',
-    lead: 'Lo que he construido.',
-  },
+// Slug, tipo y título no dependen del perfil: los necesitan Terminal.astro (la
+// línea de arranque) y WORKSPACES (la barra lateral) de forma síncrona, antes
+// de que valga la pena esperar a una colección. El lead sí depende del
+// perfil —al menos el de sobre-mi— y se calcula aparte, en leadDeSeccion().
+export const SECCIONES: { slug: string; desc: string; tipo: TipoDeSeccion; titulo: string }[] = [
+  { slug: 'sobre-mi', desc: 'quién soy y con qué trabajo', tipo: 'pagina', titulo: 'Sobre mí — JBMLL' },
+  { slug: 'proyectos', desc: 'lo que he construido', tipo: 'coleccion', titulo: 'Proyectos — JBMLL' },
   {
     slug: 'publicaciones',
     desc: 'producción académica, con DOI',
     tipo: 'coleccion',
     titulo: 'Publicaciones — JBMLL',
-    lead: 'Producción académica, con DOI.',
   },
-  {
-    slug: 'contacto',
-    desc: 'dónde encontrarme',
-    tipo: 'pagina',
-    titulo: 'Contacto — JBMLL',
-    lead: 'Dónde encontrarme.',
-  },
+  { slug: 'contacto', desc: 'dónde encontrarme', tipo: 'pagina', titulo: 'Contacto — JBMLL' },
 ];
+
+/**
+ * El lead de cada sección. El de sobre-mi repite el nombre que ya trae el
+ * perfil —no se vuelve a escribir a mano—; los demás no dependen de él y
+ * quedan fijos aquí mismo.
+ */
+function leadDeSeccion(slug: string, perfil: PerfilConContacto): string {
+  switch (slug) {
+    case 'sobre-mi':
+      return perfil.nombre;
+    case 'proyectos':
+      return 'Lo que he construido.';
+    case 'publicaciones':
+      return 'Producción académica, con DOI.';
+    case 'contacto':
+      return 'Dónde encontrarme.';
+    default:
+      return '';
+  }
+}
+
+/**
+ * El título de pestaña y el lead del inicio. `navegar()` necesita esa misma
+ * pareja para reponerlos al volver a `~` sin recargar; ambos se arman sobre el
+ * perfil ya resuelto, no se vuelven a escribir a mano.
+ */
+function inicioDe(perfil: PerfilConContacto): { titulo: string; lead: string } {
+  return {
+    titulo: `${perfil.nombre} — ${perfil.marca}`,
+    lead: `Soy <strong>${perfil.nombre}</strong> (<span class="sig">${perfil.marca}</span>), desarrollador backend.`,
+  };
+}
 
 /**
  * El título y el lead de una sección, por slug. Única puerta para que las
  * páginas dejen de escribir esa pareja a mano: un slug que no existe es un
  * error de quien programa, no algo que la página deba tolerar en silencio.
  */
-export function seccionDe(slug: string): { titulo: string; lead: string } {
+export async function seccionDe(slug: string): Promise<{ titulo: string; lead: string }> {
   const s = SECCIONES.find((sec) => sec.slug === slug);
   if (!s) throw new Error(`seccionDe: no existe la sección «${slug}»`);
-  return s;
+  const perfil = await getPerfil();
+  return { titulo: s.titulo, lead: leadDeSeccion(slug, perfil) };
 }
 
 // ── Barra lateral ────────────────────────────────────────────────────────────
@@ -276,11 +292,12 @@ function filaDePublicacion(pub: Publicacion): Fila {
 }
 
 export async function getIndice(): Promise<Indice> {
-  const [proyectos, publicaciones, stack, conPagina] = await Promise.all([
+  const [proyectos, publicaciones, stack, conPagina, perfil] = await Promise.all([
     getProyectos(),
     getPublicaciones(),
     getStack(),
     getTechsConPagina(),
+    getPerfil(),
   ]);
 
   const entradas: Record<string, Fila[]> = {
@@ -292,10 +309,11 @@ export async function getIndice(): Promise<Indice> {
 
   const secciones: Seccion[] = SECCIONES.map((s) => ({
     ...s,
+    lead: leadDeSeccion(s.slug, perfil),
     n: entradas[s.slug]?.length ?? 0,
   }));
 
-  return { secciones, entradas, stack, inicio: INICIO };
+  return { secciones, entradas, stack, inicio: inicioDe(perfil) };
 }
 
 /**

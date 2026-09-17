@@ -1,11 +1,11 @@
 ---
 import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
-import { getIndice, getPerfil, INICIO } from '../lib/content';
+import { getIndice, getPerfil } from '../lib/content';
 import { renderSecciones } from '../lib/render';
 
 const indice = await getIndice();
-const perfil = getPerfil();
+const perfil = await getPerfil();
 
 const INFO = [
   ['autor', perfil.nombre],
@@ -16,10 +16,10 @@ const INFO = [
 ---
 
 <Base
-  title={INICIO.titulo}
+  title={indice.inicio.titulo}
   description="Desarrollador backend Java. Proyectos, publicaciones y notas, en una terminal que se navega con comandos o con clic."
 >
-  <Terminal seccion="" boot lead={INICIO.lead} salida={renderSecciones(indice.secciones)}>
+  <Terminal seccion="" boot lead={indice.inicio.lead} salida={renderSecciones(indice.secciones)}>
     <dl slot="info">
       {
         INFO.map(([k, v]) => (

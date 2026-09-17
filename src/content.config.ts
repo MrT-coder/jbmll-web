@@ -123,6 +123,33 @@ const certificaciones = defineCollection({
   }),
 });
 
+// El perfil es único y no se lista, así que el YAML trae una sola clave de
+// nivel superior («perfil») en vez de una lista con id. El loader `file()`
+// trata un objeto (no un arreglo) como un mapa id → datos: cada clave de
+// nivel superior se vuelve una entrada, así que esto da exactamente una
+// entrada con id «perfil» — confirmado en
+// node_modules/astro/dist/content/loaders/file.js (rama `typeof data ===
+// 'object'`, línea ~78: `Object.entries(data)` y `store.set({ id, data:
+// parsedData, ... })` por cada clave).
+const perfil = defineCollection({
+  loader: file('./src/content/perfil.yaml'),
+  schema: z.object({
+    nombre: z.string(),
+    marca: z.string(),
+    titular: z.string(),
+    ubicacion: z.string(),
+    disponibilidad: z.string(),
+    correo: z.email(),
+    // E.164: el signo más y de 6 a 15 dígitos, sin separadores. Es lo que
+    // espera wa.me y lo que evita que el enlace y el número visible se
+    // separen (ver telefonoLegible() en src/data/perfil.ts).
+    telefono: z.string().regex(/^\+\d{6,15}$/, 'Formato E.164, por ejemplo +593958774749'),
+    github: z.string(),
+    linkedin: z.string(),
+    orcid: z.string().regex(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/, 'Formato ORCID, por ejemplo 0009-0004-2687-2314'),
+  }),
+});
+
 export const collections = {
   paginas,
   experiencia,
@@ -130,4 +157,5 @@ export const collections = {
   publicaciones,
   educacion,
   certificaciones,
+  perfil,
 };
