@@ -56,9 +56,17 @@ const el = <K extends keyof HTMLElementTagNameMap>(
   return e;
 };
 
+// Mientras arranca, la salida ya viene escrita por el servidor y el prompt se
+// añade al final: desplazarse ahí dejaría a quien llega en la mitad del texto
+// —251 px hacia abajo en el inicio— obligándolo a subir para leer desde el
+// principio. Una terminal de verdad arranca vacía y crece hacia abajo; esta
+// llega con todo escrito, así que el desplazamiento automático solo tiene
+// sentido cuando ya hay alguien ejecutando comandos.
+let arrancando = true;
+
 const push = (n: Node) => {
   scroll.append(n);
-  term.scrollTop = term.scrollHeight;
+  if (!arrancando) term.scrollTop = term.scrollHeight;
 };
 
 const line = (cls: string, txt: string) => push(el('div', 'out ' + cls, txt));
@@ -576,6 +584,10 @@ if (stClock) {
 // ── Arranque ───────────────────────────────────────────────────────────────
 
 prompt();
+
+// De acá en adelante cada salida es consecuencia de algo que alguien hizo, así
+// que sí corresponde llevarlo a verla.
+arrancando = false;
 
 // El índice llega después del primer pintado: la página ya es legible sin él y
 // solo hace falta cuando alguien navega o completa con Tab.
