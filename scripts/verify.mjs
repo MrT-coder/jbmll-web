@@ -718,12 +718,22 @@ for (const archivo of paginasHtml) {
     if (href.startsWith('http')) continue; // externo: fuera del barrido
     const sinAncla = href.split('#')[0];
     if (!sinAncla) continue; // era solo un ancla, «#lo-que-sea»
+    // Un archivo de /media/ con espacios (u otro carácter fuera de lo
+    // "seguro") en el nombre llega acá codificado (rutaMedia(), en
+    // src/lib/render.ts): hay que decodificarlo antes de buscarlo en disco,
+    // donde vive con su nombre real, sin el %20.
+    let sinCodificar;
+    try {
+      sinCodificar = decodeURI(sinAncla);
+    } catch {
+      sinCodificar = sinAncla;
+    }
     const destino =
-      sinAncla === '/'
+      sinCodificar === '/'
         ? 'index.html'
-        : extname(sinAncla)
-          ? sinAncla.slice(1)
-          : sinAncla.slice(1) + '.html';
+        : extname(sinCodificar)
+          ? sinCodificar.slice(1)
+          : sinCodificar.slice(1) + '.html';
     if (!existsSync(join(DIST, destino))) {
       enlacesRotos.push(`${relative(DIST, archivo)} → ${href}`);
     }
@@ -910,6 +920,19 @@ check(
   'el desplazamiento automático no corre durante el arranque',
   /scrollTop/.test(cuerpoPush) && /\bif\s*\([^)]*\)/.test(cuerpoPush.slice(0, cuerpoPush.indexOf('scrollTop'))),
   cuerpoPush.trim() || '(no se encontró push())',
+);
+
+// Un .ts sin import ni export es, para TypeScript, un script global: sus
+// variables comparten ámbito con las de los demás y dos scripts que declaren
+// el mismo nombre no compilan (ts2451). Pasó entre visor.ts y sidebar.ts con
+// `botonCerrar`, y lo vio el CI, no el build: acá se ataja antes.
+const scriptsSueltos = readdirSync('src/scripts')
+  .filter((n) => n.endsWith('.ts'))
+  .filter((n) => !/^\s*(import|export)\b/m.test(readFileSync(join('src/scripts', n), 'utf8')));
+check(
+  'cada script del sitio es un módulo, no un script global',
+  scriptsSueltos.length === 0,
+  scriptsSueltos.join(', ') + ' — sin import ni export comparten ámbito global',
 );
 
 const desdeTab = terminalTs.slice(terminalTs.indexOf("if (ev.key === 'Tab')"));
@@ -1671,6 +1694,17 @@ for (const flojo of ["'unsafe-inline'", "'unsafe-eval'", '*']) {
   check('script-src sin ' + flojo, scriptSrc !== '' && !scriptSrc.includes(flojo));
 }
 
+// El visor incrusta un PDF del propio origen con <object>: sin object-src la
+// CSP hereda default-src 'none' y el navegador lo bloquea en silencio, con el
+// panel abriéndose vacío. Se concede solo 'self' — nada de blob:, data: ni un
+// origen ajeno — para no abrir más de lo que este archivo necesita.
+const objectSrc = (headers.match(/object-src[^;]*/) || [''])[0];
+check(
+  "CSP del sitio: object-src 'self' (y nada más ancho)",
+  objectSrc.trim() === "object-src 'self'",
+  objectSrc || '(sin object-src: el <object> del visor se bloquearía)',
+);
+
 // Un script en línea obligaría a aflojar la CSP. define:vars lo produce sin
 // avisar y la página se ve idéntica, hasta que en producción queda bloqueado.
 const inline = (html.match(/<script(?![^>]*\ssrc=)[^>]*>/g) || []).filter(
@@ -1946,6 +1980,163 @@ console.log('\nPanel de administración: rastreo e indexación');
 const robotsTxt = readFileSync('public/robots.txt', 'utf8');
 check('robots.txt no permite rastrear /admin/', /^Disallow:\s*\/admin\/\s*$/m.test(robotsTxt));
 check('el panel no aparece en el sitemap generado', !sitemap.includes('/admin'));
+
+console.log('\nVisor de certificados');
+// El marcado del panel flotante vive una sola vez en src/components/Visor.astro
+// —vacío y cerrado por defecto—, incluido en /sobre-mi junto a la tabla que lo
+// abre; scripts/visor.ts lo llena al vuelo con el archivo de la certificación
+// que se pulsó. Estas comprobaciones se escribieron en rojo antes de crear
+// Visor.astro y el campo `archivo` (TDD): sin ellos, todo lo de abajo fallaba.
+// Ninguna nombra una certificación concreta: todo se deriva de
+// src/content/certificaciones.yaml, igual que el resto del archivo.
+
+const dialogs = [...sobreMi.matchAll(/<dialog\b[^>]*>/g)].map((m) => m[0]);
+check('/sobre-mi renderiza exactamente un <dialog>', dialogs.length === 1, `${dialogs.length} encontrados`);
+const dialogTag = dialogs[0] || '';
+check(
+  'el <dialog> no trae el atributo open: cerrado por defecto',
+  dialogs.length === 1 && !/\sopen(?=[\s=>])/.test(dialogTag),
+  dialogTag,
+);
+
+const labelledbyId = (dialogTag.match(/aria-labelledby="([^"]+)"/) || [])[1] || '';
+check(
+  'el <dialog> declara un nombre accesible (aria-labelledby) que apunta a un elemento que existe',
+  labelledbyId !== '' && new RegExp(`id="${labelledbyId}"`).test(sobreMi),
+  labelledbyId || '(sin aria-labelledby)',
+);
+
+const bloqueVisor = (sobreMi.match(/<dialog\b[^>]*>[\s\S]*?<\/dialog>/) || [''])[0];
+const botonesVisor = bloqueVisor.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) || [];
+check(
+  'el visor trae exactamente un botón de cerrar, con nombre accesible propio',
+  botonesVisor.length === 1 && /aria-label="[^"]+"/.test(botonesVisor[0] || ''),
+  botonesVisor.join(' · '),
+);
+check('el visor ofrece la pista de cerrar con Esc', /Esc/.test(bloqueVisor), bloqueVisor);
+
+// El esquema (content.config.ts) es la fuente de verdad de qué certificación
+// trae `archivo`, `url` o `credencial`.
+const certificacionesSrc = parseYaml(readFileSync('src/content/certificaciones.yaml', 'utf8')) ?? [];
+const conArchivo = certificacionesSrc.filter((c) => c.archivo);
+const conUrl = certificacionesSrc.filter((c) => c.url);
+const conCredencial = certificacionesSrc.filter((c) => c.credencial);
+
+// Mismo criterio que rutaMedia() en src/lib/render.ts: una ruta ya codificada
+// (con un '%XX') se deja tal cual, para no codificarla dos veces.
+const rutaMedia = (ruta) => (/%[0-9a-fA-F]{2}/.test(ruta) ? ruta : encodeURI(ruta));
+const escRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const anchorsSobreMi = [...sobreMi.matchAll(/<a\b[^>]*>[^<]*<\/a>/g)].map((m) => m[0]);
+const anchorParaHref = (href) => anchorsSobreMi.find((a) => a.includes(`href="${href}"`));
+
+const versRenderizados = anchorsSobreMi.filter((a) => /class="[^"]*\bvisor-abrir\b[^"]*"/.test(a));
+if (conArchivo.length === 0) {
+  skip('cada certificación con archivo (y solo esas) renderiza su enlace [ver]', 'ninguna certificación trae archivo en este build');
+  skip('el enlace [ver] incluye el nombre de la certificación en su nombre accesible', 'ninguna certificación trae archivo en este build');
+} else {
+  check(
+    'cada certificación con archivo (y solo esas) renderiza su enlace [ver]',
+    versRenderizados.length === conArchivo.length,
+    `${versRenderizados.length} enlaces [ver] · ${conArchivo.length} certificaciones con archivo`,
+  );
+  const verMal = conArchivo.filter((c) => {
+    const a = anchorParaHref(rutaMedia(c.archivo));
+    return !a || !new RegExp(`aria-label="[^"]*${escRegex(c.nombre)}[^"]*"`).test(a) || !/class="[^"]*\bvisor-abrir\b[^"]*"/.test(a);
+  });
+  check(
+    'el enlace [ver] de cada certificación con archivo apunta a su ruta (codificada) y su nombre accesible incluye el nombre de la certificación',
+    verMal.length === 0,
+    verMal.map((c) => c.id).join(', '),
+  );
+}
+
+if (conUrl.length === 0) {
+  skip('cada certificación con url (y solo esas) renderiza su enlace [verificar]', 'ninguna certificación trae url en este build');
+} else {
+  const verificarRenderizados = conUrl.filter((c) => {
+    const a = anchorParaHref(c.url);
+    return a && new RegExp(`aria-label="[^"]*${escRegex(c.nombre)}[^"]*"`).test(a);
+  });
+  check(
+    'el enlace [verificar] de cada certificación con url apunta a esa url y su nombre accesible incluye el nombre de la certificación',
+    verificarRenderizados.length === conUrl.length,
+    `${verificarRenderizados.length} de ${conUrl.length}`,
+  );
+}
+
+const credSpans = [...sobreMi.matchAll(/<span class="cred"[^>]*>([^<]*)<\/span>/g)].map((m) => m[1]);
+if (conCredencial.length === 0) {
+  skip('cada certificación con credencial (y solo esas) la muestra', 'ninguna certificación trae credencial en este build');
+} else {
+  check(
+    'cada certificación con credencial (y solo esas) la muestra, discreta',
+    credSpans.length === conCredencial.length && conCredencial.every((c) => credSpans.includes(c.credencial)),
+    `mostradas: ${credSpans.join(', ') || '—'} · esperadas: ${conCredencial.map((c) => c.credencial).join(', ')}`,
+  );
+}
+
+// Comprobación estructural por expresión regular sobre el propio código del
+// script: no sustituye una prueba real de teclado/lector de pantalla en el
+// navegador. Solo evita la regresión de reimplementar a mano lo que
+// showModal() ya resuelve — el pedido explícito de esta funcionalidad.
+const visorTsPath = 'src/scripts/visor.ts';
+const visorTsExiste = existsSync(visorTsPath);
+check('visor.ts existe como módulo aparte, para que tsc lo revise', visorTsExiste);
+const visorTs = visorTsExiste ? readFileSync(visorTsPath, 'utf8') : '';
+check('visor.ts abre el panel con showModal()', /\.showModal\(\)/.test(visorTs));
+check(
+  'visor.ts no maneja "Escape" a mano (lo resuelve el <dialog> nativo)',
+  !/Escape/.test(visorTs),
+);
+check(
+  'visor.ts no implementa su propio atrapado de foco (ninguna referencia a "Tab": responsabilidad de showModal())',
+  !/\bTab\b/.test(visorTs),
+);
+check(
+  'Visor.astro carga visor.ts como los demás scripts del sitio (sin lógica suelta en el componente)',
+  existsSync('src/components/Visor.astro') &&
+    readFileSync('src/components/Visor.astro', 'utf8').includes("import '../scripts/visor'"),
+);
+check(
+  '/sobre-mi incluye el componente Visor',
+  existsSync('src/pages/sobre-mi.astro') && readFileSync('src/pages/sobre-mi.astro', 'utf8').includes('<Visor'),
+);
+
+console.log('\nRutas de medios (/media/)');
+// Toda ruta /media/ que llega al HTML tiene que poder decodificarse a un
+// archivo real dentro de dist/: un espacio sin codificar en el nombre de un
+// archivo subido por el CMS rompe la petición (corta la URL en el espacio), y
+// una ruta que no resuelve a ningún archivo da un 404 en silencio — ninguno
+// de los dos deja rastro visible sin esta comprobación.
+const rutasMedia = new Set();
+for (const archivo of paginasHtml) {
+  const contenido = readFileSync(archivo, 'utf8');
+  for (const m of contenido.matchAll(/(?:href|src|data)="(\/media\/[^"]*)"/g)) rutasMedia.add(m[1]);
+}
+const mediaConEspacio = [...rutasMedia].filter((r) => /\s/.test(r));
+check(
+  'ninguna ruta /media/ del HTML lleva un espacio sin codificar',
+  mediaConEspacio.length === 0,
+  mediaConEspacio.join(', '),
+);
+const mediaFaltante = [];
+for (const ruta of rutasMedia) {
+  if (/\s/.test(ruta)) continue; // ya reportada arriba
+  let decodificada;
+  try {
+    decodificada = decodeURI(ruta);
+  } catch {
+    mediaFaltante.push(`${ruta} (no se pudo decodificar)`);
+    continue;
+  }
+  if (!existsSync(join(DIST, decodificada.replace(/^\//, '')))) mediaFaltante.push(ruta);
+}
+check(
+  'toda ruta /media/ del HTML resuelve, ya decodificada, a un archivo dentro de dist/',
+  rutasMedia.size > 0 && mediaFaltante.length === 0,
+  rutasMedia.size === 0 ? 'no hay ninguna ruta /media/ en este build' : mediaFaltante.join(', '),
+);
 
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';

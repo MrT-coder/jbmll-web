@@ -113,6 +113,17 @@ export function renderStack(stack: UsoDeStack[], minimoParaPagina = 2): string {
   return `<table class="list stack">\n${filas}\n</table>`;
 }
 
+/**
+ * La ruta de un archivo del CMS (`archivo` de una certificación, `foto` del
+ * perfil), lista para un atributo href/src/data. El dueño sube el archivo con
+ * su nombre real —con espacios, acentos, lo que sea— y un espacio crudo en la
+ * URL corta la petición ahí mismo. Si la ruta ya trae un '%XX' se deja tal
+ * cual: volver a codificarla la rompería (un '%' se convertiría en '%25').
+ */
+export function rutaMedia(ruta: string): string {
+  return /%[0-9a-fA-F]{2}/.test(ruta) ? ruta : encodeURI(ruta);
+}
+
 /** El identificador de una tecnología en una URL. */
 export function slugTech(tech: string): string {
   return tech

@@ -328,3 +328,8 @@ const movil = matchMedia('(max-width: 660px)');
 movil.addEventListener('change', () => {
   if (!movil.matches && estaAbierta()) cerrar();
 });
+
+// Módulo y no script global, por la misma razón que visor.ts: sin esto sus
+// variables comparten ámbito con las de los demás scripts del sitio y dos
+// nombres iguales rompen la compilación de tipos.
+export {};

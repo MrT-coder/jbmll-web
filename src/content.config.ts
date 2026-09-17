@@ -120,6 +120,22 @@ const certificaciones = defineCollection({
     credencial: z.string().optional(),
     url: z.url().optional(),
     tipo: z.enum(['certificacion', 'curso']).default('certificacion'),
+
+    // El archivo que sube el CMS (casi siempre un PDF): el visor flotante lo
+    // abre sin salir de la página (ver Visor.astro/src/scripts/visor.ts).
+    // `startsWith('/media/')` es el mismo candado que ya usa `foto` en
+    // `perfil`, más abajo: es el único `public_folder` que sirve el CMS (ver
+    // public/admin/config.yml), así que una ruta pegada a mano no pasa el
+    // esquema. La extensión decide, en el visor, si el archivo se incrusta
+    // como <object> (PDF) o como <img> (imagen); no se exige aquí ningún
+    // carácter «seguro» en el nombre — un espacio u otro carácter del archivo
+    // real que suba el dueño se codifica al renderizar (rutaMedia(), en
+    // src/lib/render.ts), no al guardar el dato.
+    archivo: z
+      .string()
+      .startsWith('/media/', 'Debe empezar con /media/')
+      .regex(/\.(pdf|png|jpe?g|webp|avif)$/i, 'Debe terminar en .pdf, .png, .jpg, .jpeg, .webp o .avif')
+      .optional(),
   }),
 });
 

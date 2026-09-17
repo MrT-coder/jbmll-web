@@ -277,6 +277,36 @@ span.chip {
   white-space: nowrap;
 }
 
+/* ── Visor de certificados ────────────────────────────────────────────────
+   El <object> (PDF) o el <img> (imagen) del certificado los crea
+   scripts/visor.ts al abrir el panel, no la plantilla de Visor.astro: sus
+   reglas no pueden llevar alcance de componente por la misma razón que el
+   resto de este archivo (ver la nota del encabezado). object-fit: contain es
+   lo que evita que una imagen mucho más grande que el panel —una foto de
+   certificado tal cual la entrega el emisor— lo desborde o fuerce scroll:
+   siempre cabe entera, nunca se agranda más allá del panel. */
+
+/* El PDF no trae alto que el panel pueda medir —lo pinta el visor del
+   navegador dentro del <object>—, así que es el único que impone uno; el
+   panel, sin alto fijo, se ajusta a él. */
+.visor-cuerpo object {
+  width: 100%;
+  height: min(78vh, 820px);
+  border: 0;
+}
+
+/* La imagen sí se mide sola: se limita a lo que cabe y el panel se encoge con
+   ella, en vez de dejar vacío alrededor de un certificado horizontal. */
+.visor-cuerpo img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: min(78vh, 820px);
+  margin: auto;
+  object-fit: contain;
+  border: 0;
+}
+
 /* ── Saltar al contenido ────────────────────────────────────────────────────
    Escondido como .sr-only mientras no tiene el foco, para que siga en el
    árbol de accesibilidad y en el orden de tabulación. Con el foco aparece
