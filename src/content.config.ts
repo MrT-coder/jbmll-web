@@ -147,6 +147,17 @@ const perfil = defineCollection({
     github: z.string(),
     linkedin: z.string(),
     orcid: z.string().regex(/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/, 'Formato ORCID, por ejemplo 0009-0004-2687-2314'),
+
+    // Opcional: sin ella, el bloque de arranque de la portada cae al banner
+    // ASCII (ver Terminal.astro). `src` vive bajo /media/, que es el único
+    // `public_folder` que sirve el CMS (ver public/admin/config.yml) — así un
+    // valor pegado desde otra ruta no pasa el esquema.
+    foto: z
+      .object({
+        src: z.string().startsWith('/media/', 'Debe empezar con /media/'),
+        alt: z.string().min(1, 'El alt no puede quedar vacío'),
+      })
+      .optional(),
   }),
 });
 

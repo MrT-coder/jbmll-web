@@ -274,3 +274,14 @@ singletons:
                 ['^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$', 'Formato ORCID, por ejemplo 0009-0004-2687-2314'],
               hint: 'Formato 0000-0000-0000-0000',
             }
+          # Opcional, igual que en el esquema de Zod: sin ella, la portada cae
+          # al banner ASCII. `src` lo llena el widget `image` subiendo a
+          # media_folder (public/media); `alt` lo escribe el dueño a mano
+          # porque ningún CMS describe una imagen por sí solo.
+          - name: foto
+            label: Foto (bloque de arranque de la portada)
+            widget: object
+            required: false
+            fields:
+              - { name: src, label: Imagen, widget: image, required: false }
+              - { name: alt, label: Texto alternativo, widget: string, required: false }

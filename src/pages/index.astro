@@ -19,7 +19,13 @@ const INFO = [
   title={indice.inicio.titulo}
   description="Desarrollador backend Java. Proyectos, publicaciones y notas, en una terminal que se navega con comandos o con clic."
 >
-  <Terminal seccion="" boot lead={indice.inicio.lead} salida={renderSecciones(indice.secciones)}>
+  <Terminal
+    seccion=""
+    boot
+    lead={indice.inicio.lead}
+    salida={renderSecciones(indice.secciones)}
+    foto={perfil.foto}
+  >
     <dl slot="info">
       {
         INFO.map(([k, v]) => (
