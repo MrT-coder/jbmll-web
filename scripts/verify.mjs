@@ -1327,6 +1327,49 @@ check('script servido como archivo', /<script[^>]+src="\/_astro\/[^"]+\.js"/.tes
 // La versión exacta del framework es una pista gratis para quien busca un CVE.
 check('sin meta generator', !/name="generator"/.test(html));
 
+console.log('\nPerfil editable (CMS)');
+// El perfil deja de ser un literal en TypeScript y pasa a vivir en
+// src/content/perfil.yaml: un CMS basado en Git (Sveltia, en una PR futura)
+// puede editar YAML pero no TypeScript. Los cálculos que sí son código — el
+// teléfono legible, los enlaces de contacto — se quedan en src/data/perfil.ts,
+// pero el dato en sí no puede seguir ahí, o el CMS no tendría nada que editar.
+const perfilYamlPath = 'src/content/perfil.yaml';
+const perfilYamlExiste = existsSync(perfilYamlPath);
+check('src/content/perfil.yaml existe', perfilYamlExiste);
+const perfilYaml = perfilYamlExiste ? readFileSync(perfilYamlPath, 'utf8') : '';
+check('el YAML declara la entrada "perfil"', /^perfil:/m.test(perfilYaml));
+
+// Se lee con una expresión regular y no con un parser de YAML: el archivo es
+// plano (una sola entrada, campos escalares) y así la comprobación no suma una
+// dependencia solo para leer cinco líneas.
+function leerCampoYaml(campo) {
+  const m = perfilYaml.match(new RegExp(`^\\s*${campo}:\\s*['"]?([^'"\\n]+?)['"]?\\s*$`, 'm'));
+  return m ? m[1].trim() : '';
+}
+const correoYaml = leerCampoYaml('correo');
+const telefonoYaml = leerCampoYaml('telefono');
+const githubYaml = leerCampoYaml('github');
+const linkedinYaml = leerCampoYaml('linkedin');
+const orcidYaml = leerCampoYaml('orcid');
+check(
+  'el YAML trae correo, teléfono, github, linkedin y orcid',
+  [correoYaml, telefonoYaml, githubYaml, linkedinYaml, orcidYaml].every((v) => v.length > 0),
+);
+
+const perfilTsPath = 'src/data/perfil.ts';
+const perfilTsExiste = existsSync(perfilTsPath);
+const perfilTs = perfilTsExiste ? readFileSync(perfilTsPath, 'utf8') : '';
+
+// Cada comprobación exige que el YAML ya tenga el dato (si no lo tiene, no hay
+// nada que comparar y la migración no terminó) y que ese mismo valor no
+// aparezca también escrito en el código.
+const sinLiteral = (valor) => perfilYamlExiste && valor.length > 0 && (!perfilTsExiste || !perfilTs.includes(valor));
+check('src/data/perfil.ts no repite el correo del perfil', sinLiteral(correoYaml));
+check('src/data/perfil.ts no repite el teléfono del perfil', sinLiteral(telefonoYaml));
+check('src/data/perfil.ts no repite el usuario de GitHub del perfil', sinLiteral(githubYaml));
+check('src/data/perfil.ts no repite el usuario de LinkedIn del perfil', sinLiteral(linkedinYaml));
+check('src/data/perfil.ts no repite el ORCID del perfil', sinLiteral(orcidYaml));
+
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);

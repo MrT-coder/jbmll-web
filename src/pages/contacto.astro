@@ -5,10 +5,9 @@ import { render } from 'astro:content';
 import { getPagina, getPerfil, seccionDe } from '../lib/content';
 import { renderContacto } from '../lib/render';
 
-const perfil = getPerfil();
-const pagina = await getPagina('contacto');
+const [perfil, pagina] = await Promise.all([getPerfil(), getPagina('contacto')]);
 const Prosa = pagina ? (await render(pagina)).Content : null;
-const { titulo, lead } = seccionDe('contacto');
+const { titulo, lead } = await seccionDe('contacto');
 ---
 
 <Base

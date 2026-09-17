@@ -6,7 +6,7 @@ import { renderEntradas } from '../lib/render';
 
 const indice = await getIndice();
 const filas = indice.entradas.publicaciones;
-const { titulo, lead } = seccionDe('publicaciones');
+const { titulo, lead } = await seccionDe('publicaciones');
 ---
 
 <Base
