@@ -1,4 +1,5 @@
 import { defineCollection, z } from 'astro:content';
+import type { ZodType } from 'zod';
 import { glob, file } from 'astro/loaders';
 
 // Astro 7 usa la Content Layer y busca este archivo en src/content.config.ts.
@@ -18,22 +19,36 @@ const mes = z
 // El orden lexicográfico de AAAA-MM coincide con el cronológico, así que
 // ordenar no necesita convertir a fecha.
 
+/**
+ * Un campo opcional que además acepta como «no hay dato» lo que el panel
+ * escribe cuando se deja en blanco: `''` en un texto y `null` en un número.
+ *
+ * El panel no omite la clave: la guarda vacía. Un `url: ''` llegaba al esquema
+ * como una URL inválida y un `horas: null` como un objeto, y rompían la
+ * construcción, y como el verificador corre en el build de Cloudflare, eso bloqueaba la
+ * publicación de todo lo demás que sí estaba bien. Para el sitio, vacío y
+ * ausente significan lo mismo, así que se normalizan antes de validar en vez
+ * de pedirle a quien edita que recuerde borrar la clave a mano.
+ */
+const opcional = <T extends ZodType>(esquema: T) =>
+  z.preprocess((v: unknown) => (v === '' || v === null ? undefined : v), esquema.optional());
+
 const experiencia = defineCollection({
   loader: base('experiencia'),
   schema: z.object({
     puesto: z.string(),
     organizacion: z.string(),
     ubicacion: z.string(),
-    modalidad: z.enum(['presencial', 'remoto', 'híbrido']).optional(),
+    modalidad: opcional(z.enum(['presencial', 'remoto', 'híbrido'])),
     inicio: mes,
     // Ausente significa «hasta hoy». Un valor centinela obligaría a recordar
     // cuál es, y tarde o temprano alguien lo compara con una fecha real.
-    fin: mes.optional(),
+    fin: opcional(mes),
 
     // Un puesto cuyo trabajo ya está descrito como proyecto no declara stack:
     // lo hereda de ahí. Si declarara el suyo, cada tecnología contaría dos
     // veces y el stack quedaría inflado sin que nadie mintiera.
-    proyecto: z.string().optional(),
+    proyecto: opcional(z.string()),
     st: z.array(z.string()).default([]),
     kw: z.array(z.string()).default([]),
   }),
@@ -45,7 +60,7 @@ const proyectos = defineCollection({
     titulo: z.string(),
     desc: z.string(),
     estado: z.enum(['produccion', 'activo', 'tesis', 'archivado']),
-    organizacion: z.string().optional(),
+    organizacion: opcional(z.string()),
     fecha: mes,
 
     // Sin stack, un proyecto no aporta nada al cálculo y es justo lo que el
@@ -53,8 +68,8 @@ const proyectos = defineCollection({
     st: z.array(z.string()).min(1),
     kw: z.array(z.string()).default([]),
 
-    repo: z.url().optional(),
-    demo: z.url().optional(),
+    repo: opcional(z.url()),
+    demo: opcional(z.url()),
     destacado: z.boolean().default(false),
     borrador: z.boolean().default(false),
   }),
@@ -68,15 +83,15 @@ const publicaciones = defineCollection({
     anio: z.number().int(),
     tipo: z.enum(['journal', 'conference', 'preprint', 'capitulo']),
     venue: z.string(),
-    serie: z.string().optional(),
-    editorial: z.string().optional(),
-    paginas: z.string().optional(),
-    doi: z.string().optional(),
-    url: z.url().optional(),
+    serie: opcional(z.string()),
+    editorial: opcional(z.string()),
+    paginas: opcional(z.string()),
+    doi: opcional(z.string()),
+    url: opcional(z.url()),
 
     // El trabajo que dio origen al artículo. Igual que en experiencia, el
     // stack se hereda de ahí y no se vuelve a contar.
-    proyecto: z.string().optional(),
+    proyecto: opcional(z.string()),
     kw: z.array(z.string()).default([]),
     borrador: z.boolean().default(false),
   }),
@@ -89,8 +104,8 @@ const educacion = defineCollection({
     institucion: z.string(),
     ubicacion: z.string(),
     inicio: mes,
-    fin: mes.optional(),
-    registro: z.string().optional(),
+    fin: opcional(mes),
+    registro: opcional(z.string()),
   }),
 });
 
@@ -112,13 +127,13 @@ const certificaciones = defineCollection({
   schema: z.object({
     id: z.string(),
     nombre: z.string(),
-    emisor: z.string().optional(),
+    emisor: opcional(z.string()),
     // Varias certificaciones no traen fecha en el CV; exigirla obligaría a
     // inventarla.
-    fecha: mes.optional(),
-    horas: z.number().int().positive().optional(),
-    credencial: z.string().optional(),
-    url: z.url().optional(),
+    fecha: opcional(mes),
+    horas: opcional(z.number().int().positive()),
+    credencial: opcional(z.string()),
+    url: opcional(z.url()),
     tipo: z.enum(['certificacion', 'curso']).default('certificacion'),
 
     // El archivo que sube el CMS (casi siempre un PDF): el visor flotante lo
@@ -131,11 +146,12 @@ const certificaciones = defineCollection({
     // carácter «seguro» en el nombre — un espacio u otro carácter del archivo
     // real que suba el dueño se codifica al renderizar (rutaMedia(), en
     // src/lib/render.ts), no al guardar el dato.
-    archivo: z
-      .string()
-      .startsWith('/media/', 'Debe empezar con /media/')
-      .regex(/\.(pdf|png|jpe?g|webp|avif)$/i, 'Debe terminar en .pdf, .png, .jpg, .jpeg, .webp o .avif')
-      .optional(),
+    archivo: opcional(
+      z
+        .string()
+        .startsWith('/media/', 'Debe empezar con /media/')
+        .regex(/\.(pdf|png|jpe?g|webp|avif)$/i, 'Debe terminar en .pdf, .png, .jpg, .jpeg, .webp o .avif'),
+    ),
   }),
 });
 
@@ -168,12 +184,12 @@ const perfil = defineCollection({
     // ASCII (ver Terminal.astro). `src` vive bajo /media/, que es el único
     // `public_folder` que sirve el CMS (ver public/admin/config.yml) — así un
     // valor pegado desde otra ruta no pasa el esquema.
-    foto: z
-      .object({
+    foto: opcional(
+      z.object({
         src: z.string().startsWith('/media/', 'Debe empezar con /media/'),
         alt: z.string().min(1, 'El alt no puede quedar vacío'),
-      })
-      .optional(),
+      }),
+    ),
   }),
 });
 

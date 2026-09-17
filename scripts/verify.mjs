@@ -927,6 +927,24 @@ check(
 // variables comparten ámbito con las de los demás y dos scripts que declaren
 // el mismo nombre no compilan (ts2451). Pasó entre visor.ts y sidebar.ts con
 // `botonCerrar`, y lo vio el CI, no el build: acá se ataja antes.
+// El panel guarda un campo opcional vacío como `''` y no lo omite, así que un
+// `.optional()` a secas rechaza lo que el propio panel escribe: pasó con
+// `url: ''` en certificaciones y, con el verificador corriendo en el build de
+// Cloudflare, bloqueó la publicación de todo lo demás. Cada campo opcional
+// tiene que pasar por el ayudante `opcional()`, que normaliza el vacío antes
+// de validar. La única aparición legítima de `.optional()` es la de su propia
+// definición.
+const configContenido = readFileSync('src/content.config.ts', 'utf8');
+const optionalesSueltos = configContenido
+  .split('\n')
+  .map((linea, i) => ({ n: i + 1, linea }))
+  .filter(({ linea }) => linea.includes('.optional()') && !linea.includes('esquema.optional()'));
+check(
+  'cada campo opcional del esquema acepta el vacío que escribe el panel',
+  optionalesSueltos.length === 0,
+  optionalesSueltos.map(({ n, linea }) => `línea ${n}: ${linea.trim()}`).join(' · '),
+);
+
 const scriptsSueltos = readdirSync('src/scripts')
   .filter((n) => n.endsWith('.ts'))
   .filter((n) => !/^\s*(import|export)\b/m.test(readFileSync(join('src/scripts', n), 'utf8')));
