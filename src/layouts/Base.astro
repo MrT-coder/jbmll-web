@@ -9,7 +9,11 @@ interface Props {
 
 const { title, description } = Astro.props;
 
-const canonical = new URL(Astro.url.pathname, Astro.site);
+// Con build.format 'file' la ruta llega como /proyectos.html o /index.html,
+// pero Cloudflare Pages redirige esas URL a /proyectos y a /, que son las que
+// lista el sitemap. La canónica declara la URL final, no la que redirige.
+const ruta = Astro.url.pathname.replace(/(?:\/index)?\.html$/, '') || '/';
+const canonical = new URL(ruta, Astro.site);
 ---
 
 <!doctype html>
