@@ -67,8 +67,13 @@ function metaDeFila(f: Fila): string {
 
 function panel(f: Fila): string {
   const destino = f.href ?? f.externo?.href;
+  // f.href es siempre una ruta propia; f.externo?.href (un DOI, cuando la
+  // publicación no tiene página propia — ver filaDePublicacion() en
+  // src/lib/content.ts) sí puede ser externo, así que se decide con
+  // esExterno() y no asumiendo uno de los dos casos.
+  const destinoExterno = destino ? esExterno(destino) : false;
   const titulo = destino
-    ? `<a class="go" href="${esc(destino)}">${esc(f.titulo)}</a>`
+    ? `<a class="go" href="${esc(destino)}"${destinoExterno ? ' target="_blank" rel="noopener"' : ''}>${esc(f.titulo)}${destinoExterno ? MARCA_EXTERNA : ''}</a>`
     : esc(f.titulo);
 
   // Mismo patrón que el título de arriba: una tecnología sin página propia se
@@ -175,6 +180,64 @@ export function slugTech(tech: string): string {
     .replace(/^-|-$/g, '');
 }
 
+// ── Enlaces externos ─────────────────────────────────────────────────────
+//
+// Quien sale del sitio en la misma pestaña no siempre vuelve. La regla es del
+// host, no del protocolo ni de la ruta: mailto:/tel: no tienen host que
+// comparar (y target="_blank" ahí deja una pestaña en blanco huérfana en
+// varios navegadores), y una ruta interna (/proyectos, #ancla, relativa)
+// tampoco entra, porque nunca empieza con http(s). Un enlace a /media/ (PDF o
+// imagen del propio dueño) tampoco es "externo" en este sentido, aunque ya
+// abra en pestaña nueva por su cuenta: esa es la puerta del visor flotante
+// (Visor.astro / scripts/visor.ts), una decisión aparte y anterior a esta.
+//
+// Esta es la única definición de "externo" del lado de Astro (usada por
+// panel() y renderContacto(), abajo, y por cada página bajo src/pages que
+// arma su propio enlace). El plugin rehype (src/lib/rehype-figuras.mjs)
+// repite el mismo criterio en vez de importar de acá: corre en su propio
+// proceso de Node, fuera del pipeline de Vite/Astro, igual que ya explica el
+// propio archivo para rutaMedia().
+
+/** El host propio del sitio: mismo valor que `site` en astro.config.mjs. Se
+ * repite acá porque ese archivo es configuración de Astro, no algo que este
+ * módulo importe. */
+export const HOST_PROPIO = 'jbmllnube.com';
+
+export function esExterno(href: string): boolean {
+  if (!/^https?:\/\//i.test(href)) return false;
+  try {
+    return new URL(href).host !== HOST_PROPIO;
+  } catch {
+    // Una URL que no se puede parsear no es un destino externo real: es un
+    // dato roto, y ya lo denuncia otra comprobación (el esquema de Zod exige
+    // z.url() en todo campo que termina siendo un href).
+    return false;
+  }
+}
+
+/** El anuncio accesible de que el enlace abre en una pestaña nueva: un
+ * sufijo visual (↗, en la línea de las flechas que ya usa el sitio — el "←"
+ * de stack/[tech].astro) con su propio texto para quien no lo ve. Va DENTRO
+ * del `<a>` —no suelto al lado— para que un lector de pantalla lo anuncie
+ * como parte del propio enlace y no como una nota que nunca alcanza a leer
+ * (WCAG 3.2.5: un cambio de contexto se anuncia antes de que ocurra). HTML de
+ * confianza, sin datos del usuario adentro, así que no pasa por esc().
+ * También se usa desde JSX (contacto.astro, sobre-mi.astro) con
+ * `<Fragment set:html={MARCA_EXTERNA} />`, para no repetir este marcado ahí. */
+export const MARCA_EXTERNA =
+  '<span class="externo" aria-hidden="true"> ↗</span><span class="sr-only"> (se abre en una pestaña nueva)</span>';
+
+/** target/rel para un enlace externo, listos para un spread de props JSX
+ * (`<a {...propsExterno(href)}>`). Un enlace que no es externo no recibe
+ * ninguno de los dos: no hace falta "apagar" nada porque nunca se puso.
+ * `relExtra` es cualquier rel que el enlace ya necesite por su cuenta —
+ * "me" en un enlace de identidad (ver renderContacto())—, y se le suma
+ * "noopener" en vez de reemplazarlo. */
+export function propsExterno(href: string, relExtra?: string): { target?: '_blank'; rel?: string } {
+  if (!esExterno(href)) return {};
+  return { target: '_blank', rel: [relExtra, 'noopener'].filter(Boolean).join(' ') };
+}
+
 export interface EnlaceDeContacto {
   etiqueta: string;
   href: string;
@@ -184,14 +247,17 @@ export interface EnlaceDeContacto {
 export function renderContacto(enlaces: EnlaceDeContacto[]): string {
   const filas = enlaces
     .map((e) => {
-      // rel="me" declara que el perfil del otro extremo es el mismo de aquí.
-      // Los enlaces salientes llevan noopener por costumbre, no por necesidad:
-      // ninguno abre en pestaña nueva, pero el día que uno lo haga ya está.
-      const externo = e.href.startsWith('http');
-      const rel = externo ? ' rel="me noopener"' : '';
+      // rel="me" declara que el perfil del otro extremo es el mismo de aquí:
+      // se conserva tal cual, y esExterno() decide, además, si suma
+      // target="_blank"/noopener y el anuncio de pestaña nueva. mailto: no es
+      // externo (no tiene host que comparar), así que sigue navegando en la
+      // misma pestaña, como siempre.
+      const externo = esExterno(e.href);
+      const rel = externo ? ' rel="me noopener" target="_blank"' : '';
+      const marca = externo ? MARCA_EXTERNA : '';
       return `<tr>
     <td class="n">${esc(e.etiqueta)}</td>
-    <td class="d"><a class="go" href="${esc(e.href)}"${rel}>${esc(e.texto ?? e.href)}</a></td>
+    <td class="d"><a class="go" href="${esc(e.href)}"${rel}>${esc(e.texto ?? e.href)}${marca}</a></td>
   </tr>`;
     })
     .join('\n');

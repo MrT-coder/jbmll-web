@@ -14,7 +14,7 @@ import {
   MINIMO_PARA_PAGINA_DE_STACK,
   seccionDe,
 } from '../lib/content';
-import { renderStack, slugTech, rutaMedia } from '../lib/render';
+import { renderStack, slugTech, rutaMedia, propsExterno, MARCA_EXTERNA } from '../lib/render';
 import { iconoDe } from '../data/iconos';
 
 const [perfil, pagina, experiencia, educacion, certificaciones, stack, conPagina] = await Promise.all([
@@ -46,6 +46,27 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
       <h1 class="out lead">{lead}</h1>
       <p class="out note"># {perfil.titular} · {perfil.ubicacion}</p>
       {Prosa && <div class="prose intro"><Prosa /></div>}
+      {
+        // Una sola línea, no un bloque propio: la ficha completa (etiqueta +
+        // enlace + divulgación) ya vive en /contacto — ver `distribuidor` en
+        // src/content.config.ts y src/pages/contacto.astro. Acá alcanza con
+        // mencionarlo sin repetir la tabla.
+        perfil.distribuidor && (
+          <p class="out note">
+            # {perfil.distribuidor.etiqueta}:{' '}
+            {/* target/rel y el anuncio de pestaña nueva salen de
+               propsExterno()/MARCA_EXTERNA en src/lib/render.ts, la misma
+               decisión que usa la ficha completa en /contacto: no se repiten
+               a mano. */}
+            <a class="go" href={perfil.distribuidor.href} {...propsExterno(perfil.distribuidor.href)}>
+              {perfil.distribuidor.href.replace(/^https?:\/\//, '')}
+              <Fragment set:html={MARCA_EXTERNA} />
+            </a>
+            {' — '}
+            {perfil.distribuidor.divulgacion}
+          </p>
+        )
+      }
     </section>
 
     <section class="bloque" id="stack">
@@ -133,14 +154,25 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
                     </a>
                   )}
                   {c.data.url && (
+                    // A diferencia del enlace [ver] de arriba (que abre
+                    // /media/ en el visor flotante, ver el comentario de esa
+                    // columna en src/lib/tipos.ts / Visor.astro), este apunta
+                    // al emisor de la certificación: un sitio de verdad
+                    // externo, así que target/rel salen de propsExterno().
+                    // El anuncio de pestaña nueva va DENTRO del propio
+                    // aria-label —no como el <span class="sr-only"> que trae
+                    // MARCA_EXTERNA— porque un aria-label ya puesto reemplaza
+                    // por completo el contenido del enlace como nombre
+                    // accesible: ese span quedaría escrito pero invisible
+                    // para cualquier lector de pantalla.
                     <a
                       class="go"
                       href={c.data.url}
-                      target="_blank"
-                      rel="noopener"
-                      aria-label={`verificar el certificado ${c.data.nombre}`}
+                      {...propsExterno(c.data.url)}
+                      aria-label={`verificar el certificado ${c.data.nombre} (se abre en una pestaña nueva)`}
                     >
                       [verificar]
+                      <span class="externo" aria-hidden="true"> ↗</span>
                     </a>
                   )}
                   {c.data.credencial && <span class="cred">{c.data.credencial}</span>}

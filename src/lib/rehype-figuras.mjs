@@ -8,7 +8,11 @@
 //
 // También marca, con el mismo mecanismo, todo enlace a un PDF propio bajo
 // /media/: lo abre el visor flotante (Visor.astro + scripts/visor.ts), ya
-// construido para los certificados — nada de esto crea un segundo visor.
+// construido para los certificados — nada de esto crea un segundo visor. Y
+// marca, aparte, todo enlace a un sitio ajeno (esExterno()) para que se abra
+// en pestaña nueva sin perder a quien leía: mismo criterio y mismo anuncio
+// accesible (MARCA_EXTERNA) que ya usan las páginas .astro del sitio, ver
+// src/lib/render.ts.
 //
 // Se conecta desde astro.config.mjs (`markdown.rehypePlugins`) y opera sobre
 // el árbol HTML (hast) que Astro ya arma a partir del Markdown, después de
@@ -30,6 +34,45 @@ import { join, extname } from 'node:path';
  * codificarla dos veces. */
 function rutaMedia(ruta) {
   return /%[0-9a-fA-F]{2}/.test(ruta) ? ruta : encodeURI(ruta);
+}
+
+/** Mismo criterio que esExterno() en src/lib/render.ts, repetido acá por la
+ * misma razón que rutaMedia(), arriba: este módulo corre en su propio
+ * proceso de Node desde astro.config.mjs, fuera del pipeline de Vite/Astro,
+ * así que no puede importar un .ts. Un enlace del cuerpo en Markdown es
+ * externo cuando es http(s) y su host no es el propio — un enlace a /media/
+ * (ya cubierto arriba, marcarSiEsPdfLocal) nunca entra acá, porque nunca
+ * empieza con http(s). */
+const HOST_PROPIO = 'jbmllnube.com';
+function esExterno(href) {
+  if (!/^https?:\/\//i.test(href)) return false;
+  try {
+    return new URL(href).host !== HOST_PROPIO;
+  } catch {
+    return false;
+  }
+}
+
+/** El mismo anuncio accesible que MARCA_EXTERNA en src/lib/render.ts (mismo
+ * porqué ahí: WCAG 3.2.5, adentro del `<a>` para que un lector de pantalla lo
+ * anuncie como parte del propio enlace). Acá se arma como nodos hast en vez
+ * de una cadena, porque este árbol nunca se serializa a mano: lo serializa
+ * Astro más adelante en el pipeline. */
+function nodosMarcaExterna() {
+  return [
+    {
+      type: 'element',
+      tagName: 'span',
+      properties: { className: ['externo'], 'aria-hidden': 'true' },
+      children: [{ type: 'text', value: ' ↗' }],
+    },
+    {
+      type: 'element',
+      tagName: 'span',
+      properties: { className: ['sr-only'] },
+      children: [{ type: 'text', value: ' (se abre en una pestaña nueva)' }],
+    },
+  ];
 }
 
 const esLocal = (src) => src.startsWith('/media/');
@@ -223,6 +266,19 @@ function marcarSiEsPdfLocal(a) {
   a.properties.rel = ['noopener'];
 }
 
+/** Un enlace del cuerpo a un sitio ajeno se abre en pestaña nueva, para no
+ * perder a quien lee un proyecto o una publicación a mitad de un artículo
+ * externo. Nunca compite con marcarSiEsPdfLocal(), arriba: esExterno()
+ * siempre da falso para una ruta /media/ (no empieza con http(s)), así que
+ * un mismo enlace nunca entra a las dos funciones. */
+function marcarSiEsExterno(a) {
+  const href = String(a.properties?.href ?? '');
+  if (!esExterno(href)) return;
+  a.properties.target = '_blank';
+  a.properties.rel = [...(a.properties.rel ?? []), 'noopener'];
+  a.children.push(...nodosMarcaExterna());
+}
+
 /**
  * Recorrido en post-orden (primero los hijos, después el propio nodo): así,
  * cuando se decide si un `<p>` se desenvuelve, su imagen ya se convirtió en
@@ -260,6 +316,7 @@ function transformar(nodo) {
 
   if (nodo.type === 'element' && nodo.tagName === 'a') {
     marcarSiEsPdfLocal(nodo);
+    marcarSiEsExterno(nodo);
     return nodo;
   }
 

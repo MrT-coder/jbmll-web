@@ -2606,6 +2606,95 @@ check(
   rutasMedia.size === 0 ? 'no hay ninguna ruta /media/ en este build' : mediaFaltante.join(', '),
 );
 
+console.log('\nEnlaces externos');
+// Quien sale del sitio en la misma pestaña no siempre vuelve: todo enlace a
+// un sitio ajeno se abre en pestaña nueva, con su aviso accesible. Mismo
+// criterio de "externo" que esExterno() en src/lib/render.ts y en
+// src/lib/rehype-figuras.mjs (repetido en ese archivo por la misma razón que
+// rutaMedia() ahí: corre en su propio proceso de Node) — así que se reusa acá
+// el dominio propio ya derivado de la canónica (`canon`, arriba en «Dominio»)
+// en vez de escribir "jbmllnube.com" una cuarta vez.
+const hostPropio = canon ? new URL(canon).host : '';
+function esExternoHref(href) {
+  if (!hostPropio || !/^https?:\/\//i.test(href)) return false;
+  try {
+    return new URL(href).host !== hostPropio;
+  } catch {
+    return false;
+  }
+}
+// Captura la etiqueta de apertura y el contenido hasta el cierre, no solo el
+// `<a ...>`: la comprobación de más abajo necesita mirar adentro del enlace
+// (el anuncio de pestaña nueva vive ahí, o en aria-label cuando el enlace ya
+// tiene uno — ver el comentario de [verificar] en sobre-mi.astro). Ningún
+// <a> del sitio anida otro <a> dentro, así que el .*? no greedy alcanza.
+const enlaces = [];
+for (const archivo of paginasHtml) {
+  const contenido = readFileSync(archivo, 'utf8');
+  for (const m of contenido.matchAll(/<a\s([^>]*)>([\s\S]*?)<\/a>/g)) {
+    const atributos = m[1];
+    const hrefM = atributos.match(/href="([^"]*)"/);
+    if (!hrefM) continue;
+    enlaces.push({ archivo, href: hrefM[1], atributos, interior: m[2] });
+  }
+}
+check('el HTML compilado trae enlaces para revisar', enlaces.length > 0);
+
+// /media/ (certificados, figuras del cuerpo) ya abre en pestaña nueva por su
+// cuenta, desde antes de este cambio y por un motivo aparte (el visor
+// flotante — Visor.astro/scripts/visor.ts): no es un enlace "externo" bajo
+// este criterio (no es http(s)) y esta sección no lo toca ni en un sentido ni
+// en el otro.
+const esMedia = (href) => href.startsWith('/media/');
+
+const externos = enlaces.filter((e) => esExternoHref(e.href));
+const externosSinBlank = externos.filter((e) => !/target="_blank"/.test(e.atributos));
+check(
+  'todo enlace externo (http(s) a un host distinto del propio) lleva target="_blank"',
+  hostPropio !== '' && externosSinBlank.length === 0,
+  externosSinBlank.map((e) => `${relative(DIST, e.archivo)}: ${e.href}`).join(', '),
+);
+const externosSinNoopener = externos.filter((e) => !/rel="[^"]*\bnoopener\b[^"]*"/.test(e.atributos));
+check(
+  'todo enlace externo lleva rel="noopener" (target="_blank" sin él expone window.opener al destino)',
+  hostPropio !== '' && externosSinNoopener.length === 0,
+  externosSinNoopener.map((e) => `${relative(DIST, e.archivo)}: ${e.href}`).join(', '),
+);
+// El aviso puede vivir como texto dentro del enlace (MARCA_EXTERNA) o dentro
+// de aria-label, cuando el enlace ya tiene uno propio que reemplaza su
+// nombre accesible entero (ver [verificar] en sobre-mi.astro): cualquiera de
+// los dos cumple WCAG 3.2.5, así que la comprobación acepta ambos.
+const externosSinAviso = externos.filter(
+  (e) => !e.interior.includes('se abre en una pestaña nueva') && !/aria-label="[^"]*pestaña nueva[^"]*"/.test(e.atributos),
+);
+check(
+  'todo enlace externo anuncia, en su propio nombre accesible, que abre en pestaña nueva (WCAG 3.2.5)',
+  hostPropio !== '' && externosSinAviso.length === 0,
+  externosSinAviso.map((e) => `${relative(DIST, e.archivo)}: ${e.href}`).join(', '),
+);
+
+// Al revés: ni un enlace interno de navegación ni un mailto:/tel: se abren en
+// pestaña nueva. mailto:/tel: con target="_blank" deja una pestaña en blanco
+// huérfana en varios navegadores (el motivo por el que este cambio los deja
+// afuera desde el vamos); un enlace interno con target="_blank" sería la
+// regresión contraria a la que existe esta sección entera.
+const internosConBlank = enlaces.filter(
+  (e) => !esExternoHref(e.href) && !esMedia(e.href) && /target="_blank"/.test(e.atributos),
+);
+check(
+  'ningún enlace interno (ni /media/, que ya tiene su propio target="_blank" por el visor) abre en pestaña nueva',
+  internosConBlank.length === 0,
+  internosConBlank.map((e) => `${relative(DIST, e.archivo)}: ${e.href}`).join(', '),
+);
+const mailtoTelConBlank = enlaces.filter(
+  (e) => /^(mailto|tel):/i.test(e.href) && /target="_blank"/.test(e.atributos),
+);
+check(
+  'ningún mailto:/tel: abre en pestaña nueva (dejaría una pestaña en blanco huérfana)',
+  mailtoTelConBlank.length === 0,
+  mailtoTelConBlank.map((e) => `${relative(DIST, e.archivo)}: ${e.href}`).join(', '),
+);
+
 console.log('\nEstados de proyecto');
 // El estado de un proyecto es su ciclo de vida (¿está construyendo, en
 // producción, abandonado?); el contexto es de dónde sale (tesis, trabajo,

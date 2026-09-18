@@ -201,6 +201,46 @@ const perfil = defineCollection({
         alt: z.string().min(1, 'El alt no puede quedar vacío'),
       }),
     ),
+
+    // Un enlace de distribuidor (afiliado), no un medio de contacto: por eso
+    // no vive en enlacesDeContacto() (src/data/perfil.ts), que solo arma
+    // formas de llegar a la persona, sino como su propio bloque de datos.
+    // Opcional: sin alianza vigente, ni /contacto ni /sobre-mi muestran nada
+    // (ver src/pages/contacto.astro y src/pages/sobre-mi.astro). La
+    // divulgación viaja pegada al enlace, no suelta en la prosa de una sola
+    // página, porque es obligatoria dondequiera que el enlace aparezca y el
+    // enlace aparece en dos.
+    // El enlace de distribuidor, con su divulgación pegada al dato y no suelta
+    // en la prosa de una página: es obligatoria dondequiera que el enlace
+    // aparezca, y aparece en /contacto y en /sobre-mi.
+    //
+    // opcional() por sí solo no alcanza, y el motivo es el mismo que explica su
+    // propia definición: el panel no omite la clave, la guarda vacía. Vaciar los
+    // campos desde el CMS deja un objeto con sus tres claves en blanco, que no
+    // es '' ni null y por eso atraviesa esa normalización intacto. De ahí el
+    // preprocesado de afuera: sin URL no hay enlace que mostrar, así que el
+    // bloque entero se apaga —vacío y ausente significan lo mismo, igual que
+    // en opcional()— en vez de romper el esquema con una URL inválida y
+    // bloquear, desde el verificador del build de Cloudflare, la publicación de
+    // todo el resto del sitio.
+    //
+    // Lo que sí falla a propósito es la URL cargada SIN divulgación: ahí no hay
+    // nada que normalizar, hay un enlace con comisión sin declarar. Entre no
+    // publicar y publicarlo sin avisar, no publicar.
+    distribuidor: z.preprocess(
+      (v: unknown) => {
+        if (typeof v !== 'object' || v === null) return v;
+        const { href } = v as Record<string, unknown>;
+        return href === '' || href === null || href === undefined ? undefined : v;
+      },
+      opcional(
+        z.object({
+          etiqueta: z.string().min(1, 'La etiqueta no puede quedar vacía'),
+          href: z.url(),
+          divulgacion: z.string().min(1, 'La divulgación de la comisión es obligatoria'),
+        }),
+      ),
+    ),
   }),
 });
 

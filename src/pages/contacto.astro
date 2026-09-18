@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
 import { render } from 'astro:content';
 import { getPagina, getPerfil, seccionDe } from '../lib/content';
-import { renderContacto } from '../lib/render';
+import { renderContacto, propsExterno, MARCA_EXTERNA } from '../lib/render';
 
 const [perfil, pagina] = await Promise.all([getPerfil(), getPagina('contacto')]);
 const Prosa = pagina ? (await render(pagina)).Content : null;
@@ -17,5 +17,39 @@ const { titulo, lead } = await seccionDe('contacto');
   <Terminal seccion="contacto" lead={lead} salida={renderContacto(perfil.contacto)}>
     {Prosa && <div class="prose intro"><Prosa /></div>}
     <p class="out note"># {perfil.ubicacion} · {perfil.disponibilidad}</p>
+    {
+      perfil.distribuidor && (
+        <>
+          {/* No pasa por renderContacto()/enlacesDeContacto(): es una oferta
+             comercial (afiliado), no una forma de contacto, así que no entra
+             en esa lista (ver `distribuidor` en src/content.config.ts). Misma
+             tabla .list que arma renderContacto() en src/lib/render.ts, para
+             que se vea como el resto de la página, pero armada acá porque el
+             dato no vive en `perfil.contacto`. */}
+          <table class="list">
+            <tbody>
+              <tr>
+                <td class="n">{perfil.distribuidor.etiqueta}</td>
+                <td class="d">
+                  {/* Sin rel="me": ese atributo declara que el perfil del otro
+                     extremo es el mismo de aquí (ver renderContacto()), y este
+                     enlace no es una identidad propia, es un enlace de
+                     distribuidor con comisión — de ahí también la divulgación
+                     de la línea de abajo. target/rel y el anuncio de pestaña
+                     nueva salen de propsExterno()/MARCA_EXTERNA en
+                     src/lib/render.ts, la misma decisión que ya usa
+                     renderContacto(): no se repiten a mano. */}
+                  <a class="go" href={perfil.distribuidor.href} {...propsExterno(perfil.distribuidor.href)}>
+                    {perfil.distribuidor.href.replace(/^https?:\/\//, '')}
+                    <Fragment set:html={MARCA_EXTERNA} />
+                  </a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p class="out note">{perfil.distribuidor.divulgacion}</p>
+        </>
+      )
+    }
   </Terminal>
 </Base>

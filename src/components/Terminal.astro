@@ -7,6 +7,7 @@ import { SECCIONES } from '../lib/content';
 import Sidebar from './Sidebar.astro';
 import Statusline from './Statusline.astro';
 import type { DocumentoAbierto } from '../lib/tipos';
+import { propsExterno, MARCA_EXTERNA } from '../lib/render';
 
 interface Props {
   /** Sección montada, o null en la raíz. Decide la ruta y el workspace activo. */
@@ -190,7 +191,13 @@ const abiertosSsr = documento ? 1 : 0;
 <footer class="foot">
   <span>© 2026 Josue Bladimir Morales Llanganate</span>
   <span class="spacer"></span>
-  <a href="https://github.com/MrT-coder" rel="me noopener">github</a>
+  {/* rel="me" se conserva (declara que este repositorio es del mismo dueño
+     del sitio); propsExterno() le suma target="_blank"/noopener sin
+     reemplazarlo, igual que en renderContacto() (src/lib/render.ts). */}
+  <a href="https://github.com/MrT-coder" {...propsExterno('https://github.com/MrT-coder', 'me')}>
+    github
+    <Fragment set:html={MARCA_EXTERNA} />
+  </a>
 </footer>
 
 <script>

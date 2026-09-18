@@ -1,5 +1,13 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist", "prototipo"]
+  // `public/admin` guarda sveltia-cms.js: dos megas de bundle ya compilado de
+  // un tercero, que scripts/copiar-admin.mjs deja ahí en cada build y que por
+  // eso vive en .gitignore. El `**/*` de arriba lo arrastraba al alcance de
+  // TypeScript, y esa sola línea minificada agotaba el heap: `astro check`
+  // moría con «JavaScript heap out of memory» y ninguna ampliación de memoria
+  // lo salvaba, porque el techo no era el problema — el trabajo lo era. Fuera
+  // de aquí el chequeo son 30 archivos y corre con el heap por defecto.
+  // `dist` y `prototipo` se excluyen porque no son código fuente del sitio.
+  "exclude": ["dist", "prototipo", "public/admin"]
 }
