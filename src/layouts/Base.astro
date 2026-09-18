@@ -31,7 +31,13 @@ const canonical = new URL(ruta, Astro.site);
     {indexable ? <link rel="canonical" href={canonical} /> : <meta name="robots" content="noindex" />}
 
     <meta name="theme-color" content="#06080F" />
+    <!-- El favicon es el prompt solo, no el logo completo: a 16 px el logo se
+         empasta (medido en el navegador). El logo entero vive en /logo.svg y
+         se usa donde hay píxeles de sobra. -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- iOS ignora el favicon SVG: sin este PNG recorta una captura de la
+         página para el icono de la pantalla de inicio. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
     <!-- crossorigin es obligatorio en fuentes aunque sean del mismo origen: sin
          él el navegador descarta la precarga y descarga el archivo dos veces. -->

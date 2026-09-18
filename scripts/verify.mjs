@@ -153,6 +153,53 @@ const pegadas = h1limpio.match(/[a-záéíóúñ][A-ZÁÉÍÓÚÑ(]/g) || [];
 check('h1 sin palabras pegadas', pegadas.length === 0, pegadas.join(', '));
 check('theme-color', /name="theme-color"/.test(html));
 
+// El favicon y el logo son dibujos de píxeles: se sostienen en que cada bloque
+// caiga en un píxel entero y en no usar más color que los tres de la paleta. Un
+// degradado o media unidad fuera de la rejilla se ve como un borde sucio justo
+// al tamaño en que el favicon se mira, 16 px. Probado en el navegador el
+// 2026-09-17: el logo completo NO sobrevive a 16 px —el marco se corta y «JB»
+// se empasta—, así que el favicon lleva solo el prompt.
+const COLORES_MARCA = ['#06080F', '#B7CC85', '#E0C15A'];
+for (const [archivo, lado] of [
+  ['favicon.svg', 16],
+  ['logo.svg', 64],
+]) {
+  const svg = existsSync(join(DIST, archivo)) ? readFileSync(join(DIST, archivo), 'utf8') : '';
+  check(`${archivo} servido`, svg !== '');
+  if (svg === '') continue;
+  check(
+    `${archivo} dibuja sobre una rejilla de ${lado} unidades`,
+    new RegExp(`viewBox="0 0 ${lado} ${lado}"`).test(svg),
+    (svg.match(/viewBox="[^"]*"/) || ['sin viewBox'])[0],
+  );
+  const colores = [...new Set([...svg.matchAll(/#[0-9a-fA-F]{3,6}/g)].map((m) => m[0].toUpperCase()))];
+  check(
+    `${archivo} usa solo los tres colores de la marca`,
+    colores.every((c) => COLORES_MARCA.includes(c)),
+    colores.join(', '),
+  );
+  // Un favicon que pide otro archivo no se pinta en una pestaña: el navegador
+  // no resuelve referencias externas ahí. Tampoco hay degradados, que a 16 px
+  // se convierten en barro.
+  check(
+    `${archivo} no depende de nada externo ni usa degradados`,
+    !/<image|xlink:href|url\(|Gradient/i.test(svg),
+  );
+  check(
+    `${archivo} pinta con bordes duros, sin suavizado`,
+    /shape-rendering="crispEdges"/.test(svg),
+    'sin crispEdges el navegador interpola los bloques y los bordes salen sucios',
+  );
+}
+
+// iOS ignora el favicon SVG y usa este PNG para el icono de la pantalla de
+// inicio. Sin declararlo, recorta una captura de la página.
+check('apple-touch-icon servido', existsSync(join(DIST, 'apple-touch-icon.png')));
+check(
+  'todas las páginas declaran el apple-touch-icon',
+  paginasHtml.every((r) => /rel="apple-touch-icon"/.test(readFileSync(r, 'utf8'))),
+);
+
 console.log('\nDominio');
 // Un solo dominio en canónica, robots y sitemap. Si no coinciden, el buscador
 // le acredita el contenido a otro sitio y la vista previa al compartir apunta
