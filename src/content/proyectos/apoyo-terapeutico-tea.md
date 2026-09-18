@@ -1,7 +1,8 @@
 ---
 titulo: Herramienta de apoyo terapéutico con IA para el trastorno del espectro autista
 desc: Detección y prevención de crisis sociales mediante visión computacional en tiempo real.
-estado: tesis
+estado: construyendo
+contexto: tesis
 organizacion: Universidad de las Fuerzas Armadas ESPE
 fecha: 2026-02
 destacado: true

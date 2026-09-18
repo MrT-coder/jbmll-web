@@ -44,6 +44,27 @@ export function renderSecciones(secciones: Seccion[]): string {
  * El borde lo dibuja el CSS y no caracteres, para que se pueda seleccionar el
  * texto sin arrastrar la caja.
  */
+/**
+ * La línea de metadatos de una fila: estado, contexto y el resto de `meta`,
+ * en ese orden. El estado va primero, con su propia clase (`estado-<clave>`)
+ * para que el CSS lo coloree — es el dato que más cambia entre proyectos, y
+ * antes de esto vivía como texto plano dentro de la misma cadena que
+ * organización y fecha, sin forma de distinguirlo. El contexto va justo
+ * después porque explica de dónde sale ese estado (un proyecto de tesis puede
+ * estar «construyendo» igual que uno personal, y sin el contexto al lado esa
+ * lectura se pierde). Una publicación no trae `estado`, así que para ella
+ * esto se reduce a lo que ya hacía: `meta` tal cual.
+ */
+function metaDeFila(f: Fila): string {
+  const partes: string[] = [];
+  if (f.estado) {
+    partes.push(`<span class="estado estado-${esc(f.estado.clave)}">${esc(f.estado.etiqueta)}</span>`);
+  }
+  if (f.contexto) partes.push(esc(f.contexto));
+  if (f.meta) partes.push(esc(f.meta));
+  return partes.join(' · ');
+}
+
 function panel(f: Fila): string {
   const destino = f.href ?? f.externo?.href;
   const titulo = destino
@@ -61,9 +82,11 @@ function panel(f: Fila): string {
     )
     .join('');
 
+  const meta = metaDeFila(f);
+
   return `<article class="panel"${destino ? ' data-go="' + esc(destino) + '"' : ''}>
   <h2 class="panel-t">${titulo}</h2>
-  ${f.meta ? `<p class="panel-m">${esc(f.meta)}</p>` : ''}
+  ${meta ? `<p class="panel-m">${meta}</p>` : ''}
   <p class="panel-d">${esc(f.desc)}</p>
   ${chips ? `<ul class="chips">${chips}</ul>` : ''}
 </article>`;

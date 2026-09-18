@@ -252,13 +252,29 @@ export function subtituloDeWorkspace(slug: string, indice: Indice): string {
   }
 }
 
+/**
+ * Las etiquetas del estado, exportadas para que la página de detalle
+ * (proyectos/[slug].astro) lea la misma palabra que el índice en vez de
+ * repetirla a mano — dos copias del mismo texto son dos oportunidades de que
+ * se desalineen.
+ */
+export const ETIQUETAS_ESTADO: Record<Proyecto['data']['estado'], string> = {
+  produccion: 'en producción',
+  construyendo: 'construyendo',
+  'prueba-de-concepto': 'prueba de concepto',
+  archivado: 'archivado',
+  cancelado: 'cancelado',
+};
+
+/** Mismo motivo que ETIQUETAS_ESTADO: una sola fuente para las dos vistas. */
+export const ETIQUETAS_CONTEXTO: Record<NonNullable<Proyecto['data']['contexto']>, string> = {
+  tesis: 'tesis',
+  laboral: 'trabajo',
+  personal: 'personal',
+  academico: 'académico',
+};
+
 function filaDeProyecto(p: Proyecto, conPagina: Set<string>): Fila {
-  const estados: Record<string, string> = {
-    produccion: 'en producción',
-    activo: 'activo',
-    tesis: 'tesis',
-    archivado: 'archivado',
-  };
   return {
     slug: p.id,
     titulo: p.data.titulo,
@@ -266,9 +282,9 @@ function filaDeProyecto(p: Proyecto, conPagina: Set<string>): Fila {
     href: `/proyectos/${p.id}`,
     st: p.data.st.map((tech) => techDe(tech, conPagina)),
     kw: [...p.data.kw],
-    meta: [estados[p.data.estado], p.data.organizacion, p.data.fecha]
-      .filter(Boolean)
-      .join(' · '),
+    estado: { clave: p.data.estado, etiqueta: ETIQUETAS_ESTADO[p.data.estado] },
+    contexto: p.data.contexto ? ETIQUETAS_CONTEXTO[p.data.contexto] : undefined,
+    meta: [p.data.organizacion, p.data.fecha].filter(Boolean).join(' · '),
   };
 }
 

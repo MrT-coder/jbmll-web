@@ -209,6 +209,30 @@ a.go:focus-visible {
   font-size: var(--text-sm);
 }
 
+/* El estado de un proyecto es el dato que más cambia de uno a otro, así que
+   lleva su propio color dentro de la línea de metadatos (ver metaDeFila() en
+   src/lib/render.ts): antes era texto plano indistinguible del resto. Los
+   cinco colores están contrastados contra --bg en scripts/verify.mjs (≥
+   4.5:1, WCAG 1.4.3 AA) — no se eligen a mano, se comprueban. */
+.estado {
+  font-weight: 700;
+}
+.estado-produccion {
+  color: var(--green);
+}
+.estado-construyendo {
+  color: var(--blue);
+}
+.estado-prueba-de-concepto {
+  color: var(--gold);
+}
+.estado-archivado {
+  color: var(--dim);
+}
+.estado-cancelado {
+  color: var(--red);
+}
+
 .panel-d {
   margin: 0;
   color: var(--muted);
