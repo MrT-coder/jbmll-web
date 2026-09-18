@@ -59,7 +59,18 @@ const proyectos = defineCollection({
   schema: z.object({
     titulo: z.string(),
     desc: z.string(),
-    estado: z.enum(['produccion', 'activo', 'tesis', 'archivado']),
+
+    // El ciclo de vida del proyecto: qué tan lejos está de terminado. «tesis»
+    // vivía acá antes, pero no es un estado — es de dónde sale el proyecto, y
+    // un proyecto de tesis puede estar en cualquiera de estos cinco (de hecho
+    // hay uno que sigue construyéndose). Ver `contexto`, abajo.
+    estado: z.enum(['produccion', 'construyendo', 'prueba-de-concepto', 'archivado', 'cancelado']),
+
+    // De dónde sale el proyecto. Opcional porque no todo proyecto tiene un
+    // origen que valga la pena declarar (uno personal sin más contexto no
+    // pierde nada quedándose sin esta clave).
+    contexto: opcional(z.enum(['tesis', 'laboral', 'personal', 'academico'])),
+
     organizacion: opcional(z.string()),
     fecha: mes,
 

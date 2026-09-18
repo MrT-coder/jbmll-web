@@ -2432,6 +2432,141 @@ check(
   rutasMedia.size === 0 ? 'no hay ninguna ruta /media/ en este build' : mediaFaltante.join(', '),
 );
 
+console.log('\nEstados de proyecto');
+// El estado de un proyecto es su ciclo de vida (¿está construyendo, en
+// producción, abandonado?); el contexto es de dónde sale (tesis, trabajo,
+// personal, académico). Mezclarlos en un solo enum —«tesis» viviendo dentro
+// de `estado`— fue el error que esta sección deja de poder repetir: ningún
+// valor se nombra a mano, todos se derivan del propio esquema, así que
+// agregar o quitar un estado sin ponerle etiqueta, color o hueco en el CMS
+// queda en rojo en vez de en silencio.
+function valoresDeEnum(regex) {
+  const m = configContenido.match(regex);
+  if (!m) return [];
+  return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+}
+const estadoValores = valoresDeEnum(/estado:\s*z\.enum\(\[([^\]]+)\]\)/);
+const contextoValores = valoresDeEnum(/contexto:\s*opcional\(z\.enum\(\[([^\]]+)\]\)\)/);
+check('el esquema declara al menos un valor de estado', estadoValores.length > 0);
+check('el esquema declara al menos un valor de contexto', contextoValores.length > 0);
+
+// Las etiquetas viven en src/lib/content.ts, en los mapas que exporta para que
+// el índice (filaDeProyecto) y la página de detalle (proyectos/[slug].astro)
+// lean la misma palabra en vez de repetirla cada uno por su cuenta.
+const contentTsSrc = readFileSync('src/lib/content.ts', 'utf8');
+function extraerMapa(nombreConst) {
+  const inicio = contentTsSrc.indexOf(nombreConst);
+  if (inicio === -1) return {};
+  const inicioLlave = contentTsSrc.indexOf('{', inicio);
+  const finLlave = contentTsSrc.indexOf('};', inicioLlave);
+  if (inicioLlave === -1 || finLlave === -1) return {};
+  const bloque = contentTsSrc.slice(inicioLlave + 1, finLlave);
+  const mapa = {};
+  for (const m of bloque.matchAll(/(?:'([^']+)'|([\w$]+)):\s*'([^']*)'/g)) {
+    mapa[m[1] ?? m[2]] = m[3];
+  }
+  return mapa;
+}
+const etiquetasEstado = extraerMapa('export const ETIQUETAS_ESTADO');
+const etiquetasContexto = extraerMapa('export const ETIQUETAS_CONTEXTO');
+
+const clavesEstado = Object.keys(etiquetasEstado);
+check(
+  'cada estado del esquema tiene una etiqueta en ETIQUETAS_ESTADO, y ninguna etiqueta sobra',
+  estadoValores.length > 0 &&
+    estadoValores.every((v) => clavesEstado.includes(v)) &&
+    clavesEstado.every((v) => estadoValores.includes(v)),
+  `esquema: ${estadoValores.join(', ')} · etiquetas: ${clavesEstado.join(', ')}`,
+);
+
+const clavesContexto = Object.keys(etiquetasContexto);
+check(
+  'cada contexto del esquema tiene una etiqueta en ETIQUETAS_CONTEXTO, y ninguna etiqueta sobra',
+  contextoValores.length > 0 &&
+    contextoValores.every((v) => clavesContexto.includes(v)) &&
+    clavesContexto.every((v) => contextoValores.includes(v)),
+  `esquema: ${contextoValores.join(', ')} · etiquetas: ${clavesContexto.join(', ')}`,
+);
+
+// El color de cada estado vive como regla propia en terminal.css
+// (`.estado-<clave> { color: var(--token); }`), sin alcance de componente
+// porque panel() y la página de detalle insertan ese marcado fuera de lo que
+// Astro puede alcanzar con estilos de componente (ver la nota del encabezado
+// de terminal.css).
+// Reutiliza terminalCssSrc, ya leído (sin comentarios) más arriba, en la
+// sección «Contraste no textual en glifos decorativos».
+const reglasEstadoCss = [
+  ...terminalCssSrc.matchAll(/\.estado-([a-z0-9-]+)\s*\{[^}]*color:\s*var\(--([a-z0-9-]+)\)/g),
+].map(([, clave, token]) => ({ clave, token }));
+const clavesCss = reglasEstadoCss.map((r) => r.clave);
+check(
+  'cada estado del esquema tiene su regla de color en terminal.css, y ninguna regla sobra',
+  estadoValores.length > 0 &&
+    estadoValores.every((v) => clavesCss.includes(v)) &&
+    clavesCss.every((v) => estadoValores.includes(v)),
+  `esquema: ${estadoValores.join(', ')} · css: ${clavesCss.join(', ')}`,
+);
+
+// Mismas fórmula y funciones que la sección «Accesibilidad»: no se repiten,
+// se reutilizan contraste()/leerToken()/bg ya definidos arriba.
+for (const { clave, token } of reglasEstadoCss) {
+  const hex = leerToken(token);
+  const ratio = hex && bg ? contraste(hex, bg) : 0;
+  check(
+    `--${token} (estado ${clave}) contra --bg ≥ 4.5:1 (WCAG 1.4.3 AA)`,
+    ratio >= 4.5,
+    `${hex || '¿?'} sobre ${bg || '¿?'}: ${ratio.toFixed(2)}:1`,
+  );
+}
+
+// Cada proyecto listado en /proyectos tiene que mostrar SU estado, con la
+// clase que corresponde a su propio dato — no basta con que exista alguna
+// clase .estado en la página.
+const estadosSinClasePropia = proyectosSrc.filter(
+  (p) => !new RegExp(`class="estado estado-${p.data.estado}"`).test(proyectos),
+);
+check(
+  'cada proyecto en /proyectos muestra su estado con la clase que corresponde a su dato',
+  proyectosSrc.length > 0 && estadosSinClasePropia.length === 0,
+  proyectosSrc.length === 0
+    ? 'no hay proyectos para probar esta comprobación'
+    : estadosSinClasePropia.map((p) => `${p.id}: ${p.data.estado}`).join(', '),
+);
+
+// El contexto es opcional: solo se comprueba para los proyectos que sí lo
+// declaran, y solo que su etiqueta aparezca en la página.
+const proyectosConContexto = proyectosSrc.filter((p) => p.data.contexto);
+const contextoNoRenderizado = proyectosConContexto.filter(
+  (p) => !proyectos.includes(etiquetasContexto[p.data.contexto] ?? '\0'),
+);
+check(
+  'el contexto, cuando existe, se renderiza en /proyectos',
+  proyectosConContexto.length === 0 || contextoNoRenderizado.length === 0,
+  proyectosConContexto.length === 0
+    ? 'no hay proyectos con contexto en este build'
+    : contextoNoRenderizado.map((p) => p.id).join(', '),
+);
+
+// El CMS y el esquema tienen que ofrecer exactamente los mismos valores: uno
+// que el esquema acepta pero el CMS no ofrece no se puede escribir desde el
+// panel, y uno que el CMS ofrece pero el esquema rechaza rompe el build en
+// cuanto alguien lo elige.
+const proyectosCms = cmsConfig.collections?.find((c) => c.name === 'proyectos');
+const opcionesEstadoCms = proyectosCms?.fields?.find((f) => f.name === 'estado')?.options ?? [];
+const opcionesContextoCms = proyectosCms?.fields?.find((f) => f.name === 'contexto')?.options ?? [];
+check(
+  'las opciones de "estado" en el CMS son exactamente las del esquema',
+  estadoValores.length > 0 &&
+    JSON.stringify([...estadoValores].sort()) === JSON.stringify([...opcionesEstadoCms].sort()),
+  `esquema: ${estadoValores.join(', ')} · cms: ${opcionesEstadoCms.join(', ')}`,
+);
+check(
+  'las opciones de "contexto" en el CMS son exactamente las del esquema',
+  contextoValores.length > 0 &&
+    JSON.stringify([...contextoValores].sort()) === JSON.stringify([...opcionesContextoCms].sort()),
+  `esquema: ${contextoValores.join(', ')} · cms: ${opcionesContextoCms.join(', ')}`,
+);
+
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);

@@ -83,7 +83,14 @@ collections:
           name: estado,
           label: Estado,
           widget: select,
-          options: [produccion, activo, tesis, archivado],
+          options: [produccion, construyendo, prueba-de-concepto, archivado, cancelado],
+        }
+      - {
+          name: contexto,
+          label: Contexto,
+          widget: select,
+          options: [tesis, laboral, personal, academico],
+          required: false,
         }
       - { name: organizacion, label: Organización, widget: string, required: false }
       - {

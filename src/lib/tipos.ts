@@ -34,7 +34,19 @@ export interface Fila {
   externo?: { href: string; etiqueta: string };
   st: Tech[];
   kw: string[];
-  /** Línea corta bajo el título: fechas, editorial, estado. */
+  /**
+   * El estado del ciclo de vida (solo proyectos: produccion, construyendo…),
+   * con su clave —para la clase CSS que le da color— y su etiqueta ya
+   * traducida. Va aparte de `meta` porque necesita pintarse con su propio
+   * color; una publicación, que no tiene estado, deja esto sin definir.
+   */
+  estado?: { clave: string; etiqueta: string };
+  /** El contexto de origen del proyecto (tesis, trabajo…), ya traducido. Es
+   * opcional incluso cuando hay estado: no todo proyecto declara uno. */
+  contexto?: string;
+  /** Línea corta bajo el título: fechas, editorial. El estado y el contexto
+   * de un proyecto se renderizan aparte (ver arriba), no como texto plano
+   * mezclado en esta cadena — así el estado puede colorearse por su cuenta. */
   meta?: string;
 }
 
