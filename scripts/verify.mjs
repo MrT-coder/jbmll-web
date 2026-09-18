@@ -1904,6 +1904,25 @@ check(
   frameSrc || '(sin frame-src: el PDF del visor queda bloqueado en producción)',
 );
 
+// Y frame-src tampoco alcanza solo: Cloudflare Pages aplica las cabeceras a
+// todas las respuestas, así que el PDF llegaba con el `frame-ancestors 'none'`
+// del sitio y se negaba a ser enmarcado por la propia página que lo incrusta.
+// La regla de /media/* lo permite desde este origen y nada más. Verificado en
+// el despliegue de vista previa, que es el único sitio donde estas cabeceras
+// existen de verdad.
+const bloqueMedia = (headers.match(/\n\/media\/\*\n([\s\S]*?)(?=\n\/\S|\n#|\n*$)/) || [])[1] || '';
+check('_headers trae un bloque /media/*', bloqueMedia !== '');
+check(
+  'los medios se pueden enmarcar desde el propio origen, y solo desde ahí',
+  /frame-ancestors 'self'/.test(bloqueMedia) && /^\s*!\s*Content-Security-Policy\s*$/m.test(bloqueMedia),
+  bloqueMedia.trim().split('\n').join(' · ') || '(sin bloque)',
+);
+check(
+  'los medios no heredan X-Frame-Options: DENY',
+  /^\s*!\s*X-Frame-Options\s*$/m.test(bloqueMedia) && /X-Frame-Options:\s*SAMEORIGIN/.test(bloqueMedia),
+  'un DENY heredado bloquea el marco igual que la CSP en los navegadores que no la leen',
+);
+
 // Un script en línea obligaría a aflojar la CSP. define:vars lo produce sin
 // avisar y la página se ve idéntica, hasta que en producción queda bloqueado.
 const inline = (html.match(/<script(?![^>]*\ssrc=)[^>]*>/g) || []).filter(
