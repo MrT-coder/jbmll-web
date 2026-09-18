@@ -192,6 +192,26 @@ for (const [archivo, lado] of [
   );
 }
 
+// Los navegadores guardan el favicon en una caché propia que no se refresca ni
+// con recarga forzada: quien ya visitó el sitio seguía viendo el anterior. La
+// versión en la URL es lo único que los obliga a pedirlo de nuevo.
+check(
+  'el favicon se declara con versión en la URL',
+  paginasHtml.every((r) => /rel="icon" href="\/favicon\.svg\?v=\d+"/.test(readFileSync(r, 'utf8'))),
+  'sin ?v= un favicon nuevo no llega a quien ya tenía el viejo en caché',
+);
+
+// Los medios se sirven con una hora de caché, no para siempre: el panel los
+// reemplaza con el mismo nombre, y una respuesta cacheada sin límite deja
+// servido el archivo viejo —o sus cabeceras viejas— hasta que alguien purgue a
+// mano. Pasó con la política del PDF el 2026-09-17.
+const headersMedios = readFileSync('public/_headers', 'utf8');
+check(
+  'los medios declaran un límite de caché',
+  /\/media\/\*[\s\S]*?Cache-Control: public, max-age=3600/.test(headersMedios),
+  'sin límite, un archivo reemplazado desde el panel queda servido viejo',
+);
+
 // iOS ignora el favicon SVG y usa este PNG para el icono de la pantalla de
 // inicio. Sin declararlo, recorta una captura de la página.
 check('apple-touch-icon servido', existsSync(join(DIST, 'apple-touch-icon.png')));
@@ -764,7 +784,10 @@ for (const archivo of paginasHtml) {
   const hrefs = [...contenido.matchAll(/href="(\/[^"]*)"/g)].map((m) => m[1]);
   for (const href of hrefs) {
     if (href.startsWith('http')) continue; // externo: fuera del barrido
-    const sinAncla = href.split('#')[0];
+    // Se quitan el ancla y la cadena de consulta: ninguna de las dos es parte
+    // del archivo en disco. El `?v=` del favicon existe para saltar la caché
+    // de favicons del navegador, y sin esto se contaba como enlace roto.
+    const sinAncla = href.split('#')[0].split('?')[0];
     if (!sinAncla) continue; // era solo un ancla, «#lo-que-sea»
     // Un archivo de /media/ con espacios (u otro carácter fuera de lo
     // "seguro") en el nombre llega acá codificado (rutaMedia(), en
