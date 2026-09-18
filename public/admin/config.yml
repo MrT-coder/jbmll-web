@@ -99,6 +99,11 @@ collections:
       - { name: demo, label: Demo, widget: string, type: url, required: false }
       - { name: destacado, label: Destacado, widget: boolean, default: false }
       - { name: borrador, label: Borrador, widget: boolean, default: false }
+      # La prosa del proyecto: va fuera del frontmatter, en el cuerpo del
+      # Markdown, y es lo que la página de detalle renderiza. No es una clave
+      # del esquema de Zod, así que scripts/verify.mjs la excluye al comparar
+      # campos. Sin este campo, el panel editaba los datos pero no el texto.
+      - { name: body, label: Contenido, widget: markdown, required: false }
 
   - name: publicaciones
     label: Publicaciones
@@ -128,6 +133,10 @@ collections:
       - { name: proyecto, label: Proyecto relacionado, widget: string, required: false }
       - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
       - { name: borrador, label: Borrador, widget: boolean, default: false }
+      # Igual que en proyectos, la prosa vive en el cuerpo del Markdown. Acá
+      # además decide algo: una publicación sin cuerpo no genera página propia
+      # —solo su fila con el DOI—, y eso lo comprueba el verificador.
+      - { name: body, label: Contenido, widget: markdown, required: false }
 
   - name: educacion
     label: Educación
