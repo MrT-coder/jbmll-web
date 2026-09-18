@@ -3,6 +3,7 @@ import type { InferGetStaticPropsType } from 'astro';
 import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import Terminal from '../../components/Terminal.astro';
+import Visor from '../../components/Visor.astro';
 import { getProyectos, getTechsConPagina, vecinos, ETIQUETAS_ESTADO, ETIQUETAS_CONTEXTO } from '../../lib/content';
 import { slugTech } from '../../lib/render';
 
@@ -65,6 +66,13 @@ const meta = [proyecto.data.organizacion, proyecto.data.fecha].filter(Boolean).j
       <div class="prose">
         <Content />
       </div>
+
+      <!-- El visor flotante que rehype-figuras.mjs ya sabe usar (clase
+           visor-abrir en cada figura y en cada PDF propio del cuerpo): sin
+           este componente aquí, esos enlaces existen en el HTML pero no hay
+           ningún <dialog id="visor"> que scripts/visor.ts pueda abrir — el
+           mismo candado que ya hace falta en /sobre-mi para certificados. -->
+      <Visor />
 
       <footer class="eof">
         <p class="eof-mark">(END)</p>

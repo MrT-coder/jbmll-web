@@ -3,6 +3,7 @@ import type { InferGetStaticPropsType } from 'astro';
 import { render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
 import Terminal from '../../components/Terminal.astro';
+import Visor from '../../components/Visor.astro';
 import { getPublicaciones, tieneCuerpo, vecinos } from '../../lib/content';
 
 // Solo las que tienen algo propio que decir. Una publicación que se agota en su
@@ -47,6 +48,11 @@ const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : p
       <div class="prose">
         <Content />
       </div>
+
+      <!-- Mismo candado que en proyectos/[slug].astro: sin este componente,
+           las figuras y los enlaces a PDF que arma rehype-figuras.mjs no
+           tienen ningún <dialog id="visor"> que scripts/visor.ts pueda abrir. -->
+      <Visor />
 
       <footer class="eof">
         <p class="eof-mark">(END)</p>

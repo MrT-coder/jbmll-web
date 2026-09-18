@@ -166,6 +166,54 @@
   border-top: 1px solid var(--line);
 }
 
+/* ── Figuras del cuerpo ───────────────────────────────────────────────────
+   No la pone Astro: la pone rehype-figuras.mjs (ver astro.config.mjs) al
+   envolver cada <img> del Markdown en <figure class="figura">. Vive en su
+   propia sección, sin alcance de componente, por el mismo motivo que el
+   resto de este archivo: el cuerpo lo compila Astro y llega al HTML plano,
+   sin el atributo de alcance de ningún componente que lo pudiera estilar. */
+.figura {
+  margin: var(--space-7) 0;
+}
+
+/* El enlace que abre el visor envuelve una imagen, no texto: sin su propio
+   color ni subrayado (los de `.prose a`, arriba, son para texto), y con un
+   borde — el mismo criterio de foto/certificado en el resto del sitio — para
+   que se note que hay algo ahí antes de pasar el ratón. */
+/* El foco visible lo da la regla global :focus-visible (tokens.css); no hace
+   falta una propia acá. */
+.figura a {
+  display: block;
+  border: 1px solid var(--line);
+}
+
+/* max-width y no width: igual que .foto en Terminal.astro, sin una propiedad
+   `width` propia el navegador usa el tamaño intrínseco (los atributos
+   width/height que puso rehype-figuras.mjs) como ancho por defecto, y
+   max-width solo puede achicarlo — nunca lo agranda más allá de su tamaño
+   real. display: block quita el aire bajo la línea base que deja un <img>
+   inline, que abría un hueco entre la imagen y el borde de abajo. */
+.figura img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.figura figcaption {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--line);
+  /* --dim y no --muted: esta leyenda vive directo sobre --bg (la columna de
+     lectura no tiene panel propio), y --dim ya está probado contra --bg en
+     scripts/verify.mjs (5.01:1, WCAG 1.4.3 AA). --muted solo está probado
+     ahí contra --panel (5.20:1): mezclar el token con el fondo equivocado es
+     justo el hueco que dejó pasar el reloj de la barra de estado a 4.18:1 el
+     2026-09-15 (ver el comentario de esa comprobación). */
+  color: var(--dim);
+  background: var(--bg);
+  font-size: var(--text-xs);
+  line-height: var(--lh);
+}
+
 /* ── Fin de artículo ───────────────────────────────────────────────────────
    `less` cierra el búfer con (END). Acá ese marcador además ofrece las salidas,
    y cada una lleva escrita la tecla: se usa con el ratón y de paso se aprende
@@ -244,6 +292,13 @@
 
   .lectura-t {
     font-size: var(--text-xl);
+  }
+
+  /* Mismo padding que ya se aprieta arriba en .lectura a este ancho: sin
+     esto el pie quedaba con el mismo aire que en escritorio, desbalanceado
+     junto a un margen de columna que ya se redujo. */
+  .figura figcaption {
+    padding: var(--space-2) var(--space-3);
   }
 }
 
