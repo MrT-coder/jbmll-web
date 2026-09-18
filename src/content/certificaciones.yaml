@@ -79,3 +79,12 @@
   url: ''
   archivo: /media/WomenCISO y MenCISO I.A.P.png
   tipo: curso
+- id: GCI-WORLD-2026-APRIL
+  nombre: GCI World April 2026
+  emisor: Matsuo-Iwasawa Laboratory - Graduate School of Engineering - The University of Tokyo
+  fecha: 2026-08
+  horas: null
+  credencial: ''
+  url: ''
+  archivo: /media/Certificate_GCI_World_2026_april.pdf
+  tipo: curso
