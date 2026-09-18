@@ -5,6 +5,7 @@ import Base from '../../layouts/Base.astro';
 import Terminal from '../../components/Terminal.astro';
 import Visor from '../../components/Visor.astro';
 import { getPublicaciones, tieneCuerpo, vecinos } from '../../lib/content';
+import { propsExterno, MARCA_EXTERNA } from '../../lib/render';
 
 // Solo las que tienen algo propio que decir. Una publicación que se agota en su
 // enlace al editor no genera página: sería un título repetido compitiendo con
@@ -63,9 +64,13 @@ const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : p
           {
             doi && (
               <li>
-                <a href={doi} rel="noopener">
+                {/* doi.org o el `url` que cargó el dueño: siempre un sitio
+                   ajeno, pero se decide con propsExterno() y no a mano, como
+                   el resto del sitio. */}
+                <a href={doi} {...propsExterno(doi)}>
                   <kbd>o</kbd>
                   {publicacion.data.doi ? 'abrir el DOI' : 'abrir el original'}
+                  <Fragment set:html={MARCA_EXTERNA} />
                 </a>
               </li>
             )

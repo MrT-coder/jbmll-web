@@ -26,3 +26,12 @@ perfil:
   foto:
     src: /media/FOTO_INGE_PUNK.jpg
     alt: 'Retrato ilustrado estilo cyberpunk de un hombre joven de cabello oscuro peinado hacia un costado, con traje oscuro y corbata verde azulada, bajo luces de neón rosadas y azules, sobre un fondo de ciudad nocturna con letreros verticales luminosos.'
+
+  # Enlace de distribuidor (afiliado), no un medio de contacto: por eso vive
+  # aparte y no junto a correo/teléfono/github/linkedin/orcid de arriba. Ver
+  # `distribuidor` en src/content.config.ts. Opcional: en blanco, ni
+  # /contacto ni /sobre-mi muestran nada.
+  distribuidor:
+    etiqueta: firmas electrónicas
+    href: https://ezsignec.com/r/8wxxqx9rbd
+    divulgacion: 'Enlace de distribuidor: cada venta hecha desde aquí deja una comisión a quien mantiene este sitio.'

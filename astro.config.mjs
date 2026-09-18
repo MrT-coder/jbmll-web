@@ -17,7 +17,8 @@ export default defineConfig({
   integrations: [sitemap()],
 
   // Convierte cada imagen del cuerpo (proyectos, publicaciones) en una figura
-  // con pie, y marca todo enlace a un PDF propio para el visor flotante. Ver
+  // con pie, marca todo enlace a un PDF propio para el visor flotante, y
+  // marca todo enlace a un sitio ajeno para que se abra en pestaña nueva. Ver
   // el encabezado de src/lib/rehype-figuras.mjs para el porqué completo.
   //
   // Astro 7 cambió el procesador de Markdown por defecto a Sätteri, que no

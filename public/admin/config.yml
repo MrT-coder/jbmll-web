@@ -308,3 +308,21 @@ singletons:
             fields:
               - { name: src, label: Imagen, widget: image, required: false }
               - { name: alt, label: Texto alternativo, widget: string, required: false }
+          # Enlace de distribuidor (afiliado), no un medio de contacto: por
+          # eso vive aparte del resto del objeto. Ver `distribuidor` en
+          # src/content.config.ts. Opcional, igual que en el esquema de Zod:
+          # el dueño lo borra entero desde el panel para apagar el bloque en
+          # /contacto y /sobre-mi sin tocar código.
+          - name: distribuidor
+            label: Enlace de distribuidor
+            widget: object
+            required: false
+            fields:
+              - { name: etiqueta, label: Etiqueta, widget: string, required: false }
+              - { name: href, label: URL, widget: string, type: url, required: false }
+              - {
+                  name: divulgacion,
+                  label: 'Divulgación (obligatoria — explica la comisión)',
+                  widget: text,
+                  required: false,
+                }
