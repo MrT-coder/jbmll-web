@@ -55,15 +55,15 @@
 # X-Frame-Options se repite porque los navegadores que no leen CSP miran esa, y
 # DENY heredado bloquearía lo mismo.
 /media/*
-  # Una hora, no para siempre: estos archivos los reemplaza el panel con el
-  # mismo nombre, y una respuesta cacheada sin límite deja servido el archivo
-  # viejo —o, como pasó con esta misma política, sus cabeceras viejas— hasta que
-  # alguien purgue a mano.
-  Cache-Control: public, max-age=3600
   ! Content-Security-Policy
   Content-Security-Policy: default-src 'none'; frame-ancestors 'self'
   ! X-Frame-Options
   X-Frame-Options: SAMEORIGIN
+  # Al final del bloque a propósito: declarado antes de las líneas que
+  # desprenden cabeceras, Cloudflare Pages lo ignoraba y servía sus 4 horas por
+  # omisión (comprobado en producción el 2026-09-17). Una hora y no para
+  # siempre, porque el panel reemplaza estos archivos con el mismo nombre.
+  Cache-Control: public, max-age=3600
 
 # El panel de administración (Sveltia CMS, autohospedado desde /admin/, ver
 # public/admin/) no puede vivir bajo la CSP del resto del sitio: necesita
