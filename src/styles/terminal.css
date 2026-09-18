@@ -436,3 +436,27 @@ div.stack-celda {
   color: var(--fg);
   border: 1px solid var(--blue);
 }
+
+/* ── El bloque de datos del arranque ────────────────────────────────────────
+   Llega por un <slot> desde src/pages/index.astro, así que pertenece a esa
+   página: los estilos con alcance de Terminal.astro no lo alcanzan y las
+   etiquetas se veían sin color aunque la regla existía ahí. Mismo motivo por
+   el que viven acá el resto de los estilos de lo que no escribe la plantilla. */
+
+.info dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--space-5);
+  margin: 0;
+}
+
+/* La etiqueta en color y el valor en blanco, como las claves de neofetch:
+   --blue mide 8.85:1 contra --bg, muy por encima del mínimo para texto. */
+.info dt {
+  color: var(--blue);
+}
+
+.info dd {
+  margin: 0;
+  color: var(--fg);
+}

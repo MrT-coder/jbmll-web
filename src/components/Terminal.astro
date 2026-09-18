@@ -317,19 +317,11 @@ const abiertosSsr = documento ? 1 : 0;
     color: var(--dim);
     margin-bottom: var(--space-2);
   }
-  .info dl {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0 var(--space-5);
-    margin: 0;
-  }
-  .info dt {
-    color: var(--blue);
-  }
-  .info dd {
-    margin: 0;
-    color: var(--fg);
-  }
+  /* Las reglas de .info dl/dt/dd viven en src/styles/terminal.css, sin ámbito:
+     ese bloque de datos entra por un <slot> desde index.astro, así que
+     pertenece a esa página y los estilos con alcance de este componente no lo
+     alcanzan —los <dt> salen sin el atributo data-astro-cid—. Por eso las
+     etiquetas se veían sin color aunque la regla existía. */
 
   .lead {
     color: var(--fg);

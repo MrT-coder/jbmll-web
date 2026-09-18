@@ -1,5 +1,18 @@
 # Cabeceras de seguridad. Cloudflare Pages lee este archivo y las aplica en el
 # borde; no hay servidor propio donde configurarlas.
+#
+# Dos cosas que este archivo NO decide, aprendidas a los golpes el 2026-09-17:
+#
+# 1) Dentro de un bloque, un Cache-Control declarado ANTES de las líneas
+#    «! Cabecera» que desprenden herencia se ignora. Va al final, como en
+#    /media/* más abajo.
+# 2) La zona del dominio puede sobrescribir lo de acá. Con «Browser Cache TTL»
+#    en 4 horas —el valor por omisión del plan gratuito— Cloudflare eleva todo
+#    tiempo más corto que el suyo: la hora de /media/* salía como cuatro,
+#    mientras el año de las fuentes sobrevivía. Está en «Respect Existing
+#    Headers», y si alguna vez los tiempos de producción no coinciden con este
+#    archivo, ese ajuste es el primer sospechoso. En un despliegue de vista
+#    previa (pages.dev) no interviene, así que ahí sí se ve lo declarado.
 
 /*
   # 'none' por defecto: cada permiso se concede a mano y lo que se olvide queda
