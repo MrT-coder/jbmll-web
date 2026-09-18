@@ -1881,11 +1881,46 @@ for (const flojo of ["'unsafe-inline'", "'unsafe-eval'", '*']) {
 // CSP hereda default-src 'none' y el navegador lo bloquea en silencio, con el
 // panel abriéndose vacío. Se concede solo 'self' — nada de blob:, data: ni un
 // origen ajeno — para no abrir más de lo que este archivo necesita.
-const objectSrc = (headers.match(/object-src[^;]*/) || [''])[0];
+// Solo la línea de la cabecera, no todo el archivo: los comentarios que
+// explican cada directiva la nombran, y buscar en el archivo entero encontraba
+// el comentario antes que la política. Lo aprendí rompiendo esta comprobación.
+const cspSitioLinea = (headers.match(/^\s*Content-Security-Policy:.*$/m) || [''])[0];
+const objectSrc = (cspSitioLinea.match(/object-src[^;]*/) || [''])[0];
 check(
   "CSP del sitio: object-src 'self' (y nada más ancho)",
   objectSrc.trim() === "object-src 'self'",
   objectSrc || '(sin object-src: el <object> del visor se bloquearía)',
+);
+
+// object-src no alcanza: Chromium pinta el PDF incrustado dentro de un marco
+// propio, así que la política también tiene que permitir enmarcar el propio
+// origen. En producción, sin esto, el visor caía a su enlace de emergencia con
+// «El navegador no pudo mostrar el PDF» — y no se veía en local, porque astro
+// preview no aplica public/_headers. Esta comprobación existe por ese fallo.
+const frameSrc = (cspSitioLinea.match(/frame-src[^;]*/) || [''])[0];
+check(
+  "CSP del sitio: frame-src 'self' (el PDF incrustado se pinta en un marco)",
+  frameSrc.trim() === "frame-src 'self'",
+  frameSrc || '(sin frame-src: el PDF del visor queda bloqueado en producción)',
+);
+
+// Y frame-src tampoco alcanza solo: Cloudflare Pages aplica las cabeceras a
+// todas las respuestas, así que el PDF llegaba con el `frame-ancestors 'none'`
+// del sitio y se negaba a ser enmarcado por la propia página que lo incrusta.
+// La regla de /media/* lo permite desde este origen y nada más. Verificado en
+// el despliegue de vista previa, que es el único sitio donde estas cabeceras
+// existen de verdad.
+const bloqueMedia = (headers.match(/\n\/media\/\*\n([\s\S]*?)(?=\n\/\S|\n#|\n*$)/) || [])[1] || '';
+check('_headers trae un bloque /media/*', bloqueMedia !== '');
+check(
+  'los medios se pueden enmarcar desde el propio origen, y solo desde ahí',
+  /frame-ancestors 'self'/.test(bloqueMedia) && /^\s*!\s*Content-Security-Policy\s*$/m.test(bloqueMedia),
+  bloqueMedia.trim().split('\n').join(' · ') || '(sin bloque)',
+);
+check(
+  'los medios no heredan X-Frame-Options: DENY',
+  /^\s*!\s*X-Frame-Options\s*$/m.test(bloqueMedia) && /X-Frame-Options:\s*SAMEORIGIN/.test(bloqueMedia),
+  'un DENY heredado bloquea el marco igual que la CSP en los navegadores que no la leen',
 );
 
 // Un script en línea obligaría a aflojar la CSP. define:vars lo produce sin
