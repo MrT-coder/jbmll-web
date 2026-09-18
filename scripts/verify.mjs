@@ -160,16 +160,17 @@ check('theme-color', /name="theme-color"/.test(html));
 // 2026-09-17: el logo completo NO sobrevive a 16 px —el marco se corta y «JB»
 // se empasta—, así que el favicon lleva solo el prompt.
 const COLORES_MARCA = ['#06080F', '#B7CC85', '#E0C15A'];
-for (const [archivo, lado] of [
-  ['favicon.svg', 16],
-  ['logo.svg', 64],
-]) {
+// El lado ya no se fija a un número: el favicon salió del propio logo, así que
+// su rejilla es la del recorte. Lo que importa es que sea cuadrada y entera —una
+// rejilla a medias saca los bloques de los píxeles y ensucia los bordes.
+for (const archivo of ['favicon.svg', 'logo.svg']) {
   const svg = existsSync(join(DIST, archivo)) ? readFileSync(join(DIST, archivo), 'utf8') : '';
   check(`${archivo} servido`, svg !== '');
   if (svg === '') continue;
+  const vb = (svg.match(/viewBox="0 0 (\d+) (\d+)"/) || []).slice(1).map(Number);
   check(
-    `${archivo} dibuja sobre una rejilla de ${lado} unidades`,
-    new RegExp(`viewBox="0 0 ${lado} ${lado}"`).test(svg),
+    `${archivo} dibuja sobre una rejilla cuadrada y entera`,
+    vb.length === 2 && vb[0] === vb[1] && vb[0] > 0,
     (svg.match(/viewBox="[^"]*"/) || ['sin viewBox'])[0],
   );
   const colores = [...new Set([...svg.matchAll(/#[0-9a-fA-F]{3,6}/g)].map((m) => m[0].toUpperCase()))];
