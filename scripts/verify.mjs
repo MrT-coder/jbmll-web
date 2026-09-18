@@ -1409,6 +1409,180 @@ if (proyectosSrc.length >= 2) {
   skip('los artículos se enlazan entre sí (anterior/siguiente)', 'hay menos de dos proyectos para comparar');
 }
 
+console.log('\nFiguras del cuerpo (imágenes en Markdown)');
+// rehype-figuras.mjs (conectado desde astro.config.mjs) envuelve cada <img>
+// del cuerpo en <figure class="figura">, con <figcaption> cuando el Markdown
+// trae el argumento de título. Nada de esto nombra un proyecto o una
+// publicación concreta: se recorre TODO el cuerpo ya construido —cada
+// proyecto y cada publicación con página propia— y, mientras ninguno traiga
+// todavía una imagen (es el estado real de este build: agregar una es el
+// siguiente paso del dueño desde /admin), la comprobación se omite en vez de
+// fingir un resultado. skip() ya existe para exactamente este caso, arriba.
+
+// La cabecera IHDR de un PNG: mismo criterio y misma forma que tamanoJpeg(),
+// abajo, duplicada a propósito porque corre en otro proceso de build que
+// src/lib/rehype-figuras.mjs (ese módulo lo importa astro.config.mjs; este
+// archivo relee dist/ por su cuenta, como el resto del verificador).
+function tamanoPng(buf) {
+  const firmaOk =
+    buf.length >= 24 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+  return firmaOk ? { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) } : null;
+}
+
+// El cuerpo vive entre el `<div class="prose">` de la plantilla y el
+// `<footer class="eof">` que le sigue siempre, en las dos páginas de detalle
+// (src/pages/proyectos/[slug].astro y .../publicaciones/[slug].astro): un
+// límite estable para no confundir esta prosa con cualquier otra <img> que la
+// página pudiera traer en otro lado.
+function prosaDe(htmlPagina) {
+  return (htmlPagina.match(/<div class="prose">([\s\S]*?)<\/div>\s*<footer class="eof">/) || ['', ''])[1];
+}
+
+const paginasConCuerpo = [
+  ...proyectosSrc.map((p) => ({ id: p.id, ruta: `proyectos/${p.id}.html`, dir: 'proyectos' })),
+  ...publicacionesSrc.filter(tieneCuerpoFuente).map((p) => ({ id: p.id, ruta: `publicaciones/${p.id}.html`, dir: 'publicaciones' })),
+];
+// El visor flotante (Visor.astro) tiene que estar en la página, con
+// imágenes o sin ellas todavía: es infraestructura, no algo que dependa de
+// si el cuerpo ya trae una figura o un PDF propio. Sin él, el enlace que
+// arma rehype-figuras.mjs existe en el HTML pero no hay ningún
+// <dialog id="visor"> que scripts/visor.ts pueda abrir.
+const sinVisor = paginasConCuerpo.filter((p) => !leer(p.ruta).includes('<dialog id="visor"'));
+check(
+  'toda página de detalle con cuerpo incluye el componente Visor',
+  paginasConCuerpo.length > 0 && sinVisor.length === 0,
+  paginasConCuerpo.length === 0
+    ? 'no hay ningún proyecto ni publicación con cuerpo en este build'
+    : sinVisor.map((p) => p.id).join(', '),
+);
+
+const prosasDelSitio = paginasConCuerpo
+  .map((p) => ({ ...p, prosa: prosaDe(leer(p.ruta)) }))
+  .filter((p) => p.prosa !== '');
+
+const imgsEnProsa = prosasDelSitio.flatMap((p) =>
+  [...p.prosa.matchAll(/<img\b[^>]*>/g)].map((m) => ({ id: p.id, tag: m[0] })),
+);
+
+if (imgsEnProsa.length === 0) {
+  const motivo = 'ningún proyecto ni publicación trae todavía una imagen en su cuerpo';
+  skip('toda <img> del cuerpo vive dentro de <figure class="figura">', motivo);
+  skip('toda <img> del cuerpo tiene alt, loading="lazy" y decoding="async"', motivo);
+  skip('toda imagen local (/media/) del cuerpo trae width/height que coinciden con el archivo real', motivo);
+  skip('el pie de una figura, cuando existe, sale como <figcaption> con ese texto exacto', motivo);
+} else {
+  // Toda <img> de la prosa tiene que quedar dentro de un bloque
+  // <figure class="figura">…</figure>: se listan esos bloques y se comprueba
+  // que cada etiqueta <img> aparezca dentro de alguno.
+  const figurasDelSitio = prosasDelSitio.flatMap((p) =>
+    [...p.prosa.matchAll(/<figure class="figura">[\s\S]*?<\/figure>/g)].map((m) => ({ id: p.id, bloque: m[0] })),
+  );
+  const sinFigura = imgsEnProsa.filter(
+    ({ tag }) => !figurasDelSitio.some((f) => f.bloque.includes(tag)),
+  );
+  check(
+    'toda <img> del cuerpo vive dentro de <figure class="figura">',
+    sinFigura.length === 0,
+    sinFigura.map((i) => `${i.id}: ${i.tag}`).join(' · '),
+  );
+
+  const sinAtributos = imgsEnProsa.filter(
+    ({ tag }) =>
+      !/\salt="[^"]+"/.test(tag) || !/\sloading="lazy"/.test(tag) || !/\sdecoding="async"/.test(tag),
+  );
+  check(
+    'toda <img> del cuerpo tiene alt, loading="lazy" y decoding="async"',
+    sinAtributos.length === 0,
+    sinAtributos.map((i) => `${i.id}: ${i.tag}`).join(' · '),
+  );
+
+  // El tamaño real se compara contra el propio archivo servido en dist/, no
+  // contra otro número escrito a mano: mismo criterio que la foto de perfil,
+  // arriba.
+  const imgsLocales = imgsEnProsa.filter((i) => /\ssrc="\/media\//.test(i.tag));
+  const dimensionesMal = imgsLocales.filter(({ tag }) => {
+    const src = (tag.match(/\ssrc="([^"]+)"/) || [])[1] ?? '';
+    const w = Number((tag.match(/\swidth="(\d+)"/) || [])[1] ?? NaN);
+    const h = Number((tag.match(/\sheight="(\d+)"/) || [])[1] ?? NaN);
+    let decodificado;
+    try {
+      decodificado = decodeURI(src);
+    } catch {
+      return true;
+    }
+    const ruta = join(DIST, decodificado.replace(/^\//, ''));
+    if (!existsSync(ruta)) return true;
+    const buf = readFileSync(ruta);
+    const ext = extname(ruta).toLowerCase();
+    const real = ext === '.png' ? tamanoPng(buf) : ext === '.jpg' || ext === '.jpeg' ? tamanoJpeg(buf) : null;
+    return !real || real.width !== w || real.height !== h;
+  });
+  check(
+    'toda imagen local (/media/) del cuerpo trae width/height que coinciden con el archivo real',
+    imgsLocales.length === 0 || dimensionesMal.length === 0,
+    imgsLocales.length === 0
+      ? 'ninguna imagen del cuerpo es local en este build'
+      : dimensionesMal.map((i) => `${i.id}: ${i.tag}`).join(' · '),
+  );
+
+  // El texto esperado del pie no se puede derivar del propio HTML sin
+  // comprobar nada consigo mismo: se deriva del argumento de título en el
+  // Markdown fuente, releído con la misma leerFrontmatter() de más arriba.
+  const piesEnMarkdown = paginasConCuerpo.flatMap(({ id, dir }) => {
+    const cuerpo = leerFrontmatter(`src/content/${dir}/${id}.md`).body;
+    return [...cuerpo.matchAll(/!\[[^\]]*\]\([^)\s]+\s+"([^"]+)"\)/g)].map((m) => ({ id, pie: m[1] }));
+  });
+  if (piesEnMarkdown.length === 0) {
+    skip(
+      'el pie de una figura, cuando existe, sale como <figcaption> con ese texto exacto',
+      'ninguna imagen del cuerpo trae argumento de título en este build',
+    );
+  } else {
+    const piesSinFigcaption = piesEnMarkdown.filter(
+      ({ id, pie }) =>
+        !figurasDelSitio.some((f) => f.id === id && f.bloque.includes(`<figcaption>${pie}</figcaption>`)),
+    );
+    check(
+      'el pie de una figura, cuando existe, sale como <figcaption> con ese texto exacto',
+      piesSinFigcaption.length === 0,
+      piesSinFigcaption.map((p) => `${p.id}: "${p.pie}"`).join(' · '),
+    );
+  }
+}
+
+console.log('\nEnlaces a un PDF propio en el cuerpo (visor)');
+// Solo un PDF bajo /media/: uno externo no pasa por rehype-figuras.mjs y
+// sigue siendo un enlace normal, así que no tiene nada que comprobar aquí.
+const enlacesPdfEnProsa = prosasDelSitio.flatMap((p) =>
+  [...p.prosa.matchAll(/<a\b[^>]*href="(\/media\/[^"]+\.pdf(?:[?#][^"]*)?)"[^>]*>/gi)].map((m) => ({
+    id: p.id,
+    tag: m[0],
+    href: m[1],
+  })),
+);
+if (enlacesPdfEnProsa.length === 0) {
+  skip(
+    'todo enlace del cuerpo a un PDF propio lleva la clase que usa el visor y resuelve en dist/',
+    'ningún proyecto ni publicación enlaza todavía un PDF propio desde su cuerpo',
+  );
+} else {
+  const enlacesMal = enlacesPdfEnProsa.filter(({ tag, href }) => {
+    if (!/class="[^"]*\bvisor-abrir\b[^"]*"/.test(tag)) return true;
+    let decodificado;
+    try {
+      decodificado = decodeURI(href);
+    } catch {
+      return true;
+    }
+    return !existsSync(join(DIST, decodificado.replace(/^\//, '')));
+  });
+  check(
+    'todo enlace del cuerpo a un PDF propio lleva la clase que usa el visor y resuelve en dist/',
+    enlacesMal.length === 0,
+    enlacesMal.map((e) => `${e.id}: ${e.href}`).join(' · '),
+  );
+}
+
 console.log('\nAlcance del CSS en set:html');
 // Lo que se inserta con set:html no recibe la marca de alcance de Astro, igual
 // que lo que crea el script. Sus estilos tienen que estar sin alcance o la
