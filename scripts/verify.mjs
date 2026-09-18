@@ -1888,6 +1888,18 @@ check(
   objectSrc || '(sin object-src: el <object> del visor se bloquearía)',
 );
 
+// object-src no alcanza: Chromium pinta el PDF incrustado dentro de un marco
+// propio, así que la política también tiene que permitir enmarcar el propio
+// origen. En producción, sin esto, el visor caía a su enlace de emergencia con
+// «El navegador no pudo mostrar el PDF» — y no se veía en local, porque astro
+// preview no aplica public/_headers. Esta comprobación existe por ese fallo.
+const frameSrc = (headers.match(/frame-src[^;]*/) || [''])[0];
+check(
+  "CSP del sitio: frame-src 'self' (el PDF incrustado se pinta en un marco)",
+  frameSrc.trim() === "frame-src 'self'",
+  frameSrc || '(sin frame-src: el PDF del visor queda bloqueado en producción)',
+);
+
 // Un script en línea obligaría a aflojar la CSP. define:vars lo produce sin
 // avisar y la página se ve idéntica, hasta que en producción queda bloqueado.
 const inline = (html.match(/<script(?![^>]*\ssrc=)[^>]*>/g) || []).filter(

@@ -11,7 +11,11 @@
   # src/components/Visor.astro); sin el permiso que agrega la línea de abajo,
   # default-src 'none' lo bloquea y el panel se abre vacío. Se concede solo al
   # propio origen — nada de blob:, data: ni un origen ajeno.
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  # frame-src, no solo object-src: Chromium pinta un PDF incrustado en un
+  # marco interno, así que sin él la política lo bloquea y el visor cae a su
+  # enlace de emergencia. No se vio en local porque astro preview no aplica
+  # este archivo; se vio en producción.
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
 
   # Sin preload: la lista de HSTS del navegador es prácticamente irreversible y
   # se entra ahí a propósito, no de paso.
