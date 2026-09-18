@@ -213,6 +213,14 @@ check(
   'sin límite, un archivo reemplazado desde el panel queda servido viejo',
 );
 
+// El navegador pide /favicon.ico por su cuenta cuando una página no declara
+// icono —el panel no lo declara—, y eso daba 404 en producción. Se sirve uno de
+// 32 px generado del mismo vector: 0.3 KB, contra los 264 KB que pesa el .ico
+// que exporta una herramienta de diseño con una sola imagen de 256 px.
+check('favicon.ico servido para quien lo pide por su cuenta', existsSync(join(DIST, 'favicon.ico')));
+const pesoIco = existsSync(join(DIST, 'favicon.ico')) ? statSync(join(DIST, 'favicon.ico')).size : 0;
+check('el favicon.ico pesa menos de 10 KB', pesoIco > 0 && pesoIco < 10 * 1024, `${(pesoIco / 1024).toFixed(1)} KB`);
+
 // iOS ignora el favicon SVG y usa este PNG para el icono de la pantalla de
 // inicio. Sin declararlo, recorta una captura de la página.
 check('apple-touch-icon servido', existsSync(join(DIST, 'apple-touch-icon.png')));
@@ -2135,8 +2143,25 @@ function nombresDeEsquema(nombreConst) {
 // comentarios de cada una.
 const COLECCIONES_CMS = [
   { astro: 'experiencia', campos: () => cmsConfig.collections?.find((c) => c.name === 'experiencia')?.fields?.map((f) => f.name) },
-  { astro: 'proyectos', campos: () => cmsConfig.collections?.find((c) => c.name === 'proyectos')?.fields?.map((f) => f.name) },
-  { astro: 'publicaciones', campos: () => cmsConfig.collections?.find((c) => c.name === 'publicaciones')?.fields?.map((f) => f.name) },
+  // «body» no es una clave del esquema: es la prosa que va fuera del
+  // frontmatter y que el sitio renderiza en la página de detalle. Se excluye de
+  // la comparación, igual que en «paginas».
+  {
+    astro: 'proyectos',
+    campos: () =>
+      cmsConfig.collections
+        ?.find((c) => c.name === 'proyectos')
+        ?.fields?.map((f) => f.name)
+        .filter((n) => n !== 'body'),
+  },
+  {
+    astro: 'publicaciones',
+    campos: () =>
+      cmsConfig.collections
+        ?.find((c) => c.name === 'publicaciones')
+        ?.fields?.map((f) => f.name)
+        .filter((n) => n !== 'body'),
+  },
   { astro: 'educacion', campos: () => cmsConfig.collections?.find((c) => c.name === 'educacion')?.fields?.map((f) => f.name) },
   {
     // Colección de archivos: sus dos entradas comparten el mismo conjunto de
