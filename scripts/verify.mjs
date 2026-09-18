@@ -1025,6 +1025,18 @@ check(
   scriptsSueltos.join(', ') + ' — sin import ni export comparten ámbito global',
 );
 
+// La pantalla del inicio —arranque, foto y bloque de datos— solo existe en el
+// HTML que entrega el servidor: repintar su listado la dejaba sin nada de eso,
+// y ahí van a parar la marca, el workspace «~» y el comando `c`. navegar() tiene
+// que delegar el inicio en reiniciar(), que restituye esa pantalla o la pide al
+// servidor. Comprobación estructural; la de verdad se hizo en el navegador.
+const navegarFuente = (terminalTs.match(/function navegar\([^)]*\): boolean \{([\s\S]*?)\n\}/) || [])[1] || '';
+check(
+  'el inicio se restituye completo en vez de repintar su listado',
+  /if \(!seccion\) return reiniciar\(\);/.test(navegarFuente),
+  'sin esto, la marca y «~» dejan el inicio sin arranque, sin foto y sin datos',
+);
+
 const desdeTab = terminalTs.slice(terminalTs.indexOf("if (ev.key === 'Tab')"));
 const bloqueTab = desdeTab.slice(0, desdeTab.indexOf("if (ev.key === 'ArrowUp'"));
 const idxReturn = bloqueTab.search(/\breturn\b/);

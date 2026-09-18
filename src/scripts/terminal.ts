@@ -20,7 +20,7 @@ const workspaces = document.getElementById('sidebar-workspaces');
 // destino para que el encabezado no se quede con el de la página anterior
 // (WCAG 2.4.2 / 1.3.1). No todas las páginas lo montan igual, así que se
 // tolera que falte.
-const nodoLead = document.querySelector<HTMLHeadingElement>('h1.lead');
+let nodoLead = document.querySelector<HTMLHeadingElement>('h1.lead');
 
 // Si falta el andamiaje, no hay terminal que arrancar. Fallar acá es mejor que
 // dejar media interfaz montada respondiendo a medias.
@@ -167,6 +167,13 @@ const completables = (): string[] => [
  */
 function navegar(seccion: string, empujar = true): boolean {
   const url = seccion ? '/' + seccion : '/';
+
+  // El inicio no es una sección más: su pantalla es el arranque, la foto y el
+  // bloque de datos, y eso solo lo tiene el HTML que entregó el servidor.
+  // Repintar su listado dejaba el inicio sin nada de eso —lo notó el dueño del
+  // sitio al hacer clic en la marca—, así que se restituye esa pantalla tal
+  // cual, o se pide al servidor si venimos de otra URL.
+  if (!seccion) return reiniciar();
 
   // Sin índice no hay nada que renderizar acá. El servidor sabe hacerlo.
   if (!indice) return irFuera(url);
@@ -348,6 +355,11 @@ function exec(raw: string): boolean {
 function reiniciar(): boolean {
   if (location.pathname !== '/') return irFuera('/');
   scroll.innerHTML = pantallaInicial;
+  // El h1 vive dentro de #scroll, así que reemplazar el HTML lo sustituye por
+  // otro nodo: sin volver a buscarlo, la referencia apuntaría a un elemento
+  // que ya no está en la página y el encabezado dejaría de actualizarse.
+  nodoLead = document.querySelector<HTMLHeadingElement>('h1.lead');
+  if (indice) document.title = indice.inicio.titulo;
   aqui = '';
   term.dataset.seccion = '';
   term.dataset.detalle = '';
