@@ -366,7 +366,11 @@ span.chip {
   cursor: pointer;
 }
 
-.lv-i:hover {
+/* .sel es la fila que las flechas tienen marcada (terminal.ts, seleccionar()):
+   se ve igual que la fila bajo el puntero, para que teclado y ratón hablen el
+   mismo idioma. */
+.lv-i:hover,
+.lv-i.sel {
   background: var(--sel);
   color: var(--fg);
 }

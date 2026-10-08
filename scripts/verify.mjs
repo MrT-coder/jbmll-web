@@ -3084,6 +3084,54 @@ if (!distribuidorYaml?.href) {
   );
 }
 
+console.log('\nListView: flechas y historial');
+// Con la lista de sugerencias abierta, ↑/↓ recorren la lista (como el ListView
+// de PSReadLine); cerrada, recorren el historial. Pasar del final del historial
+// devuelve lo que se estaba escribiendo, nunca ''. Comprobaciones estructurales
+// sobre el fuente: aquí no corre ningún navegador.
+const bloqueFlechas = terminalTs.slice(
+  terminalTs.indexOf("ev.key === 'ArrowUp'"),
+  terminalTs.indexOf("ev.key === 'Escape'"),
+);
+const bloqueEscape = terminalTs.slice(terminalTs.indexOf("ev.key === 'Escape'"), terminalTs.indexOf('function prefijoComun'));
+const seleccionarFuente = (terminalTs.match(/function seleccionar\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [])[1] || '';
+check(
+  'las flechas consultan el ListView antes que el historial',
+  bloqueFlechas.includes('lv') &&
+    bloqueFlechas.search(/\blv\b/) !== -1 &&
+    bloqueFlechas.search(/\blv\b/) < bloqueFlechas.indexOf('hIdx'),
+  'con la lista abierta, ↓ perdía lo escrito al pasar al final del historial',
+);
+check(
+  'pasar del final del historial restaura el borrador, no ""',
+  !/historial\[hIdx\]\s*\?\?\s*''/.test(terminalTs) && /borrador/.test(bloqueFlechas),
+);
+check(
+  'seleccionar() muestra la opción en el prompt sin volver a filtrar la lista',
+  seleccionarFuente.length > 0 &&
+    /sincronizar\(\)/.test(seleccionarFuente) &&
+    !/abrirListView\(|\.filter\(/.test(seleccionarFuente),
+);
+check(
+  'Escape cierra la lista y devuelve lo que la persona había escrito',
+  /input\.value\s*=\s*lvEscrito/.test(bloqueEscape) && /cerrarListView\(\)/.test(bloqueEscape),
+);
+check(
+  'el ListView es un listbox con opciones, y el campo apunta a la seleccionada',
+  /setAttribute\('role',\s*'listbox'\)/.test(terminalTs) &&
+    /setAttribute\('role',\s*'option'\)/.test(terminalTs) &&
+    /aria-selected/.test(terminalTs) &&
+    /setAttribute\('aria-activedescendant'/.test(terminalTs) &&
+    /removeAttribute\('aria-activedescendant'\)/.test(terminalTs) &&
+    /setAttribute\('aria-controls'/.test(terminalTs) &&
+    /removeAttribute\('aria-controls'\)/.test(terminalTs),
+);
+check(
+  'la fila seleccionada se ve como la fila bajo el puntero, solo con tokens',
+  /\.lv-i\.sel[^{]*\{[^}]*background:\s*var\(--sel\)[^}]*color:\s*var\(--fg\)/.test(terminalCss) ||
+    /\.lv-i:hover,\s*\.lv-i\.sel\s*\{[^}]*background:\s*var\(--sel\)[^}]*color:\s*var\(--fg\)/.test(terminalCss),
+);
+
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);

@@ -106,6 +106,8 @@ const cargarHistorial = (): string[] => {
 
 let historial = cargarHistorial();
 let hIdx = historial.length;
+/** Lo que se estaba escribiendo al empezar a recorrer el historial con ↑. */
+let borrador: string | null = null;
 
 const recordar = (cmd: string) => {
   if (!cmd.trim() || historial[historial.length - 1] === cmd) return;
@@ -571,18 +573,37 @@ function run() {
 // mientras se teclea, en vez de esconderse detrás de Tab.
 
 let lv: HTMLElement | null = null;
+/** Las opciones con que se abrió la lista. Recorrerlas no las vuelve a filtrar. */
+let lvOpciones: string[] = [];
+/** Fila seleccionada con las flechas; -1 es «ninguna»: el texto que escribió la persona. */
+let lvSel = -1;
+/** Lo que había en el campo al abrir la lista, para que Escape (o volver a -1) lo devuelva. */
+let lvEscrito = '';
 
 function cerrarListView() {
   lv?.remove();
   lv = null;
+  lvOpciones = [];
+  lvSel = -1;
+  // El campo deja de apuntar a una lista que ya no existe.
+  input.removeAttribute('aria-activedescendant');
+  input.removeAttribute('aria-controls');
 }
 
 function abrirListView(opciones: string[]) {
   cerrarListView();
   if (!opciones.length || !live) return;
   const caja = el('div', 'lv');
-  opciones.slice(0, 6).forEach((o) => {
+  caja.id = 'lv-lista';
+  caja.setAttribute('role', 'listbox');
+  caja.setAttribute('aria-label', 'Sugerencias');
+  lvOpciones = opciones.slice(0, 6);
+  lvEscrito = input.value;
+  lvOpciones.forEach((o, i) => {
     const fila = el('div', 'lv-i');
+    fila.id = 'lv-i-' + i;
+    fila.setAttribute('role', 'option');
+    fila.setAttribute('aria-selected', 'false');
     fila.textContent = o;
     fila.addEventListener('click', () => {
       input.value = o;
@@ -593,7 +614,29 @@ function abrirListView(opciones: string[]) {
   });
   live.node.after(caja);
   lv = caja;
+  input.setAttribute('aria-controls', caja.id);
   term.scrollTop = term.scrollHeight;
+}
+
+/**
+ * Marca la fila `i` (o ninguna, con -1) y la muestra en el prompt, como el
+ * ListView de PSReadLine. No vuelve a filtrar: la lista conserva las opciones
+ * originales para poder seguir recorriéndola; solo teclear de nuevo la rehace.
+ */
+function seleccionar(i: number) {
+  if (!lv) return;
+  lvSel = i;
+  [...lv.children].forEach((fila, k) => {
+    fila.classList.toggle('sel', k === i);
+    fila.setAttribute('aria-selected', String(k === i));
+  });
+  input.value = i < 0 ? lvEscrito : lvOpciones[i];
+  if (i < 0) input.removeAttribute('aria-activedescendant');
+  else {
+    input.setAttribute('aria-activedescendant', 'lv-i-' + i);
+    lv.children[i].scrollIntoView({ block: 'nearest' });
+  }
+  sincronizar();
 }
 
 const sincronizar = () => {
@@ -603,6 +646,10 @@ const sincronizar = () => {
 // ── Entrada ────────────────────────────────────────────────────────────────
 
 input.addEventListener('input', () => {
+  // Teclear de nuevo abandona el recorrido del historial: el borrador ya no es
+  // el que se guardó.
+  borrador = null;
+  hIdx = historial.length;
   sincronizar();
   const v = input.value.trim();
   if (!v) return cerrarListView();
@@ -635,16 +682,42 @@ input.addEventListener('keydown', (ev) => {
   }
 
   if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
+    // Con la lista abierta, las flechas son suyas. Antes iban siempre al
+    // historial: ↓ pasaba del final, ponía '' en el campo y cerraba la lista,
+    // y lo escrito se perdía.
+    if (lv) {
+      ev.preventDefault();
+      // Da la vuelta pasando por «ninguna» (-1, el texto original): así se
+      // puede volver a lo que se escribió sin salir con Escape.
+      const n = lvOpciones.length;
+      seleccionar(ev.key === 'ArrowDown' ? (lvSel + 1 >= n ? -1 : lvSel + 1) : lvSel - 1 < -1 ? n - 1 : lvSel - 1);
+      return;
+    }
     if (!historial.length) return;
     ev.preventDefault();
-    hIdx = ev.key === 'ArrowUp' ? Math.max(0, hIdx - 1) : Math.min(historial.length, hIdx + 1);
-    input.value = historial[hIdx] ?? '';
+    if (ev.key === 'ArrowUp') {
+      // Al empezar a recorrer el historial se guarda lo que había escrito.
+      if (hIdx === historial.length) borrador = input.value;
+      hIdx = Math.max(0, hIdx - 1);
+    } else {
+      // ↓ sin haber subido no tiene a dónde ir: no toca el campo.
+      if (hIdx === historial.length) return;
+      hIdx = hIdx + 1;
+    }
+    // Pasar de la entrada más reciente devuelve el borrador, nunca ''.
+    input.value = hIdx === historial.length ? (borrador ?? '') : historial[hIdx];
+    if (hIdx === historial.length) borrador = null;
     sincronizar();
-    cerrarListView();
     return;
   }
 
   if (ev.key === 'Escape') {
+    // Cerrar la lista deja en el campo lo que la persona había escrito, no la
+    // opción que las flechas tuvieran marcada.
+    if (lv && lvSel >= 0) {
+      input.value = lvEscrito;
+      sincronizar();
+    }
     cerrarListView();
   }
 });
