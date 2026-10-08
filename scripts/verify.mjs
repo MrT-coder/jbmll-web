@@ -3118,11 +3118,17 @@ console.log('\nListView: flechas y historial');
 // de PSReadLine); cerrada, recorren el historial. Pasar del final del historial
 // devuelve lo que se estaba escribiendo, nunca ''. Comprobaciones estructurales
 // sobre el fuente: aquí no corre ningún navegador.
+// La lógica de las flechas y de Escape vive en acciones con nombre
+// (accionFlecha, accionEscape) que comparten el teclado físico y la barra de
+// teclas del teléfono: se lee ahí y no en el manejador de keydown.
 const bloqueFlechas = terminalTs.slice(
-  terminalTs.indexOf("ev.key === 'ArrowUp'"),
-  terminalTs.indexOf("ev.key === 'Escape'"),
+  terminalTs.indexOf('function accionFlecha'),
+  terminalTs.indexOf('function accionEscape'),
 );
-const bloqueEscape = terminalTs.slice(terminalTs.indexOf("ev.key === 'Escape'"), terminalTs.indexOf('function prefijoComun'));
+const bloqueEscape = terminalTs.slice(
+  terminalTs.indexOf('function accionEscape'),
+  terminalTs.indexOf("input.addEventListener('input'"),
+);
 const seleccionarFuente = (terminalTs.match(/function seleccionar\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [])[1] || '';
 check(
   'las flechas consultan el ListView antes que el historial',
@@ -3234,6 +3240,76 @@ check(
 check(
   'terminal.css distingue el campo vivo (.entry-vivo) del campo oculto de escritorio (.entry)',
   /\.entry\s*\{[^}]*left:\s*-9999px/.test(terminalCss) && reglaVivo !== '',
+);
+
+console.log('\nTerminal en el teléfono: barra de teclas (M2)');
+// Termux y Moshi ponen sobre el teclado las teclas que el teléfono no tiene
+// (Tab, flechas, Esc). Aquí además hay comandos que se tocan: escribir es
+// opcional. La barra solo existe en táctil y reutiliza las MISMAS acciones que
+// el teclado físico (accionTab/accionFlecha/accionEscape): una copia aparte
+// terminaría divergiendo del historial y del ListView.
+const keydownFuente = terminalTs.slice(
+  terminalTs.indexOf("input.addEventListener('keydown'"),
+  terminalTs.indexOf('function prefijoComun'),
+);
+const barraFuente = (terminalTs.match(/function montarBarra\(\) \{([\s\S]*?)\n\}/) || [])[1] || '';
+const reglaTecla = (terminalCss.match(/\.tecla\s*\{([^}]*)\}/) || [])[1] || '';
+const reglaTeclas = (terminalCss.match(/\.teclas\s*\{([^}]*)\}/) || [])[1] || '';
+const reglaCmds = (terminalCss.match(/\.teclas-cmds\s*\{([^}]*)\}/) || [])[1] || '';
+check(
+  'Tab, flechas y Escape son acciones con nombre, y el keydown las usa',
+  /function accionTab\(/.test(terminalTs) &&
+    /function accionFlecha\(/.test(terminalTs) &&
+    /function accionEscape\(/.test(terminalTs) &&
+    /accionTab\(/.test(keydownFuente) &&
+    /accionFlecha\(/.test(keydownFuente) &&
+    /accionEscape\(/.test(keydownFuente),
+);
+check(
+  'la barra llama a esas mismas acciones y no fabrica KeyboardEvent',
+  /accionTab\(/.test(barraFuente) &&
+    /accionFlecha\(/.test(barraFuente) &&
+    /accionEscape\(/.test(barraFuente) &&
+    !/new KeyboardEvent|dispatchEvent/.test(terminalTs),
+);
+check(
+  'la barra solo se monta en pantallas táctiles',
+  /if \(TOUCH\) montarBarra\(\);/.test(terminalTs),
+  'en escritorio no debe existir en el DOM',
+);
+check(
+  'la barra es un toolbar con nombre y sus teclas son botones con aria-label',
+  /setAttribute\('role',\s*'toolbar'\)/.test(barraFuente) &&
+    /setAttribute\('aria-label',\s*'[^']+'\)/.test(barraFuente) &&
+    ['Tabulador', 'Historial anterior', 'Historial siguiente', 'Escape'].every((t) => barraFuente.includes(t)) &&
+    /type = 'button'/.test(terminalTs),
+);
+const rapidoFuente = (terminalTs.match(/function ejecutarRapido\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [])[1] || '';
+check(
+  'los comandos rápidos salen de SECCIONES y se ejecutan sin teclado (run)',
+  /SECCIONES\.map\(/.test(barraFuente) && /\brun\(\)/.test(rapidoFuente),
+);
+check(
+  'tocar la barra no le quita el foco al campo: pointerdown y mousedown con preventDefault',
+  /preventDefault\(\)/.test(barraFuente) &&
+    /addEventListener\('pointerdown',\s*noRobarFoco\)/.test(barraFuente) &&
+    /addEventListener\('mousedown',\s*noRobarFoco\)/.test(barraFuente),
+  'sin esto el teclado se cierra cada vez que se toca una tecla',
+);
+check(
+  'con el teclado abierto la barra queda sobre él: visualViewport marca la raíz (solo táctil) y el CSS esconde statusline y pie',
+  /classList\.toggle\('teclado',\s*TOUCH && /.test(terminalTs) &&
+    /:root\.teclado\s+\.status/.test(terminalCss) &&
+    /:root\.teclado\s+\.foot/.test(terminalCss),
+);
+check(
+  'la barra va a todo el ancho sobre la statusline, con los comandos en una franja que se desliza en horizontal',
+  /flex:\s*0 0 auto/.test(reglaTeclas) && /overflow-x:\s*auto/.test(reglaCmds) && /min-width:\s*0/.test(reglaCmds),
+  'sin min-width: 0 la franja empuja el ancho de la página',
+);
+check(
+  'las teclas usan solo tokens (sin colores crudos)',
+  reglaTecla !== '' && !/#[0-9a-fA-F]{3,8}\b|rgba?\(/.test([reglaTeclas, reglaCmds, reglaTecla].join('\n')),
 );
 
 console.log('\nPeso');

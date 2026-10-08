@@ -186,6 +186,63 @@
   }
 }
 
+/* ── Barra de teclas (teléfono) ────────────────────────────────────────────
+   La monta terminal.ts (montarBarra) solo en táctil, entre el contenido y la
+   statusline. Cuando sube el teclado, :root.teclado esconde la statusline y el
+   pie para que quede justo encima de él; sin esto quedarían entre las dos. */
+.teclas {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+.teclas-fijas {
+  flex: 0 0 auto;
+  display: flex;
+  border-right: 1px solid var(--line);
+}
+/* min-width: 0 y overflow-x: sin ellos la franja de comandos, que no cabe,
+   estiraría la barra y con ella la página entera. */
+.teclas-cmds {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.teclas-cmds::-webkit-scrollbar {
+  display: none;
+}
+.tecla {
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  /* Sin el retardo ni el zoom de doble toque: son teclas, se tocan seguido. */
+  touch-action: manipulation;
+}
+.tecla-cmd {
+  color: var(--blue);
+}
+.tecla:active {
+  background: var(--sel);
+}
+/* Dentro de una franja que recorta, el contorno de fuera quedaría cortado. */
+.tecla:focus-visible {
+  outline-offset: -2px;
+}
+:root.teclado .status,
+:root.teclado .foot {
+  display: none;
+}
+
 /* ── Movimiento ─────────────────────────────────────────────────────────────
    Todo lo oculto de acá depende de una clase que añade un script (.arranque
    desde arranque-gate.js, .entra desde terminal.ts): sin JavaScript, para un
