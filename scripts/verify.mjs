@@ -3132,6 +3132,21 @@ check(
     /\.lv-i:hover,\s*\.lv-i\.sel\s*\{[^}]*background:\s*var\(--sel\)[^}]*color:\s*var\(--fg\)/.test(terminalCss),
 );
 
+console.log('\nclear');
+// `c`, `clear` y `cls` llevan siempre a la pantalla de inicio, desde cualquier
+// sección: lo pidió el dueño del sitio. Se comprueba sobre el case entero, hasta
+// el siguiente, para que una rama que repinte la sección actual no se cuele.
+const casoClear = (terminalTs.match(/case 'c':\s*case 'clear':\s*case 'cls':[\s\S]*?(?=\n\s*case ')/) ?? [''])[0];
+const casoClearSinComentarios = casoClear.replace(/^\s*\/\/.*$/gm, '');
+check(
+  'c / clear / cls vuelven siempre al inicio con reiniciar(), sin repintar la sección actual',
+  /return reiniciar\(\);/.test(casoClearSinComentarios) && !/navegar\(/.test(casoClearSinComentarios),
+);
+check(
+  'la ayuda describe c como volver al inicio',
+  /\['c',\s*'[^']*inicio[^']*'\]/.test(terminalTs),
+);
+
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);

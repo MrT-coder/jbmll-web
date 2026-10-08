@@ -310,7 +310,7 @@ const HELP: [string, string][] = [
   ['stack', 'Con qué trabajo, contado desde los datos'],
   ['contacto', 'Dónde encontrarme'],
   ['pwd', 'Dónde estoy'],
-  ['c', 'Limpiar la pantalla de esta sección'],
+  ['c', 'Limpiar y volver al inicio'],
   ['help', 'Esto'],
 ];
 
@@ -494,18 +494,15 @@ function exec(raw: string): boolean {
     case 'c':
     case 'clear':
     case 'cls':
-      // Limpia la pantalla de esta sección y la deja como recién entregada:
-      // su encabezado, su comando y su salida. Antes volvía al inicio, y desde
-      // otra ruta con una recarga completa, así que en el inicio parecía no
-      // hacer nada y en una sección sacaba de donde estabas (lo reportó el
-      // dueño del sitio). Una pantalla vacía de verdad tampoco sirve: en un
-      // sitio web es un callejón sin salida. Donde no se puede volver a
-      // renderizar —una página de detalle, o sin índice— se cae al inicio.
-      //
-      // La guarda del detalle no es opcional: sin ella, `c` en
-      // /proyectos/<slug> pintaría la lista de proyectos dejando la URL del
-      // documento, y la pantalla diría una cosa y la barra de direcciones otra.
-      if (term.dataset.detalle !== '1' && indice) return navegar(aqui, false);
+      // Limpia y vuelve a la pantalla de inicio: el arranque, la ficha y el
+      // listado, desde cualquier sección. Historia, para no repetirla: esto ya
+      // fue así, y se cambió a «limpiar la sección actual» porque en el inicio
+      // parecía no hacer nada —restituía la misma pantalla sin señal alguna—
+      // y en una sección sacaba de donde estabas. El dueño del sitio pidió
+      // volver al inicio (2026-10-07). Lo primero ya no ocurre: reiniciar()
+      // hace un fundido, así que la limpieza se ve aunque la pantalla resulte
+      // igual. Una pantalla vacía de verdad sigue sin servir: en un sitio web
+      // es un callejón sin salida.
       return reiniciar();
 
     case 'g':
