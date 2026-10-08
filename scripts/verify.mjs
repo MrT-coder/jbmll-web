@@ -3287,7 +3287,7 @@ check(
 const rapidoFuente = (terminalTs.match(/function ejecutarRapido\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [])[1] || '';
 check(
   'los comandos rápidos salen de SECCIONES y se ejecutan sin teclado (run)',
-  /SECCIONES\.map\(/.test(barraFuente) && /\brun\(\)/.test(rapidoFuente),
+  /SECCIONES\.filter\(Boolean\)\.map\(/.test(barraFuente) && /\brun\(\)/.test(rapidoFuente),
 );
 check(
   'tocar la barra no le quita el foco al campo: pointerdown y mousedown con preventDefault',
