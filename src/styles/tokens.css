@@ -35,6 +35,11 @@
   --pink: #ff8dd7;
   --peach: #deba87;
   --gold: #e0c15a;
+  /* Fuera del esquema GENTLEMAN: el estado «construyendo» necesitaba un color
+     que no fuera --blue (el de los títulos enlazados) ni se confundiera con
+     --gold o --peach. Mismo apagado que el resto de la paleta; ~8.3:1 sobre
+     --bg, comprobado en scripts/verify.mjs. */
+  --orange: #e5a06b;
   --sel: #263356;
 
   /* 78 % de --fg sobre 22 % de --muted: deja que la negrita resalte subiendo

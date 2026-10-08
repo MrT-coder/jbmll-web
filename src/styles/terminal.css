@@ -300,8 +300,9 @@ a.go:focus-visible {
 .estado-produccion {
   color: var(--green);
 }
+/* Naranja y no --blue: en azul se leía como parte del título del panel. */
 .estado-construyendo {
-  color: var(--blue);
+  color: var(--orange);
 }
 .estado-prueba-de-concepto {
   color: var(--gold);

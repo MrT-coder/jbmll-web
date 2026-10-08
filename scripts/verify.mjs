@@ -2782,6 +2782,17 @@ for (const { clave, token } of reglasEstadoCss) {
   );
 }
 
+// Ningún estado en --blue: es el color de los títulos enlazados de los
+// paneles, y «construyendo» en azul se leía como parte del título (lo notó el
+// dueño del sitio). Los estados son cinco colores distintos entre sí, para
+// que dos estados no se confundan.
+check(
+  'ningún estado usa --blue (el color de los títulos enlazados), y cada estado tiene su propio color',
+  reglasEstadoCss.every((r) => r.token !== 'blue') &&
+    new Set(reglasEstadoCss.map((r) => r.token)).size === reglasEstadoCss.length,
+  reglasEstadoCss.map((r) => `${r.clave}: --${r.token}`).join(', '),
+);
+
 // Cada proyecto listado en /proyectos tiene que mostrar SU estado, con la
 // clase que corresponde a su propio dato — no basta con que exista alguna
 // clase .estado en la página.
