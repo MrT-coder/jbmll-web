@@ -2782,6 +2782,17 @@ for (const { clave, token } of reglasEstadoCss) {
   );
 }
 
+// Ningún estado en --blue: es el color de los títulos enlazados de los
+// paneles, y «construyendo» en azul se leía como parte del título (lo notó el
+// dueño del sitio). Los estados son cinco colores distintos entre sí, para
+// que dos estados no se confundan.
+check(
+  'ningún estado usa --blue (el color de los títulos enlazados), y cada estado tiene su propio color',
+  reglasEstadoCss.every((r) => r.token !== 'blue') &&
+    new Set(reglasEstadoCss.map((r) => r.token)).size === reglasEstadoCss.length,
+  reglasEstadoCss.map((r) => `${r.clave}: --${r.token}`).join(', '),
+);
+
 // Cada proyecto listado en /proyectos tiene que mostrar SU estado, con la
 // clase que corresponde a su propio dato — no basta con que exista alguna
 // clase .estado en la página.
@@ -2828,6 +2839,341 @@ check(
   contextoValores.length > 0 &&
     JSON.stringify([...contextoValores].sort()) === JSON.stringify([...opcionesContextoCms].sort()),
   `esquema: ${contextoValores.join(', ')} · cms: ${opcionesContextoCms.join(', ')}`,
+);
+
+console.log('\nAnimaciones de la terminal');
+// El movimiento es un añadido: el contenido siempre está en el HTML del
+// servidor y nada puede quedar oculto si el script falla o si la persona pidió
+// menos movimiento. Estas comprobaciones son estructurales (aquí no corre
+// ningún navegador): atan las garantías de mejora progresiva a las fuentes.
+const rutaGateArranque = 'src/scripts/arranque-gate.js';
+const gateArranque = existsSync(rutaGateArranque) ? readFileSync(rutaGateArranque, 'utf8') : '';
+const terminalCss = readFileSync('src/styles/terminal.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+const reiniciarFuente = (terminalTs.match(/function reiniciar\(\): boolean \{([\s\S]*?)\n\}/) || [])[1] || '';
+const runFuente = (terminalTs.match(/function run\(\) \{([\s\S]*?)\n\}/) || [])[1] || '';
+
+// T1 · Arranque del inicio (cada vez que se muestra; T8 quitó el límite de una vez por sesión)
+check(
+  'el arranque tiene un guion previo al primer pintado, separado del módulo',
+  existsSync(rutaGateArranque),
+  'sin él, el contenido se vería, desaparecería y recién entonces se animaría',
+);
+check(
+  'el guion previo no anima con prefers-reduced-motion y tolera que matchMedia lance',
+  /prefers-reduced-motion:\s*reduce/.test(gateArranque) && /try\s*\{[\s\S]*matchMedia[\s\S]*\}\s*catch/.test(gateArranque),
+);
+check(
+  'el guion previo tiene un plazo: si el módulo no corre, el contenido reaparece',
+  /setTimeout\(/.test(gateArranque) && /classList\.remove\(clase\)/.test(gateArranque) && /clase = 'arranque'/.test(gateArranque),
+);
+// El arranque se reproduce cada vez que se muestra el inicio (decisión del
+// dueño, 2026-10-07, que revirtió el «solo la primera visita de la sesión»):
+// nada lo recuerda, ni el guion previo ni terminal.ts.
+check(
+  'el arranque no se limita a una vez por sesión: nada lo recuerda en sessionStorage',
+  !/sessionStorage|jbsh:arranque/.test(gateArranque.replace(/^\s*\/\/.*$/gm, '')) &&
+    !/CLAVE_ARRANQUE|jbsh:arranque/.test(terminalTs),
+);
+// La marca del logo es un enlace a «/»: el manejador de clics lo convierte en
+// navegar(''), que va a reiniciar(); sin índice cae a una carga completa de «/»,
+// que el guion previo también anima. Ninguna de las dos rutas se salta el arranque.
+check(
+  'el logo y «~» llegan a reiniciar() (o a una carga completa de «/» que el guion anima)',
+  /class="sidebar-marca" href="\/"/.test(html) &&
+    /href\.startsWith\('\/'\) \? href\.slice\(1\)/.test(terminalTs) &&
+    /if \(!seccion\) return reiniciar\(\);/.test(terminalTs) &&
+    /if \(location\.pathname !== '\/'\) return irFuera\('\/'\);/.test(terminalTs),
+);
+const totalSsTerminal = (terminalTs.match(/sessionStorage\./g) || []).length;
+const ssEnTryTerminal = (terminalTs.match(/try\s*\{[\s\S]*?\}\s*catch/g) || []).reduce(
+  (n, b) => n + (b.match(/sessionStorage\./g) || []).length,
+  0,
+);
+check(
+  'todo acceso a sessionStorage en terminal.ts va dentro de un try',
+  totalSsTerminal > 0 && totalSsTerminal === ssEnTryTerminal,
+  `${ssEnTryTerminal} de ${totalSsTerminal} dentro de un try`,
+);
+// Toda página montada en la terminal (las que tienen #scroll) carga el guion
+// previo; el modo lo dice la propia etiqueta: el inicio arranca, el resto entra.
+const paginasTerminal = paginasHtml.filter((r) => /id="scroll"/.test(readFileSync(r, 'utf8')));
+const modoDeGate = (r) =>
+  (readFileSync(r, 'utf8').match(/<script[^>]*\ssrc="[^"]*arranque-gate[^"]*"[^>]*>/) || [])[0]?.match(
+    /data-modo="(\w+)"/,
+  )?.[1];
+check(
+  'el inicio carga el guion previo en modo arranque; el resto de páginas de la terminal, en modo entrada',
+  paginasTerminal.length > 1 &&
+    paginasTerminal.every(
+      (r) => modoDeGate(r) === (r === join(DIST, 'index.html') ? 'arranque' : 'entrada'),
+    ),
+  paginasTerminal
+    .filter((r) => modoDeGate(r) !== (r === join(DIST, 'index.html') ? 'arranque' : 'entrada'))
+    .map((r) => relative(DIST, r))
+    .join(', '),
+);
+check(
+  'el arranque sigue completo en el HTML del servidor (líneas, ok y ficha)',
+  /<div class="boot"[^>]*>[\s\S]*class="ok"[\s\S]*<div class="fetch"/.test(html),
+);
+check(
+  'el contenido solo se oculta detrás de .arranque, .entrada o .entra, nunca por defecto',
+  /:root\.arranque/.test(terminalCss) &&
+    /:root\.entrada\s+#scroll/.test(terminalCss) &&
+    [...terminalCss.matchAll(/([^{}@]+)\{([^{}]*opacity:\s*0\s*;[^{}]*)\}/g)]
+      .map((m) => m[1].trim())
+      .filter((sel) => !/^(\.entry|\.caret|50%)/.test(sel))
+      .every((sel) => /:root\.arranque|:root\.entrada|\.entra\b/.test(sel)),
+);
+check(
+  'el arranque se lanza al cargar y reiniciar() lo vuelve a armar, sin temporizadores encimados',
+  (terminalTs.match(/^arrancarAnimado\(\);/gm) || []).length === 1 &&
+    /arrancarAnimado/.test(reiniciarFuente) &&
+    /classList\.add\('arranque'\)/.test(reiniciarFuente) &&
+    reiniciarFuente.indexOf('terminarAnimacion()') !== -1 &&
+    reiniciarFuente.indexOf('terminarAnimacion()') < reiniciarFuente.indexOf("classList.add('arranque')") &&
+    reiniciarFuente.indexOf("classList.add('arranque')") < reiniciarFuente.indexOf('innerHTML'),
+  'la clase se pone antes de restituir la pantalla: sin un cuadro con todo visible antes de ocultarlo',
+);
+check(
+  'reiniciar() respeta prefers-reduced-motion al armar el arranque',
+  /reducido\.matches/.test(reiniciarFuente),
+);
+
+// T2 · Tipeo del comando y cascada de la salida
+check(
+  'navegar() termina la animación en curso antes de repintar',
+  navegarFuente.indexOf('terminarAnimacion()') !== -1 &&
+    navegarFuente.indexOf('terminarAnimacion()') < navegarFuente.indexOf('.remove()'),
+  'dos navegaciones seguidas no pueden dejar temporizadores ni contenido viejo',
+);
+check(
+  'el comando de navegar() ya está escrito entero en el DOM; el tipeo es solo visual',
+  /el\('span', 'typed', comando\)/.test(navegarFuente) &&
+    /classList\.add\('escribiendo'\)/.test(terminalTs) &&
+    !/typed\.textContent\s*\+=/.test(terminalTs),
+  'el aria-live de #scroll anunciaría el comando letra por letra',
+);
+check(
+  'los temporizadores de la animación pasan por un solo planificador que se puede cancelar',
+  /clearTimeout/.test(terminalTs) &&
+    (terminalTs.match(/\bsetTimeout\(/g) || []).length <= 2 &&
+    !/\bsetInterval\([^)]*(entra|visto|escribiendo)/.test(terminalTs),
+);
+check(
+  'ejecutar un comando mientras anima termina la animación (nada queda oculto)',
+  /terminarAnimacion\(\)/.test(runFuente),
+);
+check(
+  'terminal.css define el tipeo por pasos y la entrada en cascada',
+  /@keyframes tipeo/.test(terminalCss) && /steps\(var\(--n\)/.test(terminalCss) && /\.entra/.test(terminalCss),
+);
+
+// T5 · La misma entrada en las páginas que el servidor renderiza completas
+const bloqueEntradaGate = gateArranque.slice(gateArranque.indexOf("'entrada'"));
+check(
+  'la entrada solo se prepara sin reduced-motion, en una navegación normal y desde el mismo origen',
+  /prefers-reduced-motion:\s*reduce/.test(gateArranque) &&
+    /\.type\s*!==\s*'navigate'/.test(gateArranque) &&
+    /document\.referrer/.test(gateArranque) &&
+    /\.origin\s*!==\s*location\.origin/.test(gateArranque) &&
+    /clase = 'entrada'/.test(bloqueEntradaGate) && /classList\.add\(clase\)/.test(gateArranque),
+  'sin referente del mismo sitio (buscador, enlace externo, URL escrita), recarga o atrás/adelante: todo se ve de golpe',
+);
+check(
+  'la entrada tiene su plazo: el guion previo también quita .entrada si el módulo no corre',
+  /classList\.remove\(clase\)/.test(gateArranque) && /setTimeout\(/.test(gateArranque) && /clase = 'entrada'/.test(gateArranque),
+);
+check(
+  'el guion previo no usa almacenamiento para la entrada (el referente basta)',
+  !/sessionStorage/.test(bloqueEntradaGate.slice(0, bloqueEntradaGate.indexOf("clase = 'entrada'"))),
+);
+const entrarFuente = (terminalTs.match(/function entrarPagina\(\) \{([\s\S]*?)\n\}/) || [])[1] || '';
+check(
+  'entrarPagina() reutiliza animarNavegacion() y se lanza una sola vez, al cargar',
+  /animarNavegacion\(/.test(entrarFuente) &&
+    (terminalTs.match(/^entrarPagina\(\);/gm) || []).length === 1 &&
+    !/entrarPagina\(/.test(reiniciarFuente),
+);
+check(
+  'terminarAnimacion() quita .entrada y restaurar desde la caché (pageshow persisted) deja todo visible',
+  /classList\.remove\('arranque',\s*'entrada'\)/.test(terminalTs) &&
+    /addEventListener\('pageshow'[\s\S]*?persisted[\s\S]*?terminarAnimacion\(\)/.test(terminalTs),
+);
+check(
+  'el CSS de la entrada no declara transiciones propias: al quitar .entrada todo salta a su sitio sin parpadeo',
+  ![...terminalCss.matchAll(/([^{}@]+)\{([^{}]*)\}/g)].some(
+    (m) => /:root\.entrada/.test(m[1]) && /transition|animation/.test(m[2]),
+  ),
+);
+
+// T3 · Transición de sección
+check(
+  'terminal.css define el fundido breve del contenido al cambiar de sección',
+  /@keyframes cambio/.test(terminalCss) && /\.cambia/.test(terminalCss),
+);
+check(
+  'el indicador del workspace activo lo crea sidebar.ts y se desliza con transform',
+  /ws-indicador/.test(sidebarTs) && /\.ws-indicador[^{]*\{[^}]*transition:[^;]*transform/.test(sidebarCss),
+);
+check('la plantilla no trae el indicador: sin JavaScript no existe', !/ws-indicador/.test(html));
+const bloqueMovilSidebar = sidebarCss.slice(sidebarCss.indexOf('@media (max-width: 660px)'));
+check(
+  'la cortina móvil sigue sin animación y el indicador no se dibuja en ella',
+  !/\b(transition|animation)\s*:/.test(bloqueMovilSidebar) &&
+    /\.ws-indicador\s*\{[^}]*display:\s*none/.test(bloqueMovilSidebar),
+);
+
+// T4 · scroll suave que respeta prefers-reduced-motion
+check(
+  'ningún scroll suave incondicional: scrollIntoView consulta prefers-reduced-motion',
+  !/behavior:\s*'smooth'/.test(terminalTs) &&
+    /matchMedia\('\(prefers-reduced-motion:\s*reduce\)'\)/.test(terminalTs) &&
+    /behavior:\s*reducido\.matches\s*\?\s*'auto'\s*:\s*'smooth'/.test(terminalTs),
+);
+
+// Comunes
+check(
+  'la regla global de prefers-reduced-motion de tokens.css sigue apagando animaciones y transiciones',
+  /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*animation-duration:[\s\S]*transition-duration:/.test(
+    tokensCss,
+  ),
+);
+check(
+  'las duraciones del movimiento nuevo salen de tokens (--mov-*), no de números sueltos',
+  /--mov-fade:/.test(tokensCss) &&
+    /--mov-escalon:/.test(tokensCss) &&
+    /--mov-tipeo:/.test(tokensCss) &&
+    [terminalCss, sidebarCss]
+      .flatMap((c) => c.match(/\b(?:transition|animation):[^;]+;/g) || [])
+      .filter((d) => !/\bblink\b|:\s*none;/.test(d))
+      .every((d) => /var\(--mov-/.test(d)),
+);
+check(
+  'ni terminal.ts ni sidebar.ts escriben atributos style= (la CSP los bloquea): solo CSSOM',
+  [terminalTs, sidebarTs]
+    .map((ts) => ts.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    .every((ts) => !/setAttribute\(\s*'style'/.test(ts) && !/cssText/.test(ts) && !/style="/.test(ts)),
+);
+
+console.log('\nEnlace de distribuidor: marca de afiliado');
+// La divulgación de la comisión es obligatoria, pero ya no es un párrafo: es
+// una marca corta en la misma fila que el enlace. Se deriva de perfil.yaml,
+// no de un literal escrito acá.
+const distribuidorYaml = perfilYamlData.distribuidor;
+const configContenidoDist = readFileSync('src/content.config.ts', 'utf8');
+// El campo ocupa varias líneas (z.string().trim().min().max()): se lee hasta el
+// cierre de la coma que lo termina, sin comentarios de por medio.
+const lineaDivulgacion = (configContenidoDist.match(/divulgacion: z[\s\S]*?\)\s*,\s*\n/) ?? [''])[0].replace(/\s+/g, ' ');
+check(
+  'el esquema sigue exigiendo la divulgación y ahora la limita a una marca corta',
+  /\.min\(1,/.test(lineaDivulgacion) && /\.max\(\d+,/.test(lineaDivulgacion),
+  lineaDivulgacion.trim(),
+);
+const topeMarca = Number((lineaDivulgacion.match(/\.max\((\d+),/) || [])[1] ?? 0);
+if (!distribuidorYaml?.href) {
+  skip('la marca de afiliado en /contacto y /sobre-mi', 'perfil.yaml no declara distribuidor en este build');
+} else {
+  const marca = String(distribuidorYaml.divulgacion ?? '');
+  check(
+    'la divulgación de perfil.yaml es una marca corta, no una frase',
+    marca.length > 0 && topeMarca > 0 && marca.length <= topeMarca,
+    `${marca.length} caracteres, tope ${topeMarca}`,
+  );
+  const escapar = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const pagina of ['contacto.html', 'sobre-mi.html']) {
+    const doc = leer(pagina);
+    const ancla = doc.match(new RegExp(String.raw`<a\b[^>]*href="${escapar(distribuidorYaml.href)}"[^>]*>`))?.[0] ?? '';
+    const rels = ancla.match(/\srel="([^"]*)"/g) || [];
+    const relValores = (ancla.match(/\srel="([^"]*)"/)?.[1] ?? '').split(/\s+/);
+    check(
+      `${pagina}: el enlace de distribuidor lleva sponsored y noopener en un solo rel`,
+      rels.length === 1 && relValores.includes('sponsored') && relValores.includes('noopener'),
+      ancla,
+    );
+    const idMarca = ancla.match(/aria-describedby="([^"]+)"/)?.[1];
+    const desdeAncla = doc.slice(doc.indexOf(ancla));
+    const fila = desdeAncla.slice(0, desdeAncla.search(/<\/tr>|<\/p>/));
+    check(
+      `${pagina}: la marca está en la misma fila que el enlace y el enlace la tiene como descripción`,
+      Boolean(idMarca) &&
+        new RegExp(String.raw`<span[^>]*\sid="${escapar(idMarca ?? '')}"[^>]*>\s*${escapar(marca)}\s*</span>`).test(fila),
+      idMarca ? `aria-describedby="${idMarca}"` : 'sin aria-describedby',
+    );
+    check(
+      `${pagina}: no queda un párrafo de divulgación aparte`,
+      !new RegExp(`<p[^>]*>[^<]*${escapar(marca)}[^<]*</p>`).test(doc),
+    );
+  }
+  const hintCms = readFileSync('public/admin/config.yml', 'utf8').match(/name:\s*divulgacion[\s\S]{0,400}/)?.[0] ?? '';
+  check(
+    'el panel presenta la divulgación como una marca corta y obligatoria, con su indicación',
+    /label:[^\n]*marca/i.test(hintCms) && /hint:/.test(hintCms),
+    hintCms.split('\n').slice(0, 6).join(' | '),
+  );
+}
+
+console.log('\nListView: flechas y historial');
+// Con la lista de sugerencias abierta, ↑/↓ recorren la lista (como el ListView
+// de PSReadLine); cerrada, recorren el historial. Pasar del final del historial
+// devuelve lo que se estaba escribiendo, nunca ''. Comprobaciones estructurales
+// sobre el fuente: aquí no corre ningún navegador.
+const bloqueFlechas = terminalTs.slice(
+  terminalTs.indexOf("ev.key === 'ArrowUp'"),
+  terminalTs.indexOf("ev.key === 'Escape'"),
+);
+const bloqueEscape = terminalTs.slice(terminalTs.indexOf("ev.key === 'Escape'"), terminalTs.indexOf('function prefijoComun'));
+const seleccionarFuente = (terminalTs.match(/function seleccionar\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [])[1] || '';
+check(
+  'las flechas consultan el ListView antes que el historial',
+  bloqueFlechas.includes('lv') &&
+    bloqueFlechas.search(/\blv\b/) !== -1 &&
+    bloqueFlechas.search(/\blv\b/) < bloqueFlechas.indexOf('hIdx'),
+  'con la lista abierta, ↓ perdía lo escrito al pasar al final del historial',
+);
+check(
+  'pasar del final del historial restaura el borrador, no ""',
+  !/historial\[hIdx\]\s*\?\?\s*''/.test(terminalTs) && /borrador/.test(bloqueFlechas),
+);
+check(
+  'seleccionar() muestra la opción en el prompt sin volver a filtrar la lista',
+  seleccionarFuente.length > 0 &&
+    /sincronizar\(\)/.test(seleccionarFuente) &&
+    !/abrirListView\(|\.filter\(/.test(seleccionarFuente),
+);
+check(
+  'Escape cierra la lista y devuelve lo que la persona había escrito',
+  /input\.value\s*=\s*lvEscrito/.test(bloqueEscape) && /cerrarListView\(\)/.test(bloqueEscape),
+);
+check(
+  'el ListView es un listbox con opciones, y el campo apunta a la seleccionada',
+  /setAttribute\('role',\s*'listbox'\)/.test(terminalTs) &&
+    /setAttribute\('role',\s*'option'\)/.test(terminalTs) &&
+    /aria-selected/.test(terminalTs) &&
+    /setAttribute\('aria-activedescendant'/.test(terminalTs) &&
+    /removeAttribute\('aria-activedescendant'\)/.test(terminalTs) &&
+    /setAttribute\('aria-controls'/.test(terminalTs) &&
+    /removeAttribute\('aria-controls'\)/.test(terminalTs),
+);
+check(
+  'la fila seleccionada se ve como la fila bajo el puntero, solo con tokens',
+  /\.lv-i\.sel[^{]*\{[^}]*background:\s*var\(--sel\)[^}]*color:\s*var\(--fg\)/.test(terminalCss) ||
+    /\.lv-i:hover,\s*\.lv-i\.sel\s*\{[^}]*background:\s*var\(--sel\)[^}]*color:\s*var\(--fg\)/.test(terminalCss),
+);
+
+console.log('\nclear');
+// `c`, `clear` y `cls` llevan siempre a la pantalla de inicio, desde cualquier
+// sección: lo pidió el dueño del sitio. Se comprueba sobre el case entero, hasta
+// el siguiente, para que una rama que repinte la sección actual no se cuele.
+const casoClear = (terminalTs.match(/case 'c':\s*case 'clear':\s*case 'cls':[\s\S]*?(?=\n\s*case ')/) ?? [''])[0];
+const casoClearSinComentarios = casoClear.replace(/^\s*\/\/.*$/gm, '');
+check(
+  'c / clear / cls vuelven siempre al inicio con reiniciar(), sin repintar la sección actual',
+  /return reiniciar\(\);/.test(casoClearSinComentarios) && !/navegar\(/.test(casoClearSinComentarios),
+);
+check(
+  'la ayuda describe c como volver al inicio',
+  /\['c',\s*'[^']*inicio[^']*'\]/.test(terminalTs),
 );
 
 console.log('\nPeso');

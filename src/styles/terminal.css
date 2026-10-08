@@ -36,6 +36,15 @@
 .list td.n {
   color: var(--blue);
 }
+/* La marca de afiliado junto al enlace de distribuidor (contacto.astro y
+   sobre-mi.astro): discreta, en --dim (4.5:1 sobre --bg) y un paso menor que el
+   texto. Sin ámbito porque la usan dos páginas. */
+.marca-afiliado {
+  margin-left: var(--space-3);
+  color: var(--dim);
+  font-size: var(--text-sm);
+}
+
 .list td.d {
   color: var(--muted);
   /* linkedin.com/in/<usuario> mide ~58 caracteres: sin esto no rompe línea y
@@ -133,6 +142,77 @@
   }
 }
 
+/* ── Movimiento ─────────────────────────────────────────────────────────────
+   Todo lo oculto de acá depende de una clase que añade un script (.arranque
+   desde arranque-gate.js, .entra desde terminal.ts): sin JavaScript, para un
+   buscador o con prefers-reduced-motion, ninguna regla de abajo coincide y el
+   contenido se ve entero, sin esperar nada. */
+
+/* Arranque del inicio (cada vez que se muestra). :not(.visto) y no una clase de «oculto»: lo
+   que se muestra es lo que terminal.ts va marcando, y al quitar .arranque
+   todo vuelve a su estado normal de golpe, sin depender de ninguna marca. */
+:root.arranque
+  :is(.boot .out, .boot .ok, .fetch, #scroll > :not(.boot, .fetch)):not(.visto) {
+  opacity: 0;
+}
+:root.arranque :is(.boot .out, .boot .ok, .fetch, #scroll > :not(.boot, .fetch)) {
+  transition: opacity var(--mov-fade) ease-out;
+}
+
+/* Entrada de una página que el servidor entrega completa, llegando desde
+   dentro del sitio (arranque-gate.js, modo entrada). Oculta lo de primer nivel
+   salvo la línea del comando y el prompt; terminal.ts reparte enseguida .entra
+   entre las entradas de verdad y quita .entrada en el mismo turno, así que no
+   hay un cuadro intermedio. Sin transition a propósito: al quitar la clase,
+   lo que no sea una entrada debe aparecer ya, no desvanecerse. */
+:root.entrada #scroll > :not(.done, .sp, .inputline) {
+  opacity: 0;
+}
+:root.entrada .done .typed {
+  clip-path: inset(0 100% 0 0);
+}
+
+/* Salida de un `cd` sin recargar: cada entrada nace oculta y se muestra en
+   cascada. */
+.entra {
+  transition: opacity var(--mov-fade) ease-out;
+}
+.entra:not(.visto) {
+  opacity: 0;
+}
+
+/* El comando ya está entero en el DOM —el lector de pantalla y el aria-live
+   de #scroll lo reciben de una vez—; solo se recorta a la vista. --n (cantidad
+   de caracteres) lo asigna terminal.ts por CSSOM: la CSP no admite style="" y
+   así cada carácter descubre un paso exacto, porque la fuente es monoespaciada. */
+.typed {
+  --n: 0;
+}
+.typed.escribiendo {
+  animation: tipeo calc(var(--n) * var(--mov-tipeo)) steps(var(--n), end) both;
+}
+@keyframes tipeo {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Fundido breve de toda la pantalla al cambiar de sección. */
+#scroll.cambia {
+  animation: cambio var(--mov-fade) ease-out;
+}
+@keyframes cambio {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .caret {
     animation: none;
@@ -220,8 +300,9 @@ a.go:focus-visible {
 .estado-produccion {
   color: var(--green);
 }
+/* Naranja y no --blue: en azul se leía como parte del título del panel. */
 .estado-construyendo {
-  color: var(--blue);
+  color: var(--orange);
 }
 .estado-prueba-de-concepto {
   color: var(--gold);
@@ -286,7 +367,11 @@ span.chip {
   cursor: pointer;
 }
 
-.lv-i:hover {
+/* .sel es la fila que las flechas tienen marcada (terminal.ts, seleccionar()):
+   se ve igual que la fila bajo el puntero, para que teclado y ratón hablen el
+   mismo idioma. */
+.lv-i:hover,
+.lv-i.sel {
   background: var(--sel);
   color: var(--fg);
 }

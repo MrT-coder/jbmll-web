@@ -41,7 +41,8 @@ const SECCIONES: string[] = [...(workspaces?.querySelectorAll('a') ?? [])].map((
 let aqui = term.dataset.seccion ?? '';
 
 // La pantalla tal como la entregó el servidor: arranque, banner y primera
-// salida. Se guarda antes de que el prompt la toque, para poder volver a ella.
+// salida. Se guarda antes de que el prompt la toque y antes de que arrancarAnimado()
+// marque nada con .visto, para poder volver a ella limpia (reiniciar()).
 const pantallaInicial = scroll.innerHTML;
 let indice: Indice | null = null;
 
@@ -106,6 +107,8 @@ const cargarHistorial = (): string[] => {
 
 let historial = cargarHistorial();
 let hIdx = historial.length;
+/** Lo que se estaba escribiendo al empezar a recorrer el historial con ↑. */
+let borrador: string | null = null;
 
 const recordar = (cmd: string) => {
   if (!cmd.trim() || historial[historial.length - 1] === cmd) return;
@@ -117,6 +120,163 @@ const recordar = (cmd: string) => {
     /* sin almacenamiento el historial dura lo que la página */
   }
 };
+
+// ── Movimiento ─────────────────────────────────────────────────────────────
+// Todo es un añadido visual sobre un DOM que ya está completo: el texto de cada
+// línea (incluido el comando que se «escribe») está entero desde el primer
+// momento, porque #scroll es aria-live y animar el contenido letra por letra
+// haría que el lector de pantalla lo anunciara así. Lo único que cambia es qué
+// se ve (opacity, clip-path), y eso lo dicen las clases de terminal.css.
+
+const raiz = document.documentElement;
+
+/** Se consulta cada vez: la persona puede cambiar la preferencia con la página abierta. */
+const reducido = matchMedia('(prefers-reduced-motion: reduce)');
+
+/** Valor de un token de movimiento de tokens.css (en ms), para que el CSS y el
+ * escalonado de aquí no se desincronicen. */
+const mov = (token: string, defecto: number): number => {
+  const v = parseFloat(getComputedStyle(raiz).getPropertyValue(token));
+  return Number.isFinite(v) ? v : defecto;
+};
+
+/** Lo que dura como máximo la cascada de una salida, sea cual sea su tamaño. */
+const TOPE_CASCADA = 600;
+
+// Un solo planificador: todo temporizador de la animación pasa por programar(),
+// así terminarAnimacion() los cancela todos juntos. Sin esto, navegar dos veces
+// seguidas dejaría relojes de la pantalla anterior tocando nodos que ya no están.
+let relojes: number[] = [];
+
+const programar = (fn: () => void, ms: number) => {
+  relojes.push(window.setTimeout(fn, ms));
+};
+
+/**
+ * Corta la animación en curso y deja todo en su estado final y visible. Es
+ * idempotente: se llama al empezar cada navegación, al ejecutar un comando y
+ * al terminar la propia animación.
+ */
+function terminarAnimacion() {
+  for (const id of relojes) clearTimeout(id);
+  relojes = [];
+  raiz.classList.remove('arranque', 'entrada');
+  scroll.classList.remove('cambia');
+  for (const n of scroll.querySelectorAll('.entra, .escribiendo, .visto')) {
+    n.classList.remove('entra', 'escribiendo', 'visto');
+  }
+}
+
+/** Reinicia el fundido de la pantalla (quitar, forzar el cálculo, volver a poner). */
+function desvanecer() {
+  if (reducido.matches) return;
+  scroll.classList.remove('cambia');
+  void scroll.offsetWidth;
+  scroll.classList.add('cambia');
+}
+
+/**
+ * El arranque del inicio: las líneas, el `ok`, la ficha y el resto de la
+ * pantalla van apareciendo en ese orden, cada vez que se muestra el inicio. La
+ * clase .arranque de <html> la pone arranque-gate.js en una carga completa de
+ * «/», o reiniciar() al volver al inicio sin recargar; acá solo se ejecuta.
+ *
+ * Historia, para no repetirla: esto se limitó a la primera visita de cada
+ * sesión (con sessionStorage) y el dueño del sitio lo revirtió el 2026-10-07:
+ * se ve siempre, incluso al recargar. Nada recuerda ya que se animó.
+ */
+function arrancarAnimado() {
+  if (!raiz.classList.contains('arranque')) return;
+  if (reducido.matches) return terminarAnimacion();
+
+  const fade = mov('--mov-fade', 200);
+  const paso = mov('--mov-arranque', 80);
+  const escalon = mov('--mov-escalon', 60);
+  const mostrar = (n: Element, ms: number) => programar(() => n.classList.add('visto'), ms);
+
+  let t = 0;
+  for (const l of scroll.querySelectorAll('.boot .out')) {
+    mostrar(l, t);
+    t += paso;
+  }
+  // El `ok` se enciende cuando la última línea ya terminó de aparecer.
+  const ok = scroll.querySelector('.boot .ok');
+  t += fade - paso;
+  if (ok) mostrar(ok, t);
+  t += fade;
+  const ficha = scroll.querySelector('.fetch');
+  if (ficha) mostrar(ficha, t);
+  t += fade / 2;
+  // Lo demás —encabezado, comando, salida, prompt— entra en cascada corta.
+  for (const n of scroll.querySelectorAll(':scope > :not(.boot, .fetch)')) {
+    mostrar(n, t);
+    t += escalon;
+  }
+  programar(terminarAnimacion, t + fade);
+}
+
+/**
+ * La salida de un `cd`: el comando se escribe y, cuando termina, las entradas
+ * aparecen una a una. `entradas` ya está dentro de #scroll; aquí solo se ocultan
+ * para mostrarlas por turnos.
+ */
+function animarNavegacion(typed: HTMLElement, entradas: Element[]) {
+  const n = (typed.textContent ?? '').length;
+  typed.style.setProperty('--n', String(n));
+  typed.classList.add('escribiendo');
+  desvanecer();
+
+  const escalon = mov('--mov-escalon', 60);
+  const inicio = n * mov('--mov-tipeo', 25) + escalon;
+  const paso = Math.min(escalon, TOPE_CASCADA / Math.max(entradas.length, 1));
+  entradas.forEach((e, i) => {
+    e.classList.add('entra');
+    programar(() => e.classList.add('visto'), inicio + i * paso);
+  });
+  programar(terminarAnimacion, inicio + entradas.length * paso + mov('--mov-fade', 200));
+}
+
+/**
+ * Las entradas que se muestran en cascada en una página que el servidor
+ * entregó completa: las filas y paneles de #salida, los hijos de un artículo y
+ * los bloques de primer nivel del resto. No cada nodo pequeño: la cascada tiene
+ * que leerse como líneas que llegan, no como un temblor.
+ */
+function entradasDePagina(): Element[] {
+  const entradas: Element[] = [];
+  for (const hijo of scroll.children) {
+    if (hijo.matches('.done, .sp, .inputline, .boot, .fetch')) continue;
+    if (hijo.id === 'salida') {
+      const filas = [...hijo.querySelectorAll('.panels > *, tr')];
+      entradas.push(...(filas.length ? filas : hijo.children));
+    } else if (hijo.matches('article')) {
+      entradas.push(...hijo.children);
+    } else {
+      entradas.push(hijo);
+    }
+  }
+  return entradas;
+}
+
+/**
+ * El mismo `cd` de navegar(), para una página entregada por el servidor a la
+ * que se llegó desde dentro del sitio. arranque-gate.js ya ocultó el contenido
+ * antes del primer pintado (clase .entrada); acá se reparte el estado oculto
+ * fino y se quita la clase gruesa en el mismo turno.
+ */
+function entrarPagina() {
+  if (!raiz.classList.contains('entrada')) return;
+  const typed = scroll.querySelector<HTMLElement>('.done .typed');
+  if (reducido.matches || !typed) return terminarAnimacion();
+  animarNavegacion(typed, entradasDePagina());
+  raiz.classList.remove('entrada');
+}
+
+// Restaurada desde la caché de atrás/adelante, la página vuelve con su estado:
+// nada debe quedar oculto ni repetirse a medias.
+addEventListener('pageshow', (ev) => {
+  if (ev.persisted) terminarAnimacion();
+});
 
 // ── Prompt ─────────────────────────────────────────────────────────────────
 
@@ -146,7 +306,7 @@ const HELP: [string, string][] = [
   ['stack', 'Con qué trabajo, contado desde los datos'],
   ['contacto', 'Dónde encontrarme'],
   ['pwd', 'Dónde estoy'],
-  ['c', 'Limpiar la pantalla de esta sección'],
+  ['c', 'Limpiar y volver al inicio'],
   ['help', 'Esto'],
 ];
 
@@ -191,12 +351,23 @@ function navegar(seccion: string, empujar = true): boolean {
   // anterior encima. El h1 se conserva —es el encabezado del documento, no
   // salida— y la línea del comando se repone para que la pantalla quede igual
   // que si el servidor la hubiera entregado así.
+  //
+  // Antes de tocar nada se corta la animación anterior: si la persona navega
+  // otra vez a mitad de una cascada, no quedan relojes ni nodos a medio mostrar.
+  terminarAnimacion();
   for (const nodo of [...scroll.children]) if (nodo !== nodoLead) nodo.remove();
   const comando = seccion ? `cd ${seccion}` : 'ls';
   const linea = el('div', 'out done');
-  linea.append(el('span', 'brain ok', BRAIN), el('span', 'typed', comando));
+  const typed = el('span', 'typed', comando);
+  linea.append(el('span', 'brain ok', BRAIN), typed);
   push(linea);
-  push(fragmento(seccion ? renderEntradas(indice.entradas[seccion] ?? []) : renderSecciones(indice.secciones)));
+  const salida = fragmento(seccion ? renderEntradas(indice.entradas[seccion] ?? []) : renderSecciones(indice.secciones));
+  // Las filas de la salida, para la cascada. Se toman antes de push(): al
+  // insertar el fragmento deja de tener hijos.
+  const entradas = [...salida.querySelectorAll('.panels > *, tr')];
+  if (!entradas.length) entradas.push(...salida.children);
+  push(salida);
+  if (!reducido.matches) animarNavegacion(typed, entradas);
 
   aqui = seccion;
   term.dataset.seccion = seccion;
@@ -319,18 +490,15 @@ function exec(raw: string): boolean {
     case 'c':
     case 'clear':
     case 'cls':
-      // Limpia la pantalla de esta sección y la deja como recién entregada:
-      // su encabezado, su comando y su salida. Antes volvía al inicio, y desde
-      // otra ruta con una recarga completa, así que en el inicio parecía no
-      // hacer nada y en una sección sacaba de donde estabas (lo reportó el
-      // dueño del sitio). Una pantalla vacía de verdad tampoco sirve: en un
-      // sitio web es un callejón sin salida. Donde no se puede volver a
-      // renderizar —una página de detalle, o sin índice— se cae al inicio.
-      //
-      // La guarda del detalle no es opcional: sin ella, `c` en
-      // /proyectos/<slug> pintaría la lista de proyectos dejando la URL del
-      // documento, y la pantalla diría una cosa y la barra de direcciones otra.
-      if (term.dataset.detalle !== '1' && indice) return navegar(aqui, false);
+      // Limpia y vuelve a la pantalla de inicio: el arranque, la ficha y el
+      // listado, desde cualquier sección. Historia, para no repetirla: esto ya
+      // fue así, y se cambió a «limpiar la sección actual» porque en el inicio
+      // parecía no hacer nada —restituía la misma pantalla sin señal alguna—
+      // y en una sección sacaba de donde estabas. El dueño del sitio pidió
+      // volver al inicio (2026-10-07). Lo primero ya no ocurre: reiniciar()
+      // hace un fundido, así que la limpieza se ve aunque la pantalla resulte
+      // igual. Una pantalla vacía de verdad sigue sin servir: en un sitio web
+      // es un callejón sin salida.
       return reiniciar();
 
     case 'g':
@@ -354,6 +522,15 @@ function exec(raw: string): boolean {
  */
 function reiniciar(): boolean {
   if (location.pathname !== '/') return irFuera('/');
+  // Volver al inicio también reproduce el arranque (decisión del dueño,
+  // 2026-10-07: antes era solo de la primera carga). Orden: se corta lo que
+  // estuviera animando (sin relojes encimados si se repite `c`) y se pone
+  // .arranque ANTES de restituir el HTML, en el mismo turno: el navegador no
+  // pinta entre medio, así que no hay un cuadro con todo visible antes de
+  // ocultarlo. Con prefers-reduced-motion no se anima nada.
+  terminarAnimacion();
+  const animar = !reducido.matches;
+  if (animar) raiz.classList.add('arranque');
   scroll.innerHTML = pantallaInicial;
   // El h1 vive dentro de #scroll, así que reemplazar el HTML lo sustituye por
   // otro nodo: sin volver a buscarlo, la referencia apuntaría a un elemento
@@ -365,12 +542,20 @@ function reiniciar(): boolean {
   term.dataset.detalle = '';
   if (stPath) stPath.textContent = '~/';
   term.scrollTop = 0;
+  // En una microtarea y no aquí: quien llamó a reiniciar() añade el prompt justo
+  // después (run(), los clics), y tiene que existir para entrar en la cascada;
+  // si no, quedaría oculto hasta que termine el arranque. Una microtarea corre
+  // antes del siguiente pintado.
+  if (animar) queueMicrotask(arrancarAnimado);
   return true;
 }
 
 function run() {
   const raw = input.value;
   const escribiendo = document.activeElement === input;
+  // Quien ejecuta algo no espera a que termine la animación anterior, y lo que
+  // este comando añada no debe quedar oculto detrás de ella.
+  terminarAnimacion();
   if (live) {
     live.node.querySelector('.caret')?.remove();
     live.node.querySelector('.tap-hint')?.remove();
@@ -391,18 +576,37 @@ function run() {
 // mientras se teclea, en vez de esconderse detrás de Tab.
 
 let lv: HTMLElement | null = null;
+/** Las opciones con que se abrió la lista. Recorrerlas no las vuelve a filtrar. */
+let lvOpciones: string[] = [];
+/** Fila seleccionada con las flechas; -1 es «ninguna»: el texto que escribió la persona. */
+let lvSel = -1;
+/** Lo que había en el campo al abrir la lista, para que Escape (o volver a -1) lo devuelva. */
+let lvEscrito = '';
 
 function cerrarListView() {
   lv?.remove();
   lv = null;
+  lvOpciones = [];
+  lvSel = -1;
+  // El campo deja de apuntar a una lista que ya no existe.
+  input.removeAttribute('aria-activedescendant');
+  input.removeAttribute('aria-controls');
 }
 
 function abrirListView(opciones: string[]) {
   cerrarListView();
   if (!opciones.length || !live) return;
   const caja = el('div', 'lv');
-  opciones.slice(0, 6).forEach((o) => {
+  caja.id = 'lv-lista';
+  caja.setAttribute('role', 'listbox');
+  caja.setAttribute('aria-label', 'Sugerencias');
+  lvOpciones = opciones.slice(0, 6);
+  lvEscrito = input.value;
+  lvOpciones.forEach((o, i) => {
     const fila = el('div', 'lv-i');
+    fila.id = 'lv-i-' + i;
+    fila.setAttribute('role', 'option');
+    fila.setAttribute('aria-selected', 'false');
     fila.textContent = o;
     fila.addEventListener('click', () => {
       input.value = o;
@@ -413,7 +617,29 @@ function abrirListView(opciones: string[]) {
   });
   live.node.after(caja);
   lv = caja;
+  input.setAttribute('aria-controls', caja.id);
   term.scrollTop = term.scrollHeight;
+}
+
+/**
+ * Marca la fila `i` (o ninguna, con -1) y la muestra en el prompt, como el
+ * ListView de PSReadLine. No vuelve a filtrar: la lista conserva las opciones
+ * originales para poder seguir recorriéndola; solo teclear de nuevo la rehace.
+ */
+function seleccionar(i: number) {
+  if (!lv) return;
+  lvSel = i;
+  [...lv.children].forEach((fila, k) => {
+    fila.classList.toggle('sel', k === i);
+    fila.setAttribute('aria-selected', String(k === i));
+  });
+  input.value = i < 0 ? lvEscrito : lvOpciones[i];
+  if (i < 0) input.removeAttribute('aria-activedescendant');
+  else {
+    input.setAttribute('aria-activedescendant', 'lv-i-' + i);
+    lv.children[i].scrollIntoView({ block: 'nearest' });
+  }
+  sincronizar();
 }
 
 const sincronizar = () => {
@@ -423,6 +649,10 @@ const sincronizar = () => {
 // ── Entrada ────────────────────────────────────────────────────────────────
 
 input.addEventListener('input', () => {
+  // Teclear de nuevo abandona el recorrido del historial: el borrador ya no es
+  // el que se guardó.
+  borrador = null;
+  hIdx = historial.length;
   sincronizar();
   const v = input.value.trim();
   if (!v) return cerrarListView();
@@ -455,16 +685,42 @@ input.addEventListener('keydown', (ev) => {
   }
 
   if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
+    // Con la lista abierta, las flechas son suyas. Antes iban siempre al
+    // historial: ↓ pasaba del final, ponía '' en el campo y cerraba la lista,
+    // y lo escrito se perdía.
+    if (lv) {
+      ev.preventDefault();
+      // Da la vuelta pasando por «ninguna» (-1, el texto original): así se
+      // puede volver a lo que se escribió sin salir con Escape.
+      const n = lvOpciones.length;
+      seleccionar(ev.key === 'ArrowDown' ? (lvSel + 1 >= n ? -1 : lvSel + 1) : lvSel - 1 < -1 ? n - 1 : lvSel - 1);
+      return;
+    }
     if (!historial.length) return;
     ev.preventDefault();
-    hIdx = ev.key === 'ArrowUp' ? Math.max(0, hIdx - 1) : Math.min(historial.length, hIdx + 1);
-    input.value = historial[hIdx] ?? '';
+    if (ev.key === 'ArrowUp') {
+      // Al empezar a recorrer el historial se guarda lo que había escrito.
+      if (hIdx === historial.length) borrador = input.value;
+      hIdx = Math.max(0, hIdx - 1);
+    } else {
+      // ↓ sin haber subido no tiene a dónde ir: no toca el campo.
+      if (hIdx === historial.length) return;
+      hIdx = hIdx + 1;
+    }
+    // Pasar de la entrada más reciente devuelve el borrador, nunca ''.
+    input.value = hIdx === historial.length ? (borrador ?? '') : historial[hIdx];
+    if (hIdx === historial.length) borrador = null;
     sincronizar();
-    cerrarListView();
     return;
   }
 
   if (ev.key === 'Escape') {
+    // Cerrar la lista deja en el campo lo que la persona había escrito, no la
+    // opción que las flechas tuvieran marcada.
+    if (lv && lvSel >= 0) {
+      input.value = lvEscrito;
+      sincronizar();
+    }
     cerrarListView();
   }
 });
@@ -515,7 +771,10 @@ document.addEventListener('click', (ev) => {
   }
   l.classList.add('typing');
   input.focus();
-  setTimeout(() => l.scrollIntoView({ block: 'end', behavior: 'smooth' }), 320);
+  setTimeout(
+    () => l.scrollIntoView({ block: 'end', behavior: reducido.matches ? 'auto' : 'smooth' }),
+    320,
+  );
 });
 
 /** Deja el comando escrito en el prompt vivo, como si se hubiera tecleado. */
@@ -615,6 +874,8 @@ if (stClock) {
 // ── Arranque ───────────────────────────────────────────────────────────────
 
 prompt();
+arrancarAnimado();
+entrarPagina();
 
 // De acá en adelante cada salida es consecuencia de algo que alguien hizo, así
 // que sí corresponde llevarlo a verla.

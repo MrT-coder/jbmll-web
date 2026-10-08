@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import '../styles/terminal.css';
 import bannerRaw from '../data/banner.txt?raw';
+import arranqueGate from '../scripts/arranque-gate.js?url';
 import { SECCIONES } from '../lib/content';
 import Sidebar from './Sidebar.astro';
 import Statusline from './Statusline.astro';
@@ -14,7 +15,9 @@ interface Props {
   seccion?: string | null;
   /** Salida inicial, ya renderizada por src/lib/render.ts. */
   salida?: string;
-  /** El arranque solo tiene sentido la primera vez, en la raíz. */
+  /** El arranque (líneas de boot y ficha) solo existe en la raíz. Se anima cada
+   * vez que se muestra el inicio; antes era solo la primera visita de la sesión
+   * (revertido por el dueño, 2026-10-07). */
   boot?: boolean;
   /** Frase de encabezado, cuando la página tiene algo que decir antes. */
   lead?: string;
@@ -130,6 +133,16 @@ const abiertosSsr = documento ? 1 : 0;
   <Sidebar actual={seccion} detalle={detalle} documento={documento} />
 
   <main class="term" id="term" tabindex="-1" data-brain={BRAIN} data-seccion={seccion ?? ''} data-detalle={detalle ? '1' : ''}>
+    {
+      /* Clásico y bloqueante a propósito: tiene que correr antes de que el
+         contenido se pinte (ver el comentario de arranque-gate.js). is:inline
+         evita que Astro lo empaquete como módulo diferido; al venir de una
+         URL y no de texto en línea, la CSP lo admite. Todas las páginas de la
+         terminal lo cargan: el inicio en modo arranque, el resto (sobre-mi,
+         contacto, detalles, 404…) en modo entrada. Ninguna queda fuera: las que
+         el cliente no puede animar al navegar son justo las que lo necesitan. */
+    }
+    <script is:inline src={arranqueGate} data-modo={boot ? 'arranque' : 'entrada'}></script>
     <div class="wrap">
       <div id="scroll" aria-live="polite">
         {
