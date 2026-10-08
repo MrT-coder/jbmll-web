@@ -209,6 +209,36 @@
   color: var(--prose);
 }
 
+/* El indicador del workspace activo: una barra que se desliza de uno a otro.
+ * Lo crea sidebar.ts, así que sin JavaScript no existe y queda el fondo de
+ * .ws-actual, que sigue marcando el actual en cualquier caso. Solo se desliza con
+ * transform, sin relayout; su alto (--ind-h) cambia sin transición. .lista la pone
+ * el script después de colocarlo por primera vez, para que no «llegue» desde
+ * la esquina al cargar. */
+.sidebar-workspaces {
+  position: relative;
+}
+.ws-indicador {
+  position: absolute;
+  top: 0;
+  left: var(--space-4);
+  width: var(--space-1);
+  /* Valores iniciales; sidebar.ts los pisa por CSSOM con la fila activa. */
+  --ind-y: 0px;
+  --ind-h: 0px;
+  height: var(--ind-h);
+  background: var(--green);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(var(--ind-y));
+}
+.ws-indicador.visible {
+  opacity: 1;
+}
+.ws-indicador.lista {
+  transition: transform var(--mov-deslizar) ease-out;
+}
+
 .ab-vacio {
   padding: var(--space-2);
   color: var(--dim);
@@ -223,6 +253,12 @@
 }
 
 @media (max-width: 660px) {
+  /* La cortina móvil no se anima a propósito (ver más abajo): tampoco el
+     indicador, que ahí vive dentro de una barra con display: none. */
+  .ws-indicador {
+    display: none;
+  }
+
   :root.js .sidebar-alterna {
     display: inline-flex;
     align-items: center;

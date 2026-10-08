@@ -2830,6 +2830,204 @@ check(
   `esquema: ${contextoValores.join(', ')} · cms: ${opcionesContextoCms.join(', ')}`,
 );
 
+console.log('\nAnimaciones de la terminal');
+// El movimiento es un añadido: el contenido siempre está en el HTML del
+// servidor y nada puede quedar oculto si el script falla o si la persona pidió
+// menos movimiento. Estas comprobaciones son estructurales (aquí no corre
+// ningún navegador): atan las garantías de mejora progresiva a las fuentes.
+const rutaGateArranque = 'src/scripts/arranque-gate.js';
+const gateArranque = existsSync(rutaGateArranque) ? readFileSync(rutaGateArranque, 'utf8') : '';
+const terminalCss = readFileSync('src/styles/terminal.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+const claveArranque = (gateArranque.match(/'(jbsh:[\w-]+)'/) || [])[1];
+const reiniciarFuente = (terminalTs.match(/function reiniciar\(\): boolean \{([\s\S]*?)\n\}/) || [])[1] || '';
+const runFuente = (terminalTs.match(/function run\(\) \{([\s\S]*?)\n\}/) || [])[1] || '';
+
+// T1 · Arranque de la primera visita
+check(
+  'el arranque tiene un guion previo al primer pintado, separado del módulo',
+  existsSync(rutaGateArranque),
+  'sin él, el contenido se vería, desaparecería y recién entonces se animaría',
+);
+check(
+  'el guion previo no anima con prefers-reduced-motion ni sin almacenamiento',
+  /prefers-reduced-motion:\s*reduce/.test(gateArranque) &&
+    /try\s*\{[\s\S]*sessionStorage\.getItem[\s\S]*\}\s*catch/.test(gateArranque),
+);
+check(
+  'el guion previo tiene un plazo: si el módulo no corre, el contenido reaparece',
+  /setTimeout\(/.test(gateArranque) && /classList\.remove\(clase\)/.test(gateArranque) && /clase = 'arranque'/.test(gateArranque),
+);
+check(
+  'la marca de «ya visto» se escribe en terminal.ts con la misma clave que lee el guion previo',
+  claveArranque !== undefined &&
+    terminalTs.includes(`'${claveArranque}'`) &&
+    /try\s*\{[^}]*sessionStorage\.setItem\(CLAVE_ARRANQUE/.test(terminalTs),
+);
+const totalSsTerminal = (terminalTs.match(/sessionStorage\./g) || []).length;
+const ssEnTryTerminal = (terminalTs.match(/try\s*\{[\s\S]*?\}\s*catch/g) || []).reduce(
+  (n, b) => n + (b.match(/sessionStorage\./g) || []).length,
+  0,
+);
+check(
+  'todo acceso a sessionStorage en terminal.ts va dentro de un try',
+  totalSsTerminal > 0 && totalSsTerminal === ssEnTryTerminal,
+  `${ssEnTryTerminal} de ${totalSsTerminal} dentro de un try`,
+);
+// Toda página montada en la terminal (las que tienen #scroll) carga el guion
+// previo; el modo lo dice la propia etiqueta: el inicio arranca, el resto entra.
+const paginasTerminal = paginasHtml.filter((r) => /id="scroll"/.test(readFileSync(r, 'utf8')));
+const modoDeGate = (r) =>
+  (readFileSync(r, 'utf8').match(/<script[^>]*\ssrc="[^"]*arranque-gate[^"]*"[^>]*>/) || [])[0]?.match(
+    /data-modo="(\w+)"/,
+  )?.[1];
+check(
+  'el inicio carga el guion previo en modo arranque; el resto de páginas de la terminal, en modo entrada',
+  paginasTerminal.length > 1 &&
+    paginasTerminal.every(
+      (r) => modoDeGate(r) === (r === join(DIST, 'index.html') ? 'arranque' : 'entrada'),
+    ),
+  paginasTerminal
+    .filter((r) => modoDeGate(r) !== (r === join(DIST, 'index.html') ? 'arranque' : 'entrada'))
+    .map((r) => relative(DIST, r))
+    .join(', '),
+);
+check(
+  'el arranque sigue completo en el HTML del servidor (líneas, ok y ficha)',
+  /<div class="boot"[^>]*>[\s\S]*class="ok"[\s\S]*<div class="fetch"/.test(html),
+);
+check(
+  'el contenido solo se oculta detrás de .arranque, .entrada o .entra, nunca por defecto',
+  /:root\.arranque/.test(terminalCss) &&
+    /:root\.entrada\s+#scroll/.test(terminalCss) &&
+    [...terminalCss.matchAll(/([^{}@]+)\{([^{}]*opacity:\s*0\s*;[^{}]*)\}/g)]
+      .map((m) => m[1].trim())
+      .filter((sel) => !/^(\.entry|\.caret|50%)/.test(sel))
+      .every((sel) => /:root\.arranque|:root\.entrada|\.entra\b/.test(sel)),
+);
+check(
+  'el arranque se lanza una sola vez, al cargar, y reiniciar() no lo repite',
+  (terminalTs.match(/^arrancarAnimado\(\);/gm) || []).length === 1 &&
+    !/arrancarAnimado\(/.test(reiniciarFuente) &&
+    /terminarAnimacion\(\)/.test(reiniciarFuente),
+);
+
+// T2 · Tipeo del comando y cascada de la salida
+check(
+  'navegar() termina la animación en curso antes de repintar',
+  navegarFuente.indexOf('terminarAnimacion()') !== -1 &&
+    navegarFuente.indexOf('terminarAnimacion()') < navegarFuente.indexOf('.remove()'),
+  'dos navegaciones seguidas no pueden dejar temporizadores ni contenido viejo',
+);
+check(
+  'el comando de navegar() ya está escrito entero en el DOM; el tipeo es solo visual',
+  /el\('span', 'typed', comando\)/.test(navegarFuente) &&
+    /classList\.add\('escribiendo'\)/.test(terminalTs) &&
+    !/typed\.textContent\s*\+=/.test(terminalTs),
+  'el aria-live de #scroll anunciaría el comando letra por letra',
+);
+check(
+  'los temporizadores de la animación pasan por un solo planificador que se puede cancelar',
+  /clearTimeout/.test(terminalTs) &&
+    (terminalTs.match(/\bsetTimeout\(/g) || []).length <= 2 &&
+    !/\bsetInterval\([^)]*(entra|visto|escribiendo)/.test(terminalTs),
+);
+check(
+  'ejecutar un comando mientras anima termina la animación (nada queda oculto)',
+  /terminarAnimacion\(\)/.test(runFuente),
+);
+check(
+  'terminal.css define el tipeo por pasos y la entrada en cascada',
+  /@keyframes tipeo/.test(terminalCss) && /steps\(var\(--n\)/.test(terminalCss) && /\.entra/.test(terminalCss),
+);
+
+// T5 · La misma entrada en las páginas que el servidor renderiza completas
+const bloqueEntradaGate = gateArranque.slice(gateArranque.indexOf("'entrada'"));
+check(
+  'la entrada solo se prepara sin reduced-motion, en una navegación normal y desde el mismo origen',
+  /prefers-reduced-motion:\s*reduce/.test(gateArranque) &&
+    /\.type\s*!==\s*'navigate'/.test(gateArranque) &&
+    /document\.referrer/.test(gateArranque) &&
+    /\.origin\s*!==\s*location\.origin/.test(gateArranque) &&
+    /clase = 'entrada'/.test(bloqueEntradaGate) && /classList\.add\(clase\)/.test(gateArranque),
+  'sin referente del mismo sitio (buscador, enlace externo, URL escrita), recarga o atrás/adelante: todo se ve de golpe',
+);
+check(
+  'la entrada tiene su plazo: el guion previo también quita .entrada si el módulo no corre',
+  /classList\.remove\(clase\)/.test(gateArranque) && /setTimeout\(/.test(gateArranque) && /clase = 'entrada'/.test(gateArranque),
+);
+check(
+  'el guion previo no usa almacenamiento para la entrada (el referente basta)',
+  !/sessionStorage/.test(bloqueEntradaGate.slice(0, bloqueEntradaGate.indexOf("clase = 'entrada'"))),
+);
+const entrarFuente = (terminalTs.match(/function entrarPagina\(\) \{([\s\S]*?)\n\}/) || [])[1] || '';
+check(
+  'entrarPagina() reutiliza animarNavegacion() y se lanza una sola vez, al cargar',
+  /animarNavegacion\(/.test(entrarFuente) &&
+    (terminalTs.match(/^entrarPagina\(\);/gm) || []).length === 1 &&
+    !/entrarPagina\(/.test(reiniciarFuente),
+);
+check(
+  'terminarAnimacion() quita .entrada y restaurar desde la caché (pageshow persisted) deja todo visible',
+  /classList\.remove\('arranque',\s*'entrada'\)/.test(terminalTs) &&
+    /addEventListener\('pageshow'[\s\S]*?persisted[\s\S]*?terminarAnimacion\(\)/.test(terminalTs),
+);
+check(
+  'el CSS de la entrada no declara transiciones propias: al quitar .entrada todo salta a su sitio sin parpadeo',
+  ![...terminalCss.matchAll(/([^{}@]+)\{([^{}]*)\}/g)].some(
+    (m) => /:root\.entrada/.test(m[1]) && /transition|animation/.test(m[2]),
+  ),
+);
+
+// T3 · Transición de sección
+check(
+  'terminal.css define el fundido breve del contenido al cambiar de sección',
+  /@keyframes cambio/.test(terminalCss) && /\.cambia/.test(terminalCss),
+);
+check(
+  'el indicador del workspace activo lo crea sidebar.ts y se desliza con transform',
+  /ws-indicador/.test(sidebarTs) && /\.ws-indicador[^{]*\{[^}]*transition:[^;]*transform/.test(sidebarCss),
+);
+check('la plantilla no trae el indicador: sin JavaScript no existe', !/ws-indicador/.test(html));
+const bloqueMovilSidebar = sidebarCss.slice(sidebarCss.indexOf('@media (max-width: 660px)'));
+check(
+  'la cortina móvil sigue sin animación y el indicador no se dibuja en ella',
+  !/\b(transition|animation)\s*:/.test(bloqueMovilSidebar) &&
+    /\.ws-indicador\s*\{[^}]*display:\s*none/.test(bloqueMovilSidebar),
+);
+
+// T4 · scroll suave que respeta prefers-reduced-motion
+check(
+  'ningún scroll suave incondicional: scrollIntoView consulta prefers-reduced-motion',
+  !/behavior:\s*'smooth'/.test(terminalTs) &&
+    /matchMedia\('\(prefers-reduced-motion:\s*reduce\)'\)/.test(terminalTs) &&
+    /behavior:\s*reducido\.matches\s*\?\s*'auto'\s*:\s*'smooth'/.test(terminalTs),
+);
+
+// Comunes
+check(
+  'la regla global de prefers-reduced-motion de tokens.css sigue apagando animaciones y transiciones',
+  /@media \(prefers-reduced-motion: reduce\)\s*\{[\s\S]*animation-duration:[\s\S]*transition-duration:/.test(
+    tokensCss,
+  ),
+);
+check(
+  'las duraciones del movimiento nuevo salen de tokens (--mov-*), no de números sueltos',
+  /--mov-fade:/.test(tokensCss) &&
+    /--mov-escalon:/.test(tokensCss) &&
+    /--mov-tipeo:/.test(tokensCss) &&
+    [terminalCss, sidebarCss]
+      .flatMap((c) => c.match(/\b(?:transition|animation):[^;]+;/g) || [])
+      .filter((d) => !/\bblink\b|:\s*none;/.test(d))
+      .every((d) => /var\(--mov-/.test(d)),
+);
+check(
+  'ni terminal.ts ni sidebar.ts escriben atributos style= (la CSP los bloquea): solo CSSOM',
+  [terminalTs, sidebarTs]
+    .map((ts) => ts.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    .every((ts) => !/setAttribute\(\s*'style'/.test(ts) && !/cssText/.test(ts) && !/style="/.test(ts)),
+);
+
+
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);

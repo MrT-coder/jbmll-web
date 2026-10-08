@@ -88,6 +88,16 @@
   --tracking-wide: 0.06em;
   --tracking-wider: 0.14em;
 
+  /* Movimiento: tranquilo, sin rebotes ni escalas. Los lee el CSS (duración de
+     transiciones y animaciones) y también terminal.ts, que con ellos programa
+     el escalonado: así el ritmo se afina en un solo lugar. La regla de
+     prefers-reduced-motion de abajo los apaga todos. */
+  --mov-fade: 200ms; /* fundido de una línea o de la pantalla */
+  --mov-escalon: 60ms; /* retardo entre línea y línea de una cascada */
+  --mov-arranque: 80ms; /* ritmo del arranque, algo más pausado */
+  --mov-tipeo: 25ms; /* por carácter del comando que se «escribe» */
+  --mov-deslizar: 220ms; /* el indicador de la barra lateral */
+
   /* Lo pisa visualViewport cuando sube el teclado: dvh no siempre lo refleja
      y la statusline queda tapada. Ver Terminal.astro. */
   --vh: 100dvh;

@@ -118,6 +118,168 @@ const recordar = (cmd: string) => {
   }
 };
 
+// ── Movimiento ─────────────────────────────────────────────────────────────
+// Todo es un añadido visual sobre un DOM que ya está completo: el texto de cada
+// línea (incluido el comando que se «escribe») está entero desde el primer
+// momento, porque #scroll es aria-live y animar el contenido letra por letra
+// haría que el lector de pantalla lo anunciara así. Lo único que cambia es qué
+// se ve (opacity, clip-path), y eso lo dicen las clases de terminal.css.
+
+const raiz = document.documentElement;
+
+/** Se consulta cada vez: la persona puede cambiar la preferencia con la página abierta. */
+const reducido = matchMedia('(prefers-reduced-motion: reduce)');
+
+/** Marca de «el arranque ya se animó en esta sesión». La lee arranque-gate.js. */
+const CLAVE_ARRANQUE = 'jbsh:arranque';
+
+/** Valor de un token de movimiento de tokens.css (en ms), para que el CSS y el
+ * escalonado de aquí no se desincronicen. */
+const mov = (token: string, defecto: number): number => {
+  const v = parseFloat(getComputedStyle(raiz).getPropertyValue(token));
+  return Number.isFinite(v) ? v : defecto;
+};
+
+/** Lo que dura como máximo la cascada de una salida, sea cual sea su tamaño. */
+const TOPE_CASCADA = 600;
+
+// Un solo planificador: todo temporizador de la animación pasa por programar(),
+// así terminarAnimacion() los cancela todos juntos. Sin esto, navegar dos veces
+// seguidas dejaría relojes de la pantalla anterior tocando nodos que ya no están.
+let relojes: number[] = [];
+
+const programar = (fn: () => void, ms: number) => {
+  relojes.push(window.setTimeout(fn, ms));
+};
+
+/**
+ * Corta la animación en curso y deja todo en su estado final y visible. Es
+ * idempotente: se llama al empezar cada navegación, al ejecutar un comando y
+ * al terminar la propia animación.
+ */
+function terminarAnimacion() {
+  for (const id of relojes) clearTimeout(id);
+  relojes = [];
+  raiz.classList.remove('arranque', 'entrada');
+  scroll.classList.remove('cambia');
+  for (const n of scroll.querySelectorAll('.entra, .escribiendo, .visto')) {
+    n.classList.remove('entra', 'escribiendo', 'visto');
+  }
+}
+
+/** Reinicia el fundido de la pantalla (quitar, forzar el cálculo, volver a poner). */
+function desvanecer() {
+  if (reducido.matches) return;
+  scroll.classList.remove('cambia');
+  void scroll.offsetWidth;
+  scroll.classList.add('cambia');
+}
+
+/**
+ * Primera visita de la sesión: las líneas del arranque, el `ok`, la ficha y el
+ * resto de la pantalla van apareciendo en ese orden. La decisión de animar ya
+ * la tomó arranque-gate.js (puso .arranque en <html> antes del primer
+ * pintado); acá solo se ejecuta, y se anota para que la próxima carga de la
+ * sesión no la repita.
+ */
+function arrancarAnimado() {
+  if (!raiz.classList.contains('arranque')) return;
+  if (reducido.matches) return terminarAnimacion();
+  try {
+    sessionStorage.setItem(CLAVE_ARRANQUE, '1');
+  } catch {
+    /* sin almacenamiento el guion previo ya habría decidido no animar */
+  }
+
+  const fade = mov('--mov-fade', 200);
+  const paso = mov('--mov-arranque', 80);
+  const escalon = mov('--mov-escalon', 60);
+  const mostrar = (n: Element, ms: number) => programar(() => n.classList.add('visto'), ms);
+
+  let t = 0;
+  for (const l of scroll.querySelectorAll('.boot .out')) {
+    mostrar(l, t);
+    t += paso;
+  }
+  // El `ok` se enciende cuando la última línea ya terminó de aparecer.
+  const ok = scroll.querySelector('.boot .ok');
+  t += fade - paso;
+  if (ok) mostrar(ok, t);
+  t += fade;
+  const ficha = scroll.querySelector('.fetch');
+  if (ficha) mostrar(ficha, t);
+  t += fade / 2;
+  // Lo demás —encabezado, comando, salida, prompt— entra en cascada corta.
+  for (const n of scroll.querySelectorAll(':scope > :not(.boot, .fetch)')) {
+    mostrar(n, t);
+    t += escalon;
+  }
+  programar(terminarAnimacion, t + fade);
+}
+
+/**
+ * La salida de un `cd`: el comando se escribe y, cuando termina, las entradas
+ * aparecen una a una. `entradas` ya está dentro de #scroll; aquí solo se ocultan
+ * para mostrarlas por turnos.
+ */
+function animarNavegacion(typed: HTMLElement, entradas: Element[]) {
+  const n = (typed.textContent ?? '').length;
+  typed.style.setProperty('--n', String(n));
+  typed.classList.add('escribiendo');
+  desvanecer();
+
+  const escalon = mov('--mov-escalon', 60);
+  const inicio = n * mov('--mov-tipeo', 25) + escalon;
+  const paso = Math.min(escalon, TOPE_CASCADA / Math.max(entradas.length, 1));
+  entradas.forEach((e, i) => {
+    e.classList.add('entra');
+    programar(() => e.classList.add('visto'), inicio + i * paso);
+  });
+  programar(terminarAnimacion, inicio + entradas.length * paso + mov('--mov-fade', 200));
+}
+
+/**
+ * Las entradas que se muestran en cascada en una página que el servidor
+ * entregó completa: las filas y paneles de #salida, los hijos de un artículo y
+ * los bloques de primer nivel del resto. No cada nodo pequeño: la cascada tiene
+ * que leerse como líneas que llegan, no como un temblor.
+ */
+function entradasDePagina(): Element[] {
+  const entradas: Element[] = [];
+  for (const hijo of scroll.children) {
+    if (hijo.matches('.done, .sp, .inputline, .boot, .fetch')) continue;
+    if (hijo.id === 'salida') {
+      const filas = [...hijo.querySelectorAll('.panels > *, tr')];
+      entradas.push(...(filas.length ? filas : hijo.children));
+    } else if (hijo.matches('article')) {
+      entradas.push(...hijo.children);
+    } else {
+      entradas.push(hijo);
+    }
+  }
+  return entradas;
+}
+
+/**
+ * El mismo `cd` de navegar(), para una página entregada por el servidor a la
+ * que se llegó desde dentro del sitio. arranque-gate.js ya ocultó el contenido
+ * antes del primer pintado (clase .entrada); acá se reparte el estado oculto
+ * fino y se quita la clase gruesa en el mismo turno.
+ */
+function entrarPagina() {
+  if (!raiz.classList.contains('entrada')) return;
+  const typed = scroll.querySelector<HTMLElement>('.done .typed');
+  if (reducido.matches || !typed) return terminarAnimacion();
+  animarNavegacion(typed, entradasDePagina());
+  raiz.classList.remove('entrada');
+}
+
+// Restaurada desde la caché de atrás/adelante, la página vuelve con su estado:
+// nada debe quedar oculto ni repetirse a medias.
+addEventListener('pageshow', (ev) => {
+  if (ev.persisted) terminarAnimacion();
+});
+
 // ── Prompt ─────────────────────────────────────────────────────────────────
 
 function prompt() {
@@ -191,12 +353,23 @@ function navegar(seccion: string, empujar = true): boolean {
   // anterior encima. El h1 se conserva —es el encabezado del documento, no
   // salida— y la línea del comando se repone para que la pantalla quede igual
   // que si el servidor la hubiera entregado así.
+  //
+  // Antes de tocar nada se corta la animación anterior: si la persona navega
+  // otra vez a mitad de una cascada, no quedan relojes ni nodos a medio mostrar.
+  terminarAnimacion();
   for (const nodo of [...scroll.children]) if (nodo !== nodoLead) nodo.remove();
   const comando = seccion ? `cd ${seccion}` : 'ls';
   const linea = el('div', 'out done');
-  linea.append(el('span', 'brain ok', BRAIN), el('span', 'typed', comando));
+  const typed = el('span', 'typed', comando);
+  linea.append(el('span', 'brain ok', BRAIN), typed);
   push(linea);
-  push(fragmento(seccion ? renderEntradas(indice.entradas[seccion] ?? []) : renderSecciones(indice.secciones)));
+  const salida = fragmento(seccion ? renderEntradas(indice.entradas[seccion] ?? []) : renderSecciones(indice.secciones));
+  // Las filas de la salida, para la cascada. Se toman antes de push(): al
+  // insertar el fragmento deja de tener hijos.
+  const entradas = [...salida.querySelectorAll('.panels > *, tr')];
+  if (!entradas.length) entradas.push(...salida.children);
+  push(salida);
+  if (!reducido.matches) animarNavegacion(typed, entradas);
 
   aqui = seccion;
   term.dataset.seccion = seccion;
@@ -354,7 +527,11 @@ function exec(raw: string): boolean {
  */
 function reiniciar(): boolean {
   if (location.pathname !== '/') return irFuera('/');
+  // Se restituye la pantalla tal como la entregó el servidor, ya visible: el
+  // arranque animado es solo de la primera carga, no de volver al inicio.
+  terminarAnimacion();
   scroll.innerHTML = pantallaInicial;
+  desvanecer();
   // El h1 vive dentro de #scroll, así que reemplazar el HTML lo sustituye por
   // otro nodo: sin volver a buscarlo, la referencia apuntaría a un elemento
   // que ya no está en la página y el encabezado dejaría de actualizarse.
@@ -371,6 +548,9 @@ function reiniciar(): boolean {
 function run() {
   const raw = input.value;
   const escribiendo = document.activeElement === input;
+  // Quien ejecuta algo no espera a que termine la animación anterior, y lo que
+  // este comando añada no debe quedar oculto detrás de ella.
+  terminarAnimacion();
   if (live) {
     live.node.querySelector('.caret')?.remove();
     live.node.querySelector('.tap-hint')?.remove();
@@ -515,7 +695,10 @@ document.addEventListener('click', (ev) => {
   }
   l.classList.add('typing');
   input.focus();
-  setTimeout(() => l.scrollIntoView({ block: 'end', behavior: 'smooth' }), 320);
+  setTimeout(
+    () => l.scrollIntoView({ block: 'end', behavior: reducido.matches ? 'auto' : 'smooth' }),
+    320,
+  );
 });
 
 /** Deja el comando escrito en el prompt vivo, como si se hubiera tecleado. */
@@ -615,6 +798,8 @@ if (stClock) {
 // ── Arranque ───────────────────────────────────────────────────────────────
 
 prompt();
+arrancarAnimado();
+entrarPagina();
 
 // De acá en adelante cada salida es consecuencia de algo que alguien hizo, así
 // que sí corresponde llevarlo a verla.

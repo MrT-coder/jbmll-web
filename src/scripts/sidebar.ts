@@ -130,6 +130,40 @@ function renderWorkspaces(actual: string, detalle: boolean) {
   });
 }
 
+// ── Indicador del workspace activo ───────────────────────────────────────
+// Una barra que se desliza de un workspace al siguiente cuando terminal.ts
+// navega sin recargar. La crea este script —sin JavaScript no existe, y queda
+// el fondo de .ws-actual— y solo se coloca por CSSOM (la CSP no admite
+// style=""): su posición y alto viajan en --ind-y / --ind-h y el movimiento es
+// una transición de transform (ver sidebar.css). En la cortina móvil no se
+// dibuja: ahí la barra vive en un display: none y no se anima a propósito.
+
+const indicador = document.createElement('span');
+indicador.className = 'ws-indicador';
+indicador.setAttribute('aria-hidden', 'true');
+nodoWorkspaces.append(indicador);
+
+const reducidoMov = matchMedia('(prefers-reduced-motion: reduce)');
+
+/** `animar` en falso coloca sin transición: la primera vez, o al cambiar el
+ * tamaño de la barra, el indicador no debe «llegar» desde donde estaba. */
+function colocarIndicador(animar: boolean) {
+  const activo = nodoWorkspaces.querySelector<HTMLElement>('a.ws-actual');
+  if (!activo || activo.offsetHeight === 0) {
+    indicador.classList.remove('visible');
+    return;
+  }
+  const conTransicion = animar && !reducidoMov.matches;
+  if (!conTransicion) indicador.classList.remove('lista');
+  indicador.style.setProperty('--ind-y', activo.offsetTop + 'px');
+  indicador.style.setProperty('--ind-h', activo.offsetHeight + 'px');
+  indicador.classList.add('visible');
+  if (!conTransicion) {
+    void indicador.offsetWidth;
+    indicador.classList.add('lista');
+  }
+}
+
 // ── Abiertos ──────────────────────────────────────────────────────────────
 
 const ETIQUETA_TIPO: Record<string, string> = {
@@ -229,6 +263,11 @@ function fusionarDocumentoActual(): Abierto[] {
 
 renderWorkspaces(nodoTerm.dataset.seccion ?? '', nodoTerm.dataset.detalle === '1');
 renderAbiertos(fusionarDocumentoActual());
+colocarIndicador(false);
+// La fuente (font-display: block) y el ancho de la ventana mueven las filas
+// después del primer cálculo: se recoloca sin animar.
+document.fonts?.ready.then(() => colocarIndicador(false));
+new ResizeObserver(() => colocarIndicador(false)).observe(nodoWorkspaces);
 
 // La navegación sin recarga entre workspaces (terminal.ts) actualiza
 // data-seccion y data-detalle en #term; esta barra los observa en vez de que
@@ -237,6 +276,7 @@ renderAbiertos(fusionarDocumentoActual());
 // «abiertos»: eso solo pasa una vez, al arrancar.
 new MutationObserver(() => {
   renderWorkspaces(nodoTerm.dataset.seccion ?? '', nodoTerm.dataset.detalle === '1');
+  colocarIndicador(true);
 }).observe(nodoTerm, { attributes: true, attributeFilter: ['data-seccion', 'data-detalle'] });
 
 // ── Cortina en móvil ─────────────────────────────────────────────────────
