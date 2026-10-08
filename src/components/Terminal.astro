@@ -402,6 +402,22 @@ const abiertosSsr = documento ? 1 : 0;
     .shell {
       flex-direction: column;
     }
+    /* Menos marco: menos aire sobre el contenido y el pie en un solo renglón (el
+       copyright se recorta con puntos suspensivos antes que partirse en dos). */
+    .term {
+      padding: var(--space-3) 0 var(--space-3);
+    }
+    .foot {
+      flex-wrap: nowrap;
+      gap: var(--space-4);
+      padding: var(--space-2) var(--space-4);
+    }
+    .foot > span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     /* El arranque en una sola línea cada una: en 393px las líneas se partían en
        dos renglones feos. El texto sigue entero en el DOM (es el mismo que lee un
        lector de pantalla); solo se recorta lo que se ve, con puntos suspensivos,

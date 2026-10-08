@@ -3399,6 +3399,55 @@ check(
   'con filas de 44px cada «cd» repetido y cada «cd » fantasma ocupa una pantalla',
 );
 
+console.log('\nTerminal en el teléfono: menos marco (M5)');
+// En un iPhone 15 el botón de menú, la statusline y el pie ocupaban ~116 px de
+// 659 (más la barra de teclas, que hace falta). A ≤660px el marco se aprieta:
+// menos relleno, el pie en una sola línea y menos aire arriba del contenido. No
+// se quita nada: el botón de menú, el enlace «saltar al contenido», la ruta y el
+// reloj siguen ahí.
+const primerToken = (valor) => (valor.trim().match(/^var\(--space-\d+\)/) || [''])[0];
+const sidebarMovil = bloqueQuiebre(sidebarCss, '@media (max-width: 660px)');
+const reglaAlterna = reglaMovil(sidebarMovil, ':root.js .sidebar-alterna');
+const margenAlterna = (reglaAlterna.match(/margin:\s*([^;]+);/) || [])[1] || '';
+const rellenoAlterna = (reglaAlterna.match(/padding:\s*([^;]+);/) || [])[1] || '';
+const pasoEspacio = (tk) => Number((tk.match(/--space-(\d+)/) || [])[1] || 99);
+check(
+  'el botón de menú es más bajo a ≤660px: margen y relleno verticales de --space-2 o menos',
+  pasoEspacio(primerToken(margenAlterna)) <= 2 && pasoEspacio(primerToken(rellenoAlterna)) <= 2,
+  `margin: ${margenAlterna || '—'} · padding: ${rellenoAlterna || '—'}`,
+);
+const statuslineCss = (
+  readFileSync('src/components/Statusline.astro', 'utf8').match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? ''
+).replace(/\/\*[\s\S]*?\*\//g, '');
+const statusMovil = bloqueQuiebre(statuslineCss, '@media (max-width: 660px)');
+const rellenoStatus = (reglaMovil(statusMovil.replace(/\s+/g, ' '), '.status .mode, .status .seg').match(/padding:\s*([^;]+);/) || [])[1] || '';
+check(
+  'la statusline es más baja a ≤660px: relleno vertical de --space-1',
+  pasoEspacio(primerToken(rellenoStatus)) <= 1,
+  rellenoStatus || '(sin regla .status .mode, .status .seg en el @media móvil)',
+);
+const footMovil = reglaMovil(movilAstro, '.foot');
+const rellenoFoot = (footMovil.match(/padding:\s*([^;]+);/) || [])[1] || '';
+check(
+  'el pie va en una sola línea a ≤660px, con relleno vertical de --space-2 o menos',
+  /flex-wrap:\s*nowrap/.test(footMovil) && pasoEspacio(primerToken(rellenoFoot)) <= 2,
+  footMovil.replace(/\s+/g, ' ') || '(sin regla .foot en el @media móvil)',
+);
+const termMovil = reglaMovil(movilAstro, '.term');
+check(
+  'hay menos aire sobre el contenido a ≤660px (relleno superior de .term ≤ --space-3)',
+  pasoEspacio(primerToken((termMovil.match(/padding:\s*([^;]+);/) || [])[1] || '')) <= 3,
+  termMovil.replace(/\s+/g, ' ') || '(sin regla .term en el @media móvil)',
+);
+check(
+  'no se pierde nada: sigue el botón de menú, el enlace de salto, la ruta y el reloj',
+  /class="saltar"/.test(html) &&
+    /class="sidebar-alterna"/.test(html) &&
+    /id="st-path"/.test(html) &&
+    /id="st-clock"/.test(html) &&
+    /class="foot"/.test(html),
+);
+
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);
