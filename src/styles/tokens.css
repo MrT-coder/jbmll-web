@@ -86,6 +86,10 @@
   --text-lg: clamp(1.15em, 2.4vw, 1.45em);
   --text-xl: 1.5em;
   --text-2xl: 2em;
+  /* Letra del campo de escritura en táctil: iOS Safari hace zoom en todo campo
+     de menos de 16px al enfocarlo. Es un mínimo del sistema, no un tamaño de
+     diseño, por eso no sale de la escala de arriba. */
+  --text-input: 1rem;
   --lh-tight: 1.25;
   --lh-snug: 1.45;
   --lh-loose: 1.85;

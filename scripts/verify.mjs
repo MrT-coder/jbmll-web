@@ -3176,6 +3176,66 @@ check(
   /\['c',\s*'[^']*inicio[^']*'\]/.test(terminalTs),
 );
 
+console.log('\nTerminal en el teléfono: campo de escritura (M1)');
+// El dueño escribía «hola» en su teléfono y salía «aloh»: el <input> real estaba
+// fuera de pantalla (8×6 px, en <body>) y la línea visible era un espejo. En
+// táctil el campo es el de verdad, dentro de la línea del prompt. Comprobaciones
+// estructurales sobre el fuente: aquí no corre ningún navegador; el
+// comportamiento se vio con playwright-cli (ver odd/tasks/terminal-movil.md) y
+// el fallo del IME real solo se descarta con un teléfono de verdad.
+const promptFuente = (terminalTs.match(/function prompt\(\) \{([\s\S]*?)\n\}/) || [])[1] || '';
+const pxDe = (valor) => {
+  const m = String(valor).trim().match(/^([\d.]+)(px|rem)$/);
+  return m ? Number(m[1]) * (m[2] === 'rem' ? 16 : 1) : 0;
+};
+const textoInput = (tokensCss.match(/--text-input:\s*([^;]+);/) || [])[1] || '';
+check(
+  'el campo táctil usa una letra de 16 px o más (--text-input): menos hace zoom en iOS',
+  pxDe(textoInput) >= 16,
+  textoInput || '(sin --text-input en tokens.css)',
+);
+const reglaVivo = (terminalCss.match(/\.entry-vivo\s*\{([^}]*)\}/) || [])[1] || '';
+check(
+  '.entry-vivo se ve como la terminal: transparente, sin borde, hereda la fuente y usa --text-input',
+  reglaVivo !== '' &&
+    /background:\s*transparent/.test(reglaVivo) &&
+    /border:\s*0/.test(reglaVivo) &&
+    /font:\s*inherit/.test(reglaVivo) &&
+    /font-size:\s*var\(--text-input\)/.test(reglaVivo) &&
+    /color:\s*inherit/.test(reglaVivo) &&
+    /caret-color:\s*var\(--/.test(reglaVivo),
+  reglaVivo.replace(/\s+/g, ' ') || '(sin regla .entry-vivo)',
+);
+check(
+  '.entry-vivo no se saca de pantalla (sin left negativo, sin tamaño de 1px)',
+  reglaVivo !== '' && !/left:\s*-|width:\s*1px|height:\s*1px|position:\s*absolute/.test(reglaVivo),
+);
+check(
+  'en táctil el campo real vive dentro de la línea del prompt, no en <body>',
+  /input = el\('input',\s*TOUCH \? 'entry-vivo' : 'entry'\)/.test(terminalTs) &&
+    /if \(!TOUCH\) document\.body\.append\(input\)/.test(terminalTs) &&
+    /if \(TOUCH\)[\s\S]*?\.append\([\s\S]*?\binput\b\s*\)/.test(promptFuente),
+  'sin esto vuelve el espejo fuera de pantalla que invertía el texto',
+);
+check(
+  'el campo pide teclado de comandos: inputmode, enterkeyhint=go, sin mayúscula ni autocorrección',
+  /setAttribute\('inputmode',\s*'text'\)/.test(terminalTs) &&
+    /setAttribute\('enterkeyhint',\s*'go'\)/.test(terminalTs) &&
+    /setAttribute\('autocapitalize',\s*'off'\)/.test(terminalTs) &&
+    /setAttribute\('autocorrect',\s*'off'\)/.test(terminalTs),
+);
+check(
+  'la composición del IME no se pisa: compositionstart/end y Enter ignorado mientras compone',
+  /addEventListener\('compositionstart'/.test(terminalTs) &&
+    /addEventListener\('compositionend'/.test(terminalTs) &&
+    /ev\.isComposing/.test(terminalTs),
+  'reescribir input.value a mitad de una composición descoloca el cursor',
+);
+check(
+  'terminal.css distingue el campo vivo (.entry-vivo) del campo oculto de escritorio (.entry)',
+  /\.entry\s*\{[^}]*left:\s*-9999px/.test(terminalCss) && reglaVivo !== '',
+);
+
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);

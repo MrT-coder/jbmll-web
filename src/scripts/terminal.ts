@@ -76,11 +76,30 @@ const line = (cls: string, txt: string) => push(el('div', 'out ' + cls, txt));
 // lee entera sin escribir nada. Solo lo levanta tocar el prompt.
 const TOUCH = matchMedia('(hover: none) and (pointer: coarse)').matches;
 
-const input = el('input', 'entry');
+// En escritorio el campo real queda fuera de pantalla y la línea visible es un
+// espejo que dibuja el prompt de starship (.entry, sincronizar()). En táctil no:
+// ese campo de 8×6 px agregado a <body> descolocaba el cursor en algunos
+// teclados reales y «hola» salía «aloh». Allí el campo es el de verdad, dentro
+// de la línea (.entry-vivo en terminal.css, con letra de --text-input para que
+// iOS no haga zoom): prompt() lo mueve a la línea viva en cada pantalla nueva.
+const input = el('input', TOUCH ? 'entry-vivo' : 'entry');
 input.setAttribute('aria-label', 'Línea de comandos');
+input.type = 'text';
 input.autocomplete = 'off';
 input.spellcheck = false;
-document.body.append(input);
+// Un campo de comandos no es un campo de texto corriente: sin mayúscula
+// inicial, sin autocorrección, con «ir» en la tecla Enter del teléfono.
+input.setAttribute('inputmode', 'text');
+input.setAttribute('enterkeyhint', 'go');
+input.setAttribute('autocapitalize', 'off');
+input.setAttribute('autocorrect', 'off');
+if (TOUCH) input.placeholder = 'toque aquí para escribir';
+if (!TOUCH) document.body.append(input);
+
+/** True entre compositionstart y compositionend (teclados con predicción o IME). */
+let componiendo = false;
+input.addEventListener('compositionstart', () => (componiendo = true));
+input.addEventListener('compositionend', () => (componiendo = false));
 
 interface Live {
   node: HTMLElement;
@@ -282,15 +301,24 @@ addEventListener('pageshow', (ev) => {
 
 function prompt() {
   const l = el('div', 'out inputline');
-  l.append(
-    el('span', 'brain ' + (ok ? 'ok' : 'err'), BRAIN),
-    el('span', 'typed', ''),
-    el('span', 'caret'),
-    el('span', 'tap-hint', 'toque aquí para escribir'),
-  );
+  const brain = el('span', 'brain ' + (ok ? 'ok' : 'err'), BRAIN);
+  if (TOUCH) {
+    // El campo real ocupa el lugar del texto y del cursor. .typed sigue
+    // existiendo, oculto, porque run() deja ahí el comando ejecutado.
+    l.classList.add('vivo');
+    l.append(brain, el('span', 'typed', ''), input);
+  } else {
+    l.append(
+      brain,
+      el('span', 'typed', ''),
+      el('span', 'caret'),
+      el('span', 'tap-hint', 'toque aquí para escribir'),
+    );
+  }
   push(l);
   const typed = l.querySelector<HTMLElement>('.typed');
   live = typed ? { node: l, typed } : null;
+  componiendo = false;
   input.value = '';
   cerrarListView();
   if (!TOUCH) input.focus({ preventScroll: true });
@@ -559,6 +587,9 @@ function run() {
   if (live) {
     live.node.querySelector('.caret')?.remove();
     live.node.querySelector('.tap-hint')?.remove();
+    // La línea deja de ser la viva: el comando ejecutado vuelve a verse en
+    // .typed y el campo (que prompt() muda a la línea nueva) se oculta aquí.
+    live.node.classList.remove('vivo');
     live.typed.textContent = raw;
     live = null;
   }
@@ -660,6 +691,10 @@ input.addEventListener('input', () => {
 });
 
 input.addEventListener('keydown', (ev) => {
+  // Mientras un teclado compone (predicción, IME), Enter confirma la palabra y
+  // no es «ejecutar»; el código 229 es como lo reportan los navegadores que no
+  // llenan isComposing.
+  if (ev.isComposing || ev.keyCode === 229) return;
   if (ev.key === 'Enter') {
     ev.preventDefault();
     run();
@@ -782,6 +817,7 @@ function escribirComando(cmd: string) {
   if (!live) return;
   live.node.querySelector('.caret')?.remove();
   live.node.querySelector('.tap-hint')?.remove();
+  live.node.classList.remove('vivo');
   live.typed.textContent = cmd;
   live = null;
   recordar(cmd);

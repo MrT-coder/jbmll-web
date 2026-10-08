@@ -110,6 +110,50 @@
   opacity: 0;
 }
 
+/* El campo real de las pantallas táctiles (terminal.ts: TOUCH). No se esconde:
+   es la línea de comandos, con el aspecto de la terminal —transparente, sin
+   caja, la fuente y el color de la línea— y la letra de --text-input para que
+   iOS no haga zoom al enfocarlo. El cursor lo dibuja el navegador, en --gold,
+   que es el color del cursor de escritorio (.caret). */
+.entry-vivo {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-input);
+  caret-color: var(--gold);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.entry-vivo::placeholder {
+  color: var(--dim);
+  opacity: 1;
+}
+/* El foco se ve en la línea entera (el contorno de un campo sin caja sería un
+   rectángulo suelto en mitad del prompt). */
+.entry-vivo:focus-visible {
+  outline: 0;
+}
+.inputline.vivo:focus-within {
+  border-color: var(--blue);
+}
+/* Fuera de su línea viva (ya ejecutada) el campo no pinta nada: prompt() lo
+   muda a la siguiente. */
+.inputline:not(.vivo) .entry-vivo {
+  display: none;
+}
+.inputline.vivo .typed {
+  display: none;
+}
+.inputline.vivo {
+  font-size: var(--text-input);
+}
+
 @media (max-width: 660px) {
   .list td {
     padding-right: var(--space-5);
