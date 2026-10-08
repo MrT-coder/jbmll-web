@@ -3312,6 +3312,54 @@ check(
   reglaTecla !== '' && !/#[0-9a-fA-F]{3,8}\b|rgba?\(/.test([reglaTeclas, reglaCmds, reglaTecla].join('\n')),
 );
 
+console.log('\nTerminal en el teléfono: primera pantalla compacta (M3)');
+// A 393 px de ancho las líneas del arranque se partían en dos renglones, la
+// foto ocupaba 192 px de alto sola y la presentación, el `ls` y el prompt
+// quedaban bajo el pliegue. A ≤660 px el arranque se recorta con puntos
+// suspensivos (el texto sigue entero en el DOM: solo cambia lo que se ve) y la
+// foto va al lado de los datos. Escritorio no cambia: todo vive dentro del
+// único @media del punto de quiebre.
+const bloqueQuiebre = (css, consulta) => {
+  const i = css.indexOf(consulta);
+  if (i === -1) return '';
+  let prof = 0;
+  for (let k = css.indexOf('{', i); k < css.length; k++) {
+    if (css[k] === '{') prof++;
+    if (css[k] === '}' && --prof === 0) return css.slice(css.indexOf('{', i) + 1, k);
+  }
+  return '';
+};
+const movilAstro = bloqueQuiebre(terminalAstroCss, '@media (max-width: 660px)');
+const reglaMovil = (css, sel) =>
+  (css.match(new RegExp('(?:^|\\n|\\})\\s*' + escRegex(sel) + '\\s*\\{([^}]*)\\}')) || [])[1] || '';
+const bootMovil = reglaMovil(movilAstro, '.boot .out');
+check(
+  'a ≤660px las líneas del arranque no se parten: una sola línea con puntos suspensivos',
+  /white-space:\s*nowrap/.test(bootMovil) && /overflow:\s*hidden/.test(bootMovil) && /text-overflow:\s*ellipsis/.test(bootMovil),
+  bootMovil.replace(/\s+/g, ' ') || '(sin regla .boot .out en el @media móvil)',
+);
+check(
+  'a ≤660px el arranque baja un paso de letra (--text-xs) para que quepa más de cada línea',
+  /font-size:\s*var\(--text-xs\)/.test(reglaMovil(movilAstro, '.boot')),
+);
+const fetchMovil = reglaMovil(movilAstro, '.fetch:has(> .foto)');
+const fotoMovil = reglaMovil(movilAstro, '.foto');
+const anchoFotoMovil = Number((fotoMovil.match(/max-width:\s*(\d+)ch/) || [])[1] || 99);
+check(
+  'a ≤660px la foto va al lado de los datos, no encima',
+  /flex-direction:\s*row/.test(fetchMovil) && /flex-wrap:\s*nowrap/.test(fetchMovil),
+  fetchMovil.replace(/\s+/g, ' ') || '(sin regla .fetch:has(> .foto) en el @media móvil)',
+);
+check(
+  'a ≤660px la foto es pequeña (≤12ch) y los datos pueden encogerse (min-width: 0)',
+  anchoFotoMovil <= 12 && /min-width:\s*0/.test(reglaMovil(movilAstro, '.info')),
+  `max-width de la foto: ${anchoFotoMovil}ch`,
+);
+check(
+  'el banner ASCII (sin foto) conserva la columna a ≤660px',
+  /flex-direction:\s*column/.test(reglaMovil(movilAstro, '.fetch')),
+);
+
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);
