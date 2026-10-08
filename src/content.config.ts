@@ -237,7 +237,15 @@ const perfil = defineCollection({
         z.object({
           etiqueta: z.string().min(1, 'La etiqueta no puede quedar vacía'),
           href: z.url(),
-          divulgacion: z.string().min(1, 'La divulgación de la comisión es obligatoria'),
+          // Una marca corta (`afiliado`) y no una frase: se dibuja junto al
+          // enlace, en su misma fila. El tope impide que vuelva a ser un
+          // párrafo sin que nadie lo note; trim() para que un espacio no
+          // cuente como divulgación.
+          divulgacion: z
+            .string()
+            .trim()
+            .min(1, 'La marca de afiliado es obligatoria')
+            .max(24, 'La marca de afiliado debe ser corta (24 caracteres como máximo)'),
         }),
       ),
     ),

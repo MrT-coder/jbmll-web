@@ -3027,6 +3027,62 @@ check(
     .every((ts) => !/setAttribute\(\s*'style'/.test(ts) && !/cssText/.test(ts) && !/style="/.test(ts)),
 );
 
+console.log('\nEnlace de distribuidor: marca de afiliado');
+// La divulgación de la comisión es obligatoria, pero ya no es un párrafo: es
+// una marca corta en la misma fila que el enlace. Se deriva de perfil.yaml,
+// no de un literal escrito acá.
+const distribuidorYaml = perfilYamlData.distribuidor;
+const configContenidoDist = readFileSync('src/content.config.ts', 'utf8');
+// El campo ocupa varias líneas (z.string().trim().min().max()): se lee hasta el
+// cierre de la coma que lo termina, sin comentarios de por medio.
+const lineaDivulgacion = (configContenidoDist.match(/divulgacion: z[\s\S]*?\)\s*,\s*\n/) ?? [''])[0].replace(/\s+/g, ' ');
+check(
+  'el esquema sigue exigiendo la divulgación y ahora la limita a una marca corta',
+  /\.min\(1,/.test(lineaDivulgacion) && /\.max\(\d+,/.test(lineaDivulgacion),
+  lineaDivulgacion.trim(),
+);
+const topeMarca = Number((lineaDivulgacion.match(/\.max\((\d+),/) || [])[1] ?? 0);
+if (!distribuidorYaml?.href) {
+  skip('la marca de afiliado en /contacto y /sobre-mi', 'perfil.yaml no declara distribuidor en este build');
+} else {
+  const marca = String(distribuidorYaml.divulgacion ?? '');
+  check(
+    'la divulgación de perfil.yaml es una marca corta, no una frase',
+    marca.length > 0 && topeMarca > 0 && marca.length <= topeMarca,
+    `${marca.length} caracteres, tope ${topeMarca}`,
+  );
+  const escapar = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const pagina of ['contacto.html', 'sobre-mi.html']) {
+    const doc = leer(pagina);
+    const ancla = doc.match(new RegExp(String.raw`<a\b[^>]*href="${escapar(distribuidorYaml.href)}"[^>]*>`))?.[0] ?? '';
+    const rels = ancla.match(/\srel="([^"]*)"/g) || [];
+    const relValores = (ancla.match(/\srel="([^"]*)"/)?.[1] ?? '').split(/\s+/);
+    check(
+      `${pagina}: el enlace de distribuidor lleva sponsored y noopener en un solo rel`,
+      rels.length === 1 && relValores.includes('sponsored') && relValores.includes('noopener'),
+      ancla,
+    );
+    const idMarca = ancla.match(/aria-describedby="([^"]+)"/)?.[1];
+    const desdeAncla = doc.slice(doc.indexOf(ancla));
+    const fila = desdeAncla.slice(0, desdeAncla.search(/<\/tr>|<\/p>/));
+    check(
+      `${pagina}: la marca está en la misma fila que el enlace y el enlace la tiene como descripción`,
+      Boolean(idMarca) &&
+        new RegExp(String.raw`<span[^>]*\sid="${escapar(idMarca ?? '')}"[^>]*>\s*${escapar(marca)}\s*</span>`).test(fila),
+      idMarca ? `aria-describedby="${idMarca}"` : 'sin aria-describedby',
+    );
+    check(
+      `${pagina}: no queda un párrafo de divulgación aparte`,
+      !new RegExp(`<p[^>]*>[^<]*${escapar(marca)}[^<]*</p>`).test(doc),
+    );
+  }
+  const hintCms = readFileSync('public/admin/config.yml', 'utf8').match(/name:\s*divulgacion[\s\S]{0,400}/)?.[0] ?? '';
+  check(
+    'el panel presenta la divulgación como una marca corta y obligatoria, con su indicación',
+    /label:[^\n]*marca/i.test(hintCms) && /hint:/.test(hintCms),
+    hintCms.split('\n').slice(0, 6).join(' | '),
+  );
+}
 
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';

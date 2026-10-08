@@ -30,8 +30,10 @@ perfil:
   # Enlace de distribuidor (afiliado), no un medio de contacto: por eso vive
   # aparte y no junto a correo/teléfono/github/linkedin/orcid de arriba. Ver
   # `distribuidor` en src/content.config.ts. Opcional: en blanco, ni
-  # /contacto ni /sobre-mi muestran nada.
+  # /contacto ni /sobre-mi muestran nada. `divulgacion` es una marca corta
+  # (máximo 24 caracteres) que se dibuja junto al enlace; es obligatoria si
+  # hay URL.
   distribuidor:
     etiqueta: firmas electrónicas
     href: https://ezsignec.com/r/8wxxqx9rbd
-    divulgacion: 'Enlace de distribuidor: cada venta hecha desde aquí deja una comisión a quien mantiene este sitio.'
+    divulgacion: afiliado

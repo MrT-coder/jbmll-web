@@ -36,6 +36,15 @@
 .list td.n {
   color: var(--blue);
 }
+/* La marca de afiliado junto al enlace de distribuidor (contacto.astro y
+   sobre-mi.astro): discreta, en --dim (4.5:1 sobre --bg) y un paso menor que el
+   texto. Sin ámbito porque la usan dos páginas. */
+.marca-afiliado {
+  margin-left: var(--space-3);
+  color: var(--dim);
+  font-size: var(--text-sm);
+}
+
 .list td.d {
   color: var(--muted);
   /* linkedin.com/in/<usuario> mide ~58 caracteres: sin esto no rompe línea y

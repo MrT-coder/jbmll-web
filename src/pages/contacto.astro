@@ -34,20 +34,32 @@ const { titulo, lead } = await seccionDe('contacto');
                   {/* Sin rel="me": ese atributo declara que el perfil del otro
                      extremo es el mismo de aquí (ver renderContacto()), y este
                      enlace no es una identidad propia, es un enlace de
-                     distribuidor con comisión — de ahí también la divulgación
-                     de la línea de abajo. target/rel y el anuncio de pestaña
-                     nueva salen de propsExterno()/MARCA_EXTERNA en
-                     src/lib/render.ts, la misma decisión que ya usa
-                     renderContacto(): no se repiten a mano. */}
-                  <a class="go" href={perfil.distribuidor.href} {...propsExterno(perfil.distribuidor.href)}>
+                     distribuidor con comisión. En su lugar lleva
+                     rel="sponsored" (la indicación de Google para enlaces de
+                     afiliado), que propsExterno() fusiona con noopener en un
+                     solo rel. target/rel y el anuncio de pestaña nueva salen
+                     de propsExterno()/MARCA_EXTERNA en src/lib/render.ts, la
+                     misma decisión que ya usa renderContacto(): no se repiten
+                     a mano.
+
+                     La divulgación ya no es un párrafo: es una marca corta
+                     (perfil.distribuidor.divulgacion) en esta misma fila.
+                     aria-describedby la asocia al enlace, así que el lector de
+                     pantalla la anuncia junto a él y no solo se ve. */}
+                  <a
+                    class="go"
+                    href={perfil.distribuidor.href}
+                    aria-describedby="marca-distribuidor"
+                    {...propsExterno(perfil.distribuidor.href, 'sponsored')}
+                  >
                     {perfil.distribuidor.href.replace(/^https?:\/\//, '')}
                     <Fragment set:html={MARCA_EXTERNA} />
                   </a>
+                  <span class="marca-afiliado" id="marca-distribuidor">{perfil.distribuidor.divulgacion}</span>
                 </td>
               </tr>
             </tbody>
           </table>
-          <p class="out note">{perfil.distribuidor.divulgacion}</p>
         </>
       )
     }

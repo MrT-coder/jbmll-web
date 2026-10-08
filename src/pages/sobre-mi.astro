@@ -48,9 +48,10 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
       {Prosa && <div class="prose intro"><Prosa /></div>}
       {
         // Una sola línea, no un bloque propio: la ficha completa (etiqueta +
-        // enlace + divulgación) ya vive en /contacto — ver `distribuidor` en
-        // src/content.config.ts y src/pages/contacto.astro. Acá alcanza con
-        // mencionarlo sin repetir la tabla.
+        // enlace + marca de afiliado) ya vive en /contacto — ver
+        // `distribuidor` en src/content.config.ts y src/pages/contacto.astro.
+        // Acá alcanza con mencionarlo sin repetir la tabla; la marca va en la
+        // misma línea que el enlace y se asocia a él con aria-describedby.
         perfil.distribuidor && (
           <p class="out note">
             # {perfil.distribuidor.etiqueta}:{' '}
@@ -58,12 +59,16 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
                propsExterno()/MARCA_EXTERNA en src/lib/render.ts, la misma
                decisión que usa la ficha completa en /contacto: no se repiten
                a mano. */}
-            <a class="go" href={perfil.distribuidor.href} {...propsExterno(perfil.distribuidor.href)}>
+            <a
+              class="go"
+              href={perfil.distribuidor.href}
+              aria-describedby="marca-distribuidor"
+              {...propsExterno(perfil.distribuidor.href, 'sponsored')}
+            >
               {perfil.distribuidor.href.replace(/^https?:\/\//, '')}
               <Fragment set:html={MARCA_EXTERNA} />
             </a>
-            {' — '}
-            {perfil.distribuidor.divulgacion}
+            <span class="marca-afiliado" id="marca-distribuidor">{perfil.distribuidor.divulgacion}</span>
           </p>
         )
       }
