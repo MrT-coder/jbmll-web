@@ -3360,6 +3360,45 @@ check(
   /flex-direction:\s*column/.test(reglaMovil(movilAstro, '.fetch')),
 );
 
+console.log('\nTerminal en el teléfono: objetivos táctiles (M4)');
+// WCAG 2.5.8 (AA) pide 24 px como mínimo; 44 px es lo que recomienda 2.5.5 y lo
+// que un pulgar acierta sin zoom. Las filas del ListView (.lv-i) medían ~25 px
+// y las teclas de la barra, 35 px. --toque es el mínimo del sistema para
+// cualquier cosa que se toque.
+const toqueToken = (tokensCss.match(/--toque:\s*([^;]+);/) || [])[1] || '';
+check(
+  '--toque existe y vale al menos 44 px',
+  pxDe(toqueToken) >= 44,
+  toqueToken || '(sin --toque en tokens.css)',
+);
+const bloqueTactil = (css) =>
+  [...css.matchAll(/@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*\{/g)]
+    .map((m) => bloqueQuiebre(css.slice(m.index), '@media'))
+    .join('\n');
+const tactilTerminal = bloqueTactil(terminalCss);
+const reglaLvTactil = reglaMovil(tactilTerminal, '.lv-i');
+check(
+  'las filas del ListView (.lv-i) miden al menos --toque de alto en táctil, con el texto centrado',
+  /min-height:\s*var\(--toque\)/.test(reglaLvTactil) && /display:\s*flex/.test(reglaLvTactil) && /align-items:\s*center/.test(reglaLvTactil),
+  reglaLvTactil.replace(/\s+/g, ' ') || '(sin regla .lv-i bajo (hover: none) and (pointer: coarse))',
+);
+check(
+  'las teclas y los comandos de la barra miden al menos --toque, y las teclas fijas también de ancho',
+  /min-height:\s*var\(--toque\)/.test(reglaTecla) &&
+    /min-width:\s*var\(--toque\)/.test((terminalCss.match(/\.tecla-fija\s*\{([^}]*)\}/) || [])[1] || ''),
+);
+check(
+  'las teclas centran su texto (con min-height ya no lo da el relleno)',
+  /display:\s*inline-flex|display:\s*flex/.test(reglaTecla) && /align-items:\s*center/.test(reglaTecla) && /justify-content:\s*center/.test(reglaTecla),
+);
+
+const completablesFuente = (terminalTs.match(/const completables = \(\): string\[\] => \{([\s\S]*?)\n\};/) || [])[1] || '';
+check(
+  'las sugerencias no repiten comandos ni incluyen la sección vacía (el enlace de la marca)',
+  /new Set\(/.test(completablesFuente) && /SECCIONES\.filter\(Boolean\)/.test(completablesFuente),
+  'con filas de 44px cada «cd» repetido y cada «cd » fantasma ocupa una pantalla',
+);
+
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);

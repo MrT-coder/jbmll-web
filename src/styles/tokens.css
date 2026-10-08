@@ -73,6 +73,10 @@
   --space-9: 4rem; /* 64px */
   --space-10: 5rem; /* 80px */
 
+  /* Lo mínimo que mide algo que se toca con el dedo. WCAG 2.5.8 (AA) exige 24px;
+     44px es lo que recomienda 2.5.5 y lo que un pulgar acierta sin zoom. */
+  --toque: 2.75rem; /* 44px */
+
   --fs: clamp(13px, 1.55vw, 14.5px);
   --lh: 1.65;
 

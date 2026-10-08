@@ -338,13 +338,21 @@ const HELP: [string, string][] = [
   ['help', 'Esto'],
 ];
 
-/** Todo lo que se puede completar con Tab, en el contexto actual. */
-const completables = (): string[] => [
-  ...HELP.map(([c]) => c.split(' ')[0]),
-  ...SECCIONES,
-  ...SECCIONES.map((s) => 'cd ' + s),
-  ...(indice?.entradas[aqui] ?? []).map((f) => 'cat ' + f.slug),
-];
+// Todo lo que se puede completar con Tab, en el contexto actual. Sin repetidos y
+// sin la sección vacía: HELP repite `cd`, `contacto` ya es una sección y el
+// enlace de la marca entra en SECCIONES como cadena vacía (daba un «cd »
+// fantasma). En una lista de filas de 44px en el teléfono, cada una se nota.
+const completables = (): string[] => {
+  const secciones = SECCIONES.filter(Boolean);
+  return [
+    ...new Set([
+      ...HELP.map(([c]) => c.split(' ')[0]),
+      ...secciones,
+      ...secciones.map((s) => 'cd ' + s),
+      ...(indice?.entradas[aqui] ?? []).map((f) => 'cat ' + f.slug),
+    ]),
+  ];
+};
 
 /**
  * Navegación sin recarga. La URL cambia de verdad: quien comparte el enlace

@@ -189,6 +189,12 @@
   .list td {
     padding-top: var(--space-3);
     padding-bottom: var(--space-3);
+  }  /* Una fila de sugerencias es un botón para el dedo: con el relleno de
+     escritorio medía ~25px. */
+  .lv-i {
+    display: flex;
+    align-items: center;
+    min-height: var(--toque);
   }
 }
 
@@ -222,7 +228,11 @@
 }
 .tecla {
   flex: 0 0 auto;
-  padding: var(--space-3) var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--toque);
+  padding: 0 var(--space-4);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -233,6 +243,10 @@
   cursor: pointer;
   /* Sin el retardo ni el zoom de doble toque: son teclas, se tocan seguido. */
   touch-action: manipulation;
+}
+.tecla-fija {
+  min-width: var(--toque);
+  padding: 0 var(--space-3);
 }
 .tecla-cmd {
   color: var(--blue);
