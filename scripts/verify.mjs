@@ -2838,30 +2838,40 @@ console.log('\nAnimaciones de la terminal');
 const rutaGateArranque = 'src/scripts/arranque-gate.js';
 const gateArranque = existsSync(rutaGateArranque) ? readFileSync(rutaGateArranque, 'utf8') : '';
 const terminalCss = readFileSync('src/styles/terminal.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-const claveArranque = (gateArranque.match(/'(jbsh:[\w-]+)'/) || [])[1];
 const reiniciarFuente = (terminalTs.match(/function reiniciar\(\): boolean \{([\s\S]*?)\n\}/) || [])[1] || '';
 const runFuente = (terminalTs.match(/function run\(\) \{([\s\S]*?)\n\}/) || [])[1] || '';
 
-// T1 · Arranque de la primera visita
+// T1 · Arranque del inicio (cada vez que se muestra; T8 quitó el límite de una vez por sesión)
 check(
   'el arranque tiene un guion previo al primer pintado, separado del módulo',
   existsSync(rutaGateArranque),
   'sin él, el contenido se vería, desaparecería y recién entonces se animaría',
 );
 check(
-  'el guion previo no anima con prefers-reduced-motion ni sin almacenamiento',
-  /prefers-reduced-motion:\s*reduce/.test(gateArranque) &&
-    /try\s*\{[\s\S]*sessionStorage\.getItem[\s\S]*\}\s*catch/.test(gateArranque),
+  'el guion previo no anima con prefers-reduced-motion y tolera que matchMedia lance',
+  /prefers-reduced-motion:\s*reduce/.test(gateArranque) && /try\s*\{[\s\S]*matchMedia[\s\S]*\}\s*catch/.test(gateArranque),
 );
 check(
   'el guion previo tiene un plazo: si el módulo no corre, el contenido reaparece',
   /setTimeout\(/.test(gateArranque) && /classList\.remove\(clase\)/.test(gateArranque) && /clase = 'arranque'/.test(gateArranque),
 );
+// El arranque se reproduce cada vez que se muestra el inicio (decisión del
+// dueño, 2026-10-07, que revirtió el «solo la primera visita de la sesión»):
+// nada lo recuerda, ni el guion previo ni terminal.ts.
 check(
-  'la marca de «ya visto» se escribe en terminal.ts con la misma clave que lee el guion previo',
-  claveArranque !== undefined &&
-    terminalTs.includes(`'${claveArranque}'`) &&
-    /try\s*\{[^}]*sessionStorage\.setItem\(CLAVE_ARRANQUE/.test(terminalTs),
+  'el arranque no se limita a una vez por sesión: nada lo recuerda en sessionStorage',
+  !/sessionStorage|jbsh:arranque/.test(gateArranque.replace(/^\s*\/\/.*$/gm, '')) &&
+    !/CLAVE_ARRANQUE|jbsh:arranque/.test(terminalTs),
+);
+// La marca del logo es un enlace a «/»: el manejador de clics lo convierte en
+// navegar(''), que va a reiniciar(); sin índice cae a una carga completa de «/»,
+// que el guion previo también anima. Ninguna de las dos rutas se salta el arranque.
+check(
+  'el logo y «~» llegan a reiniciar() (o a una carga completa de «/» que el guion anima)',
+  /class="sidebar-marca" href="\/"/.test(html) &&
+    /href\.startsWith\('\/'\) \? href\.slice\(1\)/.test(terminalTs) &&
+    /if \(!seccion\) return reiniciar\(\);/.test(terminalTs) &&
+    /if \(location\.pathname !== '\/'\) return irFuera\('\/'\);/.test(terminalTs),
 );
 const totalSsTerminal = (terminalTs.match(/sessionStorage\./g) || []).length;
 const ssEnTryTerminal = (terminalTs.match(/try\s*\{[\s\S]*?\}\s*catch/g) || []).reduce(
@@ -2905,10 +2915,18 @@ check(
       .every((sel) => /:root\.arranque|:root\.entrada|\.entra\b/.test(sel)),
 );
 check(
-  'el arranque se lanza una sola vez, al cargar, y reiniciar() no lo repite',
+  'el arranque se lanza al cargar y reiniciar() lo vuelve a armar, sin temporizadores encimados',
   (terminalTs.match(/^arrancarAnimado\(\);/gm) || []).length === 1 &&
-    !/arrancarAnimado\(/.test(reiniciarFuente) &&
-    /terminarAnimacion\(\)/.test(reiniciarFuente),
+    /arrancarAnimado/.test(reiniciarFuente) &&
+    /classList\.add\('arranque'\)/.test(reiniciarFuente) &&
+    reiniciarFuente.indexOf('terminarAnimacion()') !== -1 &&
+    reiniciarFuente.indexOf('terminarAnimacion()') < reiniciarFuente.indexOf("classList.add('arranque')") &&
+    reiniciarFuente.indexOf("classList.add('arranque')") < reiniciarFuente.indexOf('innerHTML'),
+  'la clase se pone antes de restituir la pantalla: sin un cuadro con todo visible antes de ocultarlo',
+);
+check(
+  'reiniciar() respeta prefers-reduced-motion al armar el arranque',
+  /reducido\.matches/.test(reiniciarFuente),
 );
 
 // T2 · Tipeo del comando y cascada de la salida

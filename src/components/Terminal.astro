@@ -15,7 +15,9 @@ interface Props {
   seccion?: string | null;
   /** Salida inicial, ya renderizada por src/lib/render.ts. */
   salida?: string;
-  /** El arranque solo tiene sentido la primera vez, en la raíz. */
+  /** El arranque (líneas de boot y ficha) solo existe en la raíz. Se anima cada
+   * vez que se muestra el inicio; antes era solo la primera visita de la sesión
+   * (revertido por el dueño, 2026-10-07). */
   boot?: boolean;
   /** Frase de encabezado, cuando la página tiene algo que decir antes. */
   lead?: string;

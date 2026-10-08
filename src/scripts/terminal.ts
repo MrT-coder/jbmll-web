@@ -41,7 +41,8 @@ const SECCIONES: string[] = [...(workspaces?.querySelectorAll('a') ?? [])].map((
 let aqui = term.dataset.seccion ?? '';
 
 // La pantalla tal como la entregó el servidor: arranque, banner y primera
-// salida. Se guarda antes de que el prompt la toque, para poder volver a ella.
+// salida. Se guarda antes de que el prompt la toque y antes de que arrancarAnimado()
+// marque nada con .visto, para poder volver a ella limpia (reiniciar()).
 const pantallaInicial = scroll.innerHTML;
 let indice: Indice | null = null;
 
@@ -132,9 +133,6 @@ const raiz = document.documentElement;
 /** Se consulta cada vez: la persona puede cambiar la preferencia con la página abierta. */
 const reducido = matchMedia('(prefers-reduced-motion: reduce)');
 
-/** Marca de «el arranque ya se animó en esta sesión». La lee arranque-gate.js. */
-const CLAVE_ARRANQUE = 'jbsh:arranque';
-
 /** Valor de un token de movimiento de tokens.css (en ms), para que el CSS y el
  * escalonado de aquí no se desincronicen. */
 const mov = (token: string, defecto: number): number => {
@@ -178,20 +176,18 @@ function desvanecer() {
 }
 
 /**
- * Primera visita de la sesión: las líneas del arranque, el `ok`, la ficha y el
- * resto de la pantalla van apareciendo en ese orden. La decisión de animar ya
- * la tomó arranque-gate.js (puso .arranque en <html> antes del primer
- * pintado); acá solo se ejecuta, y se anota para que la próxima carga de la
- * sesión no la repita.
+ * El arranque del inicio: las líneas, el `ok`, la ficha y el resto de la
+ * pantalla van apareciendo en ese orden, cada vez que se muestra el inicio. La
+ * clase .arranque de <html> la pone arranque-gate.js en una carga completa de
+ * «/», o reiniciar() al volver al inicio sin recargar; acá solo se ejecuta.
+ *
+ * Historia, para no repetirla: esto se limitó a la primera visita de cada
+ * sesión (con sessionStorage) y el dueño del sitio lo revirtió el 2026-10-07:
+ * se ve siempre, incluso al recargar. Nada recuerda ya que se animó.
  */
 function arrancarAnimado() {
   if (!raiz.classList.contains('arranque')) return;
   if (reducido.matches) return terminarAnimacion();
-  try {
-    sessionStorage.setItem(CLAVE_ARRANQUE, '1');
-  } catch {
-    /* sin almacenamiento el guion previo ya habría decidido no animar */
-  }
 
   const fade = mov('--mov-fade', 200);
   const paso = mov('--mov-arranque', 80);
@@ -526,11 +522,16 @@ function exec(raw: string): boolean {
  */
 function reiniciar(): boolean {
   if (location.pathname !== '/') return irFuera('/');
-  // Se restituye la pantalla tal como la entregó el servidor, ya visible: el
-  // arranque animado es solo de la primera carga, no de volver al inicio.
+  // Volver al inicio también reproduce el arranque (decisión del dueño,
+  // 2026-10-07: antes era solo de la primera carga). Orden: se corta lo que
+  // estuviera animando (sin relojes encimados si se repite `c`) y se pone
+  // .arranque ANTES de restituir el HTML, en el mismo turno: el navegador no
+  // pinta entre medio, así que no hay un cuadro con todo visible antes de
+  // ocultarlo. Con prefers-reduced-motion no se anima nada.
   terminarAnimacion();
+  const animar = !reducido.matches;
+  if (animar) raiz.classList.add('arranque');
   scroll.innerHTML = pantallaInicial;
-  desvanecer();
   // El h1 vive dentro de #scroll, así que reemplazar el HTML lo sustituye por
   // otro nodo: sin volver a buscarlo, la referencia apuntaría a un elemento
   // que ya no está en la página y el encabezado dejaría de actualizarse.
@@ -541,6 +542,11 @@ function reiniciar(): boolean {
   term.dataset.detalle = '';
   if (stPath) stPath.textContent = '~/';
   term.scrollTop = 0;
+  // En una microtarea y no aquí: quien llamó a reiniciar() añade el prompt justo
+  // después (run(), los clics), y tiene que existir para entrar en la cascada;
+  // si no, quedaría oculto hasta que termine el arranque. Una microtarea corre
+  // antes del siguiente pintado.
+  if (animar) queueMicrotask(arrancarAnimado);
   return true;
 }
 

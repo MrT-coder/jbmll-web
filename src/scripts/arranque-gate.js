@@ -11,16 +11,17 @@
 // admite; por eso es un archivo, y por eso es JS plano y no un .ts.
 //
 // Dos modos, que fija la etiqueta (data-modo, ver Terminal.astro):
-//   · arranque (el inicio): `arranque` en <html>, solo la primera visita de la
-//     sesión. Lo recuerda sessionStorage.
+//   · arranque (el inicio): `arranque` en <html> en cada carga completa de «/»,
+//     recarga incluida. Antes era solo la primera visita de la sesión (lo
+//     recordaba sessionStorage); el dueño del sitio lo revirtió el 2026-10-07 y
+//     ya nada lo recuerda. Volver al inicio sin recargar lo arma reiniciar().
 //   · entrada (cualquier otra página): `entrada` en <html>, solo si la persona
 //     llegó desde dentro del sitio. Es el mismo `cd` que se ve al navegar sin
 //     recargar, para las páginas que el servidor entrega completas (sobre-mi,
 //     contacto, detalles, 404…) y que navegar() no puede animar desde el cliente.
 //
 // Sin la clase todo se ve entero y de inmediato: prefers-reduced-motion,
-// almacenamiento bloqueado (arranque), visita ya vista (arranque), llegada
-// directa o externa (entrada) o sin JavaScript.
+// llegada directa o externa (entrada) o sin JavaScript.
 (function () {
   var raiz = document.documentElement;
   var script = document.currentScript;
@@ -29,11 +30,6 @@
   try {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     if (modo === 'arranque') {
-      // La misma clave que escribe terminal.ts al empezar a animar. Un
-      // almacenamiento que lanza (ventana privada, permisos) cae al catch: sin
-      // poder recordar la visita, mostrar todo es mejor que repetir el arranque
-      // en cada carga.
-      if (sessionStorage.getItem('jbsh:arranque')) return;
       clase = 'arranque';
     } else if (modo === 'entrada') {
       // Se decide por el referente y no por una marca puesta al hacer clic:

@@ -148,7 +148,7 @@
    buscador o con prefers-reduced-motion, ninguna regla de abajo coincide y el
    contenido se ve entero, sin esperar nada. */
 
-/* Arranque de la primera visita. :not(.visto) y no una clase de «oculto»: lo
+/* Arranque del inicio (cada vez que se muestra). :not(.visto) y no una clase de «oculto»: lo
    que se muestra es lo que terminal.ts va marcando, y al quitar .arranque
    todo vuelve a su estado normal de golpe, sin depender de ninguna marca. */
 :root.arranque
