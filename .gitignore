@@ -37,3 +37,7 @@ npm-debug.log*
 # un tercero que ya vive versionado en package-lock.json; comprometerlo aquí
 # lo duplicaría sin necesidad.
 public/admin/sveltia-cms.js
+
+# Documentos de trabajo locales (ODD): seguimiento de features del agente,
+# no forman parte del sitio.
+odd/
