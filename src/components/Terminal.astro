@@ -402,19 +402,66 @@ const abiertosSsr = documento ? 1 : 0;
     .shell {
       flex-direction: column;
     }
-    /* flex-direction y no flex-wrap solo: el banner ASCII es tan ancho que ya
-       se apilaba solo por desbordar la fila, pero la foto (acotada a 12ch) sí
-       cabría junto al panel de info sin este empujón explícito. */
+    /* Menos marco: menos aire sobre el contenido y el pie en un solo renglón (el
+       copyright se recorta con puntos suspensivos antes que partirse en dos). */
+    .term {
+      padding: var(--space-3) 0 var(--space-3);
+    }
+    .foot {
+      flex-wrap: nowrap;
+      gap: var(--space-4);
+      padding: var(--space-2) var(--space-4);
+    }
+    .foot > span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    /* El arranque en una sola línea cada una: en 393px las líneas se partían en
+       dos renglones feos. El texto sigue entero en el DOM (es el mismo que lee un
+       lector de pantalla); solo se recorta lo que se ve, con puntos suspensivos,
+       y una letra más chica para que quepa más de cada línea. */
+    .boot {
+      font-size: var(--text-xs);
+    }
+    .boot .out {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .fetch {
       flex-direction: column;
-      gap: var(--space-6);
+      gap: var(--space-4);
+      margin: var(--space-5) 0 var(--space-5);
+    }
+    /* Con foto, junto a los datos y no encima: apilada ocupaba 192px de alto ella
+       sola y la presentación, el `ls` y el prompt quedaban bajo el pliegue. El
+       banner ASCII (sin foto) es demasiado ancho para ir al lado y conserva la
+       columna de arriba. */
+    .fetch:has(> .foto) {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: flex-start;
+      gap: var(--space-4);
     }
     .logo {
       align-self: center;
       font-size: clamp(7.5px, 2.6vw, 12px);
     }
     .foto {
-      align-self: center;
+      max-width: 12ch;
+    }
+    /* min-width: 0 y no el mínimo de 26ch de escritorio: sin eso los datos no
+       dejan encoger la fila y la foto se queda sin sitio al lado. */
+    .info {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+    .info .rule {
+      overflow: hidden;
+      white-space: nowrap;
     }
     .lead {
       font-size: var(--text-md);

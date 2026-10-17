@@ -76,11 +76,30 @@ const line = (cls: string, txt: string) => push(el('div', 'out ' + cls, txt));
 // lee entera sin escribir nada. Solo lo levanta tocar el prompt.
 const TOUCH = matchMedia('(hover: none) and (pointer: coarse)').matches;
 
-const input = el('input', 'entry');
+// En escritorio el campo real queda fuera de pantalla y la línea visible es un
+// espejo que dibuja el prompt de starship (.entry, sincronizar()). En táctil no:
+// ese campo de 8×6 px agregado a <body> descolocaba el cursor en algunos
+// teclados reales y «hola» salía «aloh». Allí el campo es el de verdad, dentro
+// de la línea (.entry-vivo en terminal.css, con letra de --text-input para que
+// iOS no haga zoom): prompt() lo mueve a la línea viva en cada pantalla nueva.
+const input = el('input', TOUCH ? 'entry-vivo' : 'entry');
 input.setAttribute('aria-label', 'Línea de comandos');
+input.type = 'text';
 input.autocomplete = 'off';
 input.spellcheck = false;
-document.body.append(input);
+// Un campo de comandos no es un campo de texto corriente: sin mayúscula
+// inicial, sin autocorrección, con «ir» en la tecla Enter del teléfono.
+input.setAttribute('inputmode', 'text');
+input.setAttribute('enterkeyhint', 'go');
+input.setAttribute('autocapitalize', 'off');
+input.setAttribute('autocorrect', 'off');
+if (TOUCH) input.placeholder = 'toque aquí para escribir';
+if (!TOUCH) document.body.append(input);
+
+/** True entre compositionstart y compositionend (teclados con predicción o IME). */
+let componiendo = false;
+input.addEventListener('compositionstart', () => (componiendo = true));
+input.addEventListener('compositionend', () => (componiendo = false));
 
 interface Live {
   node: HTMLElement;
@@ -282,15 +301,24 @@ addEventListener('pageshow', (ev) => {
 
 function prompt() {
   const l = el('div', 'out inputline');
-  l.append(
-    el('span', 'brain ' + (ok ? 'ok' : 'err'), BRAIN),
-    el('span', 'typed', ''),
-    el('span', 'caret'),
-    el('span', 'tap-hint', 'toque aquí para escribir'),
-  );
+  const brain = el('span', 'brain ' + (ok ? 'ok' : 'err'), BRAIN);
+  if (TOUCH) {
+    // El campo real ocupa el lugar del texto y del cursor. .typed sigue
+    // existiendo, oculto, porque run() deja ahí el comando ejecutado.
+    l.classList.add('vivo');
+    l.append(brain, el('span', 'typed', ''), input);
+  } else {
+    l.append(
+      brain,
+      el('span', 'typed', ''),
+      el('span', 'caret'),
+      el('span', 'tap-hint', 'toque aquí para escribir'),
+    );
+  }
   push(l);
   const typed = l.querySelector<HTMLElement>('.typed');
   live = typed ? { node: l, typed } : null;
+  componiendo = false;
   input.value = '';
   cerrarListView();
   if (!TOUCH) input.focus({ preventScroll: true });
@@ -310,13 +338,21 @@ const HELP: [string, string][] = [
   ['help', 'Esto'],
 ];
 
-/** Todo lo que se puede completar con Tab, en el contexto actual. */
-const completables = (): string[] => [
-  ...HELP.map(([c]) => c.split(' ')[0]),
-  ...SECCIONES,
-  ...SECCIONES.map((s) => 'cd ' + s),
-  ...(indice?.entradas[aqui] ?? []).map((f) => 'cat ' + f.slug),
-];
+// Todo lo que se puede completar con Tab, en el contexto actual. Sin repetidos y
+// sin la sección vacía: HELP repite `cd`, `contacto` ya es una sección y el
+// enlace de la marca entra en SECCIONES como cadena vacía (daba un «cd »
+// fantasma). En una lista de filas de 44px en el teléfono, cada una se nota.
+const completables = (): string[] => {
+  const secciones = SECCIONES.filter(Boolean);
+  return [
+    ...new Set([
+      ...HELP.map(([c]) => c.split(' ')[0]),
+      ...secciones,
+      ...secciones.map((s) => 'cd ' + s),
+      ...(indice?.entradas[aqui] ?? []).map((f) => 'cat ' + f.slug),
+    ]),
+  ];
+};
 
 /**
  * Navegación sin recarga. La URL cambia de verdad: quien comparte el enlace
@@ -559,6 +595,9 @@ function run() {
   if (live) {
     live.node.querySelector('.caret')?.remove();
     live.node.querySelector('.tap-hint')?.remove();
+    // La línea deja de ser la viva: el comando ejecutado vuelve a verse en
+    // .typed y el campo (que prompt() muda a la línea nueva) se oculta aquí.
+    live.node.classList.remove('vivo');
     live.typed.textContent = raw;
     live = null;
   }
@@ -648,6 +687,75 @@ const sincronizar = () => {
 
 // ── Entrada ────────────────────────────────────────────────────────────────
 
+// Tab, ↑, ↓ y Escape son acciones con nombre y no código dentro del keydown: el
+// teclado físico y la barra de teclas del teléfono (montarBarra) tienen que
+// hacer exactamente lo mismo, y fabricar un KeyboardEvent para eso sería frágil
+// (los navegadores ni siquiera los tratan igual). Cada una devuelve si «se
+// quedó» con la tecla, para que quien llama decida el preventDefault.
+//
+// Ninguna escribe en el campo mientras un teclado está componiendo: asignar
+// input.value a mitad de una composición del IME cancela la palabra y descoloca
+// el cursor, que es justo el tipo de fallo que esta rama persigue.
+
+/** Tab: completa lo escrito. Devuelve false si no hay nada que completar. */
+function accionTab(): boolean {
+  if (componiendo) return false;
+  // Con el input vacío tampoco hay nada que completar: el teclado físico deja
+  // salir el foco hacia los enlaces de la página (una terminal que se queda con
+  // la tecla y no devuelve nada deja fuera a quien no usa ratón).
+  const v = input.value.trim();
+  if (!v) return false;
+  const opciones = completables().filter((c) => c.startsWith(v));
+  if (!opciones.length) return true;
+  // Con una sola opción, completar. Con varias, el prefijo común: es lo que
+  // hace una terminal de verdad y evita elegir por el usuario.
+  input.value = opciones.length === 1 ? opciones[0] : prefijoComun(opciones);
+  sincronizar();
+  abrirListView(opciones.filter((c) => c !== input.value));
+  return true;
+}
+
+/** ↑ (-1) y ↓ (1): recorren el ListView si está abierto y, si no, el historial. */
+function accionFlecha(dir: -1 | 1): boolean {
+  if (componiendo) return false;
+  // Con la lista abierta, las flechas son suyas. Antes iban siempre al
+  // historial: ↓ pasaba del final, ponía '' en el campo y cerraba la lista,
+  // y lo escrito se perdía.
+  if (lv) {
+    // Da la vuelta pasando por «ninguna» (-1, el texto original): así se
+    // puede volver a lo que se escribió sin salir con Escape.
+    const n = lvOpciones.length;
+    seleccionar(dir === 1 ? (lvSel + 1 >= n ? -1 : lvSel + 1) : lvSel - 1 < -1 ? n - 1 : lvSel - 1);
+    return true;
+  }
+  if (!historial.length) return false;
+  if (dir === -1) {
+    // Al empezar a recorrer el historial se guarda lo que había escrito.
+    if (hIdx === historial.length) borrador = input.value;
+    hIdx = Math.max(0, hIdx - 1);
+  } else {
+    // ↓ sin haber subido no tiene a dónde ir: no toca el campo.
+    if (hIdx === historial.length) return true;
+    hIdx = hIdx + 1;
+  }
+  // Pasar de la entrada más reciente devuelve el borrador, nunca ''.
+  input.value = hIdx === historial.length ? (borrador ?? '') : historial[hIdx];
+  if (hIdx === historial.length) borrador = null;
+  sincronizar();
+  return true;
+}
+
+/** Escape: cierra la lista y deja lo que la persona había escrito. */
+function accionEscape() {
+  // Cerrar la lista deja en el campo lo que la persona había escrito, no la
+  // opción que las flechas tuvieran marcada.
+  if (lv && lvSel >= 0 && !componiendo) {
+    input.value = lvEscrito;
+    sincronizar();
+  }
+  cerrarListView();
+}
+
 input.addEventListener('input', () => {
   // Teclear de nuevo abandona el recorrido del historial: el borrador ya no es
   // el que se guardó.
@@ -660,6 +768,10 @@ input.addEventListener('input', () => {
 });
 
 input.addEventListener('keydown', (ev) => {
+  // Mientras un teclado compone (predicción, IME), Enter confirma la palabra y
+  // no es «ejecutar»; el código 229 es como lo reportan los navegadores que no
+  // llenan isComposing.
+  if (ev.isComposing || ev.keyCode === 229) return;
   if (ev.key === 'Enter') {
     ev.preventDefault();
     run();
@@ -669,60 +781,19 @@ input.addEventListener('keydown', (ev) => {
   if (ev.key === 'Tab') {
     // Shift+Tab nunca completa: siempre sale hacia atrás. Con el input vacío
     // tampoco hay nada que completar, así que Tab se comporta como Tab normal
-    // y deja salir el foco hacia los enlaces de la página. Una terminal que se
-    // queda con la tecla y no devuelve nada deja fuera a quien no usa ratón.
-    const v = input.value.trim();
-    if (ev.shiftKey || !v) return;
+    // y deja salir el foco hacia los enlaces de la página.
+    if (ev.shiftKey || !input.value.trim()) return;
     ev.preventDefault();
-    const opciones = completables().filter((c) => c.startsWith(v));
-    if (!opciones.length) return;
-    // Con una sola opción, completar. Con varias, el prefijo común: es lo que
-    // hace una terminal de verdad y evita elegir por el usuario.
-    input.value = opciones.length === 1 ? opciones[0] : prefijoComun(opciones);
-    sincronizar();
-    abrirListView(opciones.filter((c) => c !== input.value));
+    accionTab();
     return;
   }
 
   if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') {
-    // Con la lista abierta, las flechas son suyas. Antes iban siempre al
-    // historial: ↓ pasaba del final, ponía '' en el campo y cerraba la lista,
-    // y lo escrito se perdía.
-    if (lv) {
-      ev.preventDefault();
-      // Da la vuelta pasando por «ninguna» (-1, el texto original): así se
-      // puede volver a lo que se escribió sin salir con Escape.
-      const n = lvOpciones.length;
-      seleccionar(ev.key === 'ArrowDown' ? (lvSel + 1 >= n ? -1 : lvSel + 1) : lvSel - 1 < -1 ? n - 1 : lvSel - 1);
-      return;
-    }
-    if (!historial.length) return;
-    ev.preventDefault();
-    if (ev.key === 'ArrowUp') {
-      // Al empezar a recorrer el historial se guarda lo que había escrito.
-      if (hIdx === historial.length) borrador = input.value;
-      hIdx = Math.max(0, hIdx - 1);
-    } else {
-      // ↓ sin haber subido no tiene a dónde ir: no toca el campo.
-      if (hIdx === historial.length) return;
-      hIdx = hIdx + 1;
-    }
-    // Pasar de la entrada más reciente devuelve el borrador, nunca ''.
-    input.value = hIdx === historial.length ? (borrador ?? '') : historial[hIdx];
-    if (hIdx === historial.length) borrador = null;
-    sincronizar();
+    if (accionFlecha(ev.key === 'ArrowUp' ? -1 : 1)) ev.preventDefault();
     return;
   }
 
-  if (ev.key === 'Escape') {
-    // Cerrar la lista deja en el campo lo que la persona había escrito, no la
-    // opción que las flechas tuvieran marcada.
-    if (lv && lvSel >= 0) {
-      input.value = lvEscrito;
-      sincronizar();
-    }
-    cerrarListView();
-  }
+  if (ev.key === 'Escape') accionEscape();
 });
 
 function prefijoComun(xs: string[]): string {
@@ -732,6 +803,83 @@ function prefijoComun(xs: string[]): string {
     while (!x.startsWith(p)) p = p.slice(0, -1);
   }
   return p;
+}
+
+// ── Barra de teclas (teléfono) ─────────────────────────────────────────────
+// Lo que Termux y Moshi hacen sobre el teclado: las teclas que un teléfono no
+// tiene (Tab, ↑, ↓, Esc) y, aparte, comandos que se tocan, porque escribir en
+// una pantalla pequeña es lo último que debería hacer falta para leer este
+// sitio. Solo existe en táctil (ver el `if (TOUCH)` del arranque): en escritorio
+// ni siquiera está en el DOM.
+
+/** Ejecuta un comando como si se hubiera escrito, sin abrir el teclado. */
+function ejecutarRapido(cmd: string) {
+  // Escribir y ejecutar a la vez pisaría la composición en curso.
+  if (componiendo) return;
+  input.value = cmd;
+  sincronizar();
+  run();
+}
+
+/** Tab con el campo vacío no completa nada: aquí enseña lo que hay, que es lo que Tab promete. */
+function sugerirComandos() {
+  const nombres = new Set(completables().filter((c) => !c.includes(' ')));
+  abrirListView([...nombres]);
+}
+
+function montarBarra() {
+  const shell = document.querySelector('.shell');
+  if (!shell) return;
+
+  const barra = el('div', 'teclas');
+  barra.setAttribute('role', 'toolbar');
+  barra.setAttribute('aria-label', 'Teclas y comandos rápidos');
+
+  const boton = (cls: string, texto: string, etiqueta: string, alTocar: () => void) => {
+    const b = el('button', 'tecla ' + cls, texto);
+    b.type = 'button';
+    b.setAttribute('aria-label', etiqueta);
+    // click y no pointerup: así también responde a Enter/Espacio con el foco
+    // en el botón (quien usa un teclado externo o un lector de pantalla).
+    b.addEventListener('click', alTocar);
+    return b;
+  };
+
+  const fijas = el('div', 'teclas-fijas');
+  fijas.append(
+    boton('tecla-fija', 'tab', 'Tabulador', () => {
+      if (!accionTab() && !input.value.trim()) sugerirComandos();
+    }),
+    boton('tecla-fija', '↑', 'Historial anterior', () => void accionFlecha(-1)),
+    boton('tecla-fija', '↓', 'Historial siguiente', () => void accionFlecha(1)),
+    boton('tecla-fija', 'esc', 'Escape', () => accionEscape()),
+    // Sin teclado abierto no hay otro Enter: recuperar un comando con ↑ y no
+    // poder ejecutarlo sería una tecla a medias.
+    boton('tecla-fija', '↵', 'Ejecutar', () => run()),
+  );
+
+  // Las secciones salen de la barra lateral (SECCIONES), no de una lista
+  // escrita aquí: si el sitio gana o pierde una, los comandos la siguen. El
+  // enlace de la marca apunta a «/», que se lee como la sección vacía: no es
+  // una sección, es el inicio (`c` ya lleva ahí).
+  const comandos = ['ls', ...SECCIONES.filter(Boolean).map((s) => 'cd ' + s), 'whoami', 'help', 'c'];
+  const cmds = el('div', 'teclas-cmds');
+  for (const c of comandos) {
+    cmds.append(boton('tecla-cmd', c, 'Ejecutar ' + c, () => ejecutarRapido(c)));
+  }
+  barra.append(fijas, cmds);
+
+  // Tocar una tecla no debe quitarle el foco al campo: sin esto el teclado se
+  // cierra y vuelve a abrirse con cada toque. pointerdown cubre el táctil y el
+  // lápiz; mousedown, los navegadores que aún generan el evento de ratón.
+  const noRobarFoco = (ev: Event) => {
+    if (ev.target instanceof Element && ev.target.closest('button')) ev.preventDefault();
+  };
+  barra.addEventListener('pointerdown', noRobarFoco);
+  barra.addEventListener('mousedown', noRobarFoco);
+
+  // Entre el contenido y la statusline: abajo del todo, pegada al teclado.
+  shell.after(barra);
 }
 
 // ── Clics ──────────────────────────────────────────────────────────────────
@@ -782,6 +930,7 @@ function escribirComando(cmd: string) {
   if (!live) return;
   live.node.querySelector('.caret')?.remove();
   live.node.querySelector('.tap-hint')?.remove();
+  live.node.classList.remove('vivo');
   live.typed.textContent = cmd;
   live = null;
   recordar(cmd);
@@ -852,7 +1001,13 @@ if (window.visualViewport) {
   const vv = window.visualViewport;
   const ajustar = () => {
     const hueco = window.innerHeight - vv.height;
-    document.documentElement.style.setProperty('--vh', hueco > 120 ? vv.height + 'px' : '100dvh');
+    const abierto = hueco > 120;
+    document.documentElement.style.setProperty('--vh', abierto ? vv.height + 'px' : '100dvh');
+    // Con el teclado arriba, la barra de teclas tiene que quedar justo sobre él:
+    // terminal.css esconde entonces la statusline y el pie (:root.teclado), que
+    // de otro modo se interpondrían. Solo en táctil: en escritorio un hueco así
+    // es zoom o una ventana a medias, no un teclado.
+    raiz.classList.toggle('teclado', TOUCH && abierto);
   };
   vv.addEventListener('resize', ajustar);
   ajustar();
@@ -873,6 +1028,7 @@ if (stClock) {
 
 // ── Arranque ───────────────────────────────────────────────────────────────
 
+if (TOUCH) montarBarra();
 prompt();
 arrancarAnimado();
 entrarPagina();

@@ -110,9 +110,59 @@
   opacity: 0;
 }
 
+/* El campo real de las pantallas táctiles (terminal.ts: TOUCH). No se esconde:
+   es la línea de comandos, con el aspecto de la terminal —transparente, sin
+   caja, la fuente y el color de la línea— y la letra de --text-input para que
+   iOS no haga zoom al enfocarlo. El cursor lo dibuja el navegador, en --gold,
+   que es el color del cursor de escritorio (.caret). */
+.entry-vivo {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-input);
+  caret-color: var(--gold);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.entry-vivo::placeholder {
+  color: var(--dim);
+  opacity: 1;
+}
+/* El foco se ve en la línea entera (el contorno de un campo sin caja sería un
+   rectángulo suelto en mitad del prompt). */
+.entry-vivo:focus-visible {
+  outline: 0;
+}
+.inputline.vivo:focus-within {
+  border-color: var(--blue);
+}
+/* Fuera de su línea viva (ya ejecutada) el campo no pinta nada: prompt() lo
+   muda a la siguiente. */
+.inputline:not(.vivo) .entry-vivo {
+  display: none;
+}
+.inputline.vivo .typed {
+  display: none;
+}
+.inputline.vivo {
+  font-size: var(--text-input);
+}
+
 @media (max-width: 660px) {
   .list td {
     padding-right: var(--space-5);
+  }
+  /* Los datos del arranque comparten fila con la foto (Terminal.astro): con la
+     letra y el hueco de escritorio el valor se partía en tres renglones. */
+  .info dl {
+    gap: 0 var(--space-3);
+    font-size: var(--text-sm);
   }
 }
 
@@ -139,7 +189,78 @@
   .list td {
     padding-top: var(--space-3);
     padding-bottom: var(--space-3);
+  }  /* Una fila de sugerencias es un botón para el dedo: con el relleno de
+     escritorio medía ~25px. */
+  .lv-i {
+    display: flex;
+    align-items: center;
+    min-height: var(--toque);
   }
+}
+
+/* ── Barra de teclas (teléfono) ────────────────────────────────────────────
+   La monta terminal.ts (montarBarra) solo en táctil, entre el contenido y la
+   statusline. Cuando sube el teclado, :root.teclado esconde la statusline y el
+   pie para que quede justo encima de él; sin esto quedarían entre las dos. */
+.teclas {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+}
+.teclas-fijas {
+  flex: 0 0 auto;
+  display: flex;
+  border-right: 1px solid var(--line);
+}
+/* min-width: 0 y overflow-x: sin ellos la franja de comandos, que no cabe,
+   estiraría la barra y con ella la página entera. */
+.teclas-cmds {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.teclas-cmds::-webkit-scrollbar {
+  display: none;
+}
+.tecla {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--toque);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+  /* Sin el retardo ni el zoom de doble toque: son teclas, se tocan seguido. */
+  touch-action: manipulation;
+}
+.tecla-fija {
+  min-width: var(--toque);
+  padding: 0 var(--space-3);
+}
+.tecla-cmd {
+  color: var(--blue);
+}
+.tecla:active {
+  background: var(--sel);
+}
+/* Dentro de una franja que recorta, el contorno de fuera quedaría cortado. */
+.tecla:focus-visible {
+  outline-offset: -2px;
+}
+:root.teclado .status,
+:root.teclado .foot {
+  display: none;
 }
 
 /* ── Movimiento ─────────────────────────────────────────────────────────────

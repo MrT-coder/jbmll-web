@@ -63,5 +63,11 @@ const etiquetaAbiertos = `${abiertos} ${abiertos === 1 ? 'abierto' : 'abiertos'}
     .hide-sm {
       display: none;
     }
+    /* Una barra de estado de un renglón apretado: en el teléfono no hace falta
+       el aire de escritorio. */
+    .status .mode,
+    .status .seg {
+      padding: var(--space-1) var(--space-3);
+    }
   }
 </style>

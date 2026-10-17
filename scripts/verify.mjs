@@ -3118,11 +3118,17 @@ console.log('\nListView: flechas y historial');
 // de PSReadLine); cerrada, recorren el historial. Pasar del final del historial
 // devuelve lo que se estaba escribiendo, nunca ''. Comprobaciones estructurales
 // sobre el fuente: aquí no corre ningún navegador.
+// La lógica de las flechas y de Escape vive en acciones con nombre
+// (accionFlecha, accionEscape) que comparten el teclado físico y la barra de
+// teclas del teléfono: se lee ahí y no en el manejador de keydown.
 const bloqueFlechas = terminalTs.slice(
-  terminalTs.indexOf("ev.key === 'ArrowUp'"),
-  terminalTs.indexOf("ev.key === 'Escape'"),
+  terminalTs.indexOf('function accionFlecha'),
+  terminalTs.indexOf('function accionEscape'),
 );
-const bloqueEscape = terminalTs.slice(terminalTs.indexOf("ev.key === 'Escape'"), terminalTs.indexOf('function prefijoComun'));
+const bloqueEscape = terminalTs.slice(
+  terminalTs.indexOf('function accionEscape'),
+  terminalTs.indexOf("input.addEventListener('input'"),
+);
 const seleccionarFuente = (terminalTs.match(/function seleccionar\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [])[1] || '';
 check(
   'las flechas consultan el ListView antes que el historial',
@@ -3174,6 +3180,272 @@ check(
 check(
   'la ayuda describe c como volver al inicio',
   /\['c',\s*'[^']*inicio[^']*'\]/.test(terminalTs),
+);
+
+console.log('\nTerminal en el teléfono: campo de escritura (M1)');
+// El dueño escribía «hola» en su teléfono y salía «aloh»: el <input> real estaba
+// fuera de pantalla (8×6 px, en <body>) y la línea visible era un espejo. En
+// táctil el campo es el de verdad, dentro de la línea del prompt. Comprobaciones
+// estructurales sobre el fuente: aquí no corre ningún navegador; el
+// comportamiento se vio con playwright-cli (ver odd/tasks/terminal-movil.md) y
+// el fallo del IME real solo se descarta con un teléfono de verdad.
+const promptFuente = (terminalTs.match(/function prompt\(\) \{([\s\S]*?)\n\}/) || [])[1] || '';
+const pxDe = (valor) => {
+  const m = String(valor).trim().match(/^([\d.]+)(px|rem)$/);
+  return m ? Number(m[1]) * (m[2] === 'rem' ? 16 : 1) : 0;
+};
+const textoInput = (tokensCss.match(/--text-input:\s*([^;]+);/) || [])[1] || '';
+check(
+  'el campo táctil usa una letra de 16 px o más (--text-input): menos hace zoom en iOS',
+  pxDe(textoInput) >= 16,
+  textoInput || '(sin --text-input en tokens.css)',
+);
+const reglaVivo = (terminalCss.match(/\.entry-vivo\s*\{([^}]*)\}/) || [])[1] || '';
+check(
+  '.entry-vivo se ve como la terminal: transparente, sin borde, hereda la fuente y usa --text-input',
+  reglaVivo !== '' &&
+    /background:\s*transparent/.test(reglaVivo) &&
+    /border:\s*0/.test(reglaVivo) &&
+    /font:\s*inherit/.test(reglaVivo) &&
+    /font-size:\s*var\(--text-input\)/.test(reglaVivo) &&
+    /color:\s*inherit/.test(reglaVivo) &&
+    /caret-color:\s*var\(--/.test(reglaVivo),
+  reglaVivo.replace(/\s+/g, ' ') || '(sin regla .entry-vivo)',
+);
+check(
+  '.entry-vivo no se saca de pantalla (sin left negativo, sin tamaño de 1px)',
+  reglaVivo !== '' && !/left:\s*-|width:\s*1px|height:\s*1px|position:\s*absolute/.test(reglaVivo),
+);
+check(
+  'en táctil el campo real vive dentro de la línea del prompt, no en <body>',
+  /input = el\('input',\s*TOUCH \? 'entry-vivo' : 'entry'\)/.test(terminalTs) &&
+    /if \(!TOUCH\) document\.body\.append\(input\)/.test(terminalTs) &&
+    /if \(TOUCH\)[\s\S]*?\.append\([\s\S]*?\binput\b\s*\)/.test(promptFuente),
+  'sin esto vuelve el espejo fuera de pantalla que invertía el texto',
+);
+check(
+  'el campo pide teclado de comandos: inputmode, enterkeyhint=go, sin mayúscula ni autocorrección',
+  /setAttribute\('inputmode',\s*'text'\)/.test(terminalTs) &&
+    /setAttribute\('enterkeyhint',\s*'go'\)/.test(terminalTs) &&
+    /setAttribute\('autocapitalize',\s*'off'\)/.test(terminalTs) &&
+    /setAttribute\('autocorrect',\s*'off'\)/.test(terminalTs),
+);
+check(
+  'la composición del IME no se pisa: compositionstart/end y Enter ignorado mientras compone',
+  /addEventListener\('compositionstart'/.test(terminalTs) &&
+    /addEventListener\('compositionend'/.test(terminalTs) &&
+    /ev\.isComposing/.test(terminalTs),
+  'reescribir input.value a mitad de una composición descoloca el cursor',
+);
+check(
+  'terminal.css distingue el campo vivo (.entry-vivo) del campo oculto de escritorio (.entry)',
+  /\.entry\s*\{[^}]*left:\s*-9999px/.test(terminalCss) && reglaVivo !== '',
+);
+
+console.log('\nTerminal en el teléfono: barra de teclas (M2)');
+// Termux y Moshi ponen sobre el teclado las teclas que el teléfono no tiene
+// (Tab, flechas, Esc). Aquí además hay comandos que se tocan: escribir es
+// opcional. La barra solo existe en táctil y reutiliza las MISMAS acciones que
+// el teclado físico (accionTab/accionFlecha/accionEscape): una copia aparte
+// terminaría divergiendo del historial y del ListView.
+const keydownFuente = terminalTs.slice(
+  terminalTs.indexOf("input.addEventListener('keydown'"),
+  terminalTs.indexOf('function prefijoComun'),
+);
+const barraFuente = (terminalTs.match(/function montarBarra\(\) \{([\s\S]*?)\n\}/) || [])[1] || '';
+const reglaTecla = (terminalCss.match(/\.tecla\s*\{([^}]*)\}/) || [])[1] || '';
+const reglaTeclas = (terminalCss.match(/\.teclas\s*\{([^}]*)\}/) || [])[1] || '';
+const reglaCmds = (terminalCss.match(/\.teclas-cmds\s*\{([^}]*)\}/) || [])[1] || '';
+check(
+  'Tab, flechas y Escape son acciones con nombre, y el keydown las usa',
+  /function accionTab\(/.test(terminalTs) &&
+    /function accionFlecha\(/.test(terminalTs) &&
+    /function accionEscape\(/.test(terminalTs) &&
+    /accionTab\(/.test(keydownFuente) &&
+    /accionFlecha\(/.test(keydownFuente) &&
+    /accionEscape\(/.test(keydownFuente),
+);
+check(
+  'la barra llama a esas mismas acciones y no fabrica KeyboardEvent',
+  /accionTab\(/.test(barraFuente) &&
+    /accionFlecha\(/.test(barraFuente) &&
+    /accionEscape\(/.test(barraFuente) &&
+    !/new KeyboardEvent|dispatchEvent/.test(terminalTs),
+);
+check(
+  'la barra solo se monta en pantallas táctiles',
+  /if \(TOUCH\) montarBarra\(\);/.test(terminalTs),
+  'en escritorio no debe existir en el DOM',
+);
+check(
+  'la barra es un toolbar con nombre y sus teclas son botones con aria-label',
+  /setAttribute\('role',\s*'toolbar'\)/.test(barraFuente) &&
+    /setAttribute\('aria-label',\s*'[^']+'\)/.test(barraFuente) &&
+    ['Tabulador', 'Historial anterior', 'Historial siguiente', 'Escape'].every((t) => barraFuente.includes(t)) &&
+    /type = 'button'/.test(terminalTs),
+);
+const rapidoFuente = (terminalTs.match(/function ejecutarRapido\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [])[1] || '';
+check(
+  'los comandos rápidos salen de SECCIONES y se ejecutan sin teclado (run)',
+  /SECCIONES\.filter\(Boolean\)\.map\(/.test(barraFuente) && /\brun\(\)/.test(rapidoFuente),
+);
+check(
+  'tocar la barra no le quita el foco al campo: pointerdown y mousedown con preventDefault',
+  /preventDefault\(\)/.test(barraFuente) &&
+    /addEventListener\('pointerdown',\s*noRobarFoco\)/.test(barraFuente) &&
+    /addEventListener\('mousedown',\s*noRobarFoco\)/.test(barraFuente),
+  'sin esto el teclado se cierra cada vez que se toca una tecla',
+);
+check(
+  'con el teclado abierto la barra queda sobre él: visualViewport marca la raíz (solo táctil) y el CSS esconde statusline y pie',
+  /classList\.toggle\('teclado',\s*TOUCH && /.test(terminalTs) &&
+    /:root\.teclado\s+\.status/.test(terminalCss) &&
+    /:root\.teclado\s+\.foot/.test(terminalCss),
+);
+check(
+  'la barra va a todo el ancho sobre la statusline, con los comandos en una franja que se desliza en horizontal',
+  /flex:\s*0 0 auto/.test(reglaTeclas) && /overflow-x:\s*auto/.test(reglaCmds) && /min-width:\s*0/.test(reglaCmds),
+  'sin min-width: 0 la franja empuja el ancho de la página',
+);
+check(
+  'las teclas usan solo tokens (sin colores crudos)',
+  reglaTecla !== '' && !/#[0-9a-fA-F]{3,8}\b|rgba?\(/.test([reglaTeclas, reglaCmds, reglaTecla].join('\n')),
+);
+
+console.log('\nTerminal en el teléfono: primera pantalla compacta (M3)');
+// A 393 px de ancho las líneas del arranque se partían en dos renglones, la
+// foto ocupaba 192 px de alto sola y la presentación, el `ls` y el prompt
+// quedaban bajo el pliegue. A ≤660 px el arranque se recorta con puntos
+// suspensivos (el texto sigue entero en el DOM: solo cambia lo que se ve) y la
+// foto va al lado de los datos. Escritorio no cambia: todo vive dentro del
+// único @media del punto de quiebre.
+const bloqueQuiebre = (css, consulta) => {
+  const i = css.indexOf(consulta);
+  if (i === -1) return '';
+  let prof = 0;
+  for (let k = css.indexOf('{', i); k < css.length; k++) {
+    if (css[k] === '{') prof++;
+    if (css[k] === '}' && --prof === 0) return css.slice(css.indexOf('{', i) + 1, k);
+  }
+  return '';
+};
+const movilAstro = bloqueQuiebre(terminalAstroCss, '@media (max-width: 660px)');
+const reglaMovil = (css, sel) =>
+  (css.match(new RegExp('(?:^|\\n|\\})\\s*' + escRegex(sel) + '\\s*\\{([^}]*)\\}')) || [])[1] || '';
+const bootMovil = reglaMovil(movilAstro, '.boot .out');
+check(
+  'a ≤660px las líneas del arranque no se parten: una sola línea con puntos suspensivos',
+  /white-space:\s*nowrap/.test(bootMovil) && /overflow:\s*hidden/.test(bootMovil) && /text-overflow:\s*ellipsis/.test(bootMovil),
+  bootMovil.replace(/\s+/g, ' ') || '(sin regla .boot .out en el @media móvil)',
+);
+check(
+  'a ≤660px el arranque baja un paso de letra (--text-xs) para que quepa más de cada línea',
+  /font-size:\s*var\(--text-xs\)/.test(reglaMovil(movilAstro, '.boot')),
+);
+const fetchMovil = reglaMovil(movilAstro, '.fetch:has(> .foto)');
+const fotoMovil = reglaMovil(movilAstro, '.foto');
+const anchoFotoMovil = Number((fotoMovil.match(/max-width:\s*(\d+)ch/) || [])[1] || 99);
+check(
+  'a ≤660px la foto va al lado de los datos, no encima',
+  /flex-direction:\s*row/.test(fetchMovil) && /flex-wrap:\s*nowrap/.test(fetchMovil),
+  fetchMovil.replace(/\s+/g, ' ') || '(sin regla .fetch:has(> .foto) en el @media móvil)',
+);
+check(
+  'a ≤660px la foto es pequeña (≤12ch) y los datos pueden encogerse (min-width: 0)',
+  anchoFotoMovil <= 12 && /min-width:\s*0/.test(reglaMovil(movilAstro, '.info')),
+  `max-width de la foto: ${anchoFotoMovil}ch`,
+);
+check(
+  'el banner ASCII (sin foto) conserva la columna a ≤660px',
+  /flex-direction:\s*column/.test(reglaMovil(movilAstro, '.fetch')),
+);
+
+console.log('\nTerminal en el teléfono: objetivos táctiles (M4)');
+// WCAG 2.5.8 (AA) pide 24 px como mínimo; 44 px es lo que recomienda 2.5.5 y lo
+// que un pulgar acierta sin zoom. Las filas del ListView (.lv-i) medían ~25 px
+// y las teclas de la barra, 35 px. --toque es el mínimo del sistema para
+// cualquier cosa que se toque.
+const toqueToken = (tokensCss.match(/--toque:\s*([^;]+);/) || [])[1] || '';
+check(
+  '--toque existe y vale al menos 44 px',
+  pxDe(toqueToken) >= 44,
+  toqueToken || '(sin --toque en tokens.css)',
+);
+const bloqueTactil = (css) =>
+  [...css.matchAll(/@media\s*\(hover:\s*none\)\s*and\s*\(pointer:\s*coarse\)\s*\{/g)]
+    .map((m) => bloqueQuiebre(css.slice(m.index), '@media'))
+    .join('\n');
+const tactilTerminal = bloqueTactil(terminalCss);
+const reglaLvTactil = reglaMovil(tactilTerminal, '.lv-i');
+check(
+  'las filas del ListView (.lv-i) miden al menos --toque de alto en táctil, con el texto centrado',
+  /min-height:\s*var\(--toque\)/.test(reglaLvTactil) && /display:\s*flex/.test(reglaLvTactil) && /align-items:\s*center/.test(reglaLvTactil),
+  reglaLvTactil.replace(/\s+/g, ' ') || '(sin regla .lv-i bajo (hover: none) and (pointer: coarse))',
+);
+check(
+  'las teclas y los comandos de la barra miden al menos --toque, y las teclas fijas también de ancho',
+  /min-height:\s*var\(--toque\)/.test(reglaTecla) &&
+    /min-width:\s*var\(--toque\)/.test((terminalCss.match(/\.tecla-fija\s*\{([^}]*)\}/) || [])[1] || ''),
+);
+check(
+  'las teclas centran su texto (con min-height ya no lo da el relleno)',
+  /display:\s*inline-flex|display:\s*flex/.test(reglaTecla) && /align-items:\s*center/.test(reglaTecla) && /justify-content:\s*center/.test(reglaTecla),
+);
+
+const completablesFuente = (terminalTs.match(/const completables = \(\): string\[\] => \{([\s\S]*?)\n\};/) || [])[1] || '';
+check(
+  'las sugerencias no repiten comandos ni incluyen la sección vacía (el enlace de la marca)',
+  /new Set\(/.test(completablesFuente) && /SECCIONES\.filter\(Boolean\)/.test(completablesFuente),
+  'con filas de 44px cada «cd» repetido y cada «cd » fantasma ocupa una pantalla',
+);
+
+console.log('\nTerminal en el teléfono: menos marco (M5)');
+// En un iPhone 15 el botón de menú, la statusline y el pie ocupaban ~116 px de
+// 659 (más la barra de teclas, que hace falta). A ≤660px el marco se aprieta:
+// menos relleno, el pie en una sola línea y menos aire arriba del contenido. No
+// se quita nada: el botón de menú, el enlace «saltar al contenido», la ruta y el
+// reloj siguen ahí.
+const primerToken = (valor) => (valor.trim().match(/^var\(--space-\d+\)/) || [''])[0];
+const sidebarMovil = bloqueQuiebre(sidebarCss, '@media (max-width: 660px)');
+const reglaAlterna = reglaMovil(sidebarMovil, ':root.js .sidebar-alterna');
+const margenAlterna = (reglaAlterna.match(/margin:\s*([^;]+);/) || [])[1] || '';
+const rellenoAlterna = (reglaAlterna.match(/padding:\s*([^;]+);/) || [])[1] || '';
+const pasoEspacio = (tk) => Number((tk.match(/--space-(\d+)/) || [])[1] || 99);
+check(
+  'el botón de menú es más bajo a ≤660px: margen y relleno verticales de --space-2 o menos',
+  pasoEspacio(primerToken(margenAlterna)) <= 2 && pasoEspacio(primerToken(rellenoAlterna)) <= 2,
+  `margin: ${margenAlterna || '—'} · padding: ${rellenoAlterna || '—'}`,
+);
+const statuslineCss = (
+  readFileSync('src/components/Statusline.astro', 'utf8').match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? ''
+).replace(/\/\*[\s\S]*?\*\//g, '');
+const statusMovil = bloqueQuiebre(statuslineCss, '@media (max-width: 660px)');
+const rellenoStatus = (reglaMovil(statusMovil.replace(/\s+/g, ' '), '.status .mode, .status .seg').match(/padding:\s*([^;]+);/) || [])[1] || '';
+check(
+  'la statusline es más baja a ≤660px: relleno vertical de --space-1',
+  pasoEspacio(primerToken(rellenoStatus)) <= 1,
+  rellenoStatus || '(sin regla .status .mode, .status .seg en el @media móvil)',
+);
+const footMovil = reglaMovil(movilAstro, '.foot');
+const rellenoFoot = (footMovil.match(/padding:\s*([^;]+);/) || [])[1] || '';
+check(
+  'el pie va en una sola línea a ≤660px, con relleno vertical de --space-2 o menos',
+  /flex-wrap:\s*nowrap/.test(footMovil) && pasoEspacio(primerToken(rellenoFoot)) <= 2,
+  footMovil.replace(/\s+/g, ' ') || '(sin regla .foot en el @media móvil)',
+);
+const termMovil = reglaMovil(movilAstro, '.term');
+check(
+  'hay menos aire sobre el contenido a ≤660px (relleno superior de .term ≤ --space-3)',
+  pasoEspacio(primerToken((termMovil.match(/padding:\s*([^;]+);/) || [])[1] || '')) <= 3,
+  termMovil.replace(/\s+/g, ' ') || '(sin regla .term en el @media móvil)',
+);
+check(
+  'no se pierde nada: sigue el botón de menú, el enlace de salto, la ruta y el reloj',
+  /class="saltar"/.test(html) &&
+    /class="sidebar-alterna"/.test(html) &&
+    /id="st-path"/.test(html) &&
+    /id="st-clock"/.test(html) &&
+    /class="foot"/.test(html),
 );
 
 console.log('\nPeso');

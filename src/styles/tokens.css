@@ -73,6 +73,10 @@
   --space-9: 4rem; /* 64px */
   --space-10: 5rem; /* 80px */
 
+  /* Lo mínimo que mide algo que se toca con el dedo. WCAG 2.5.8 (AA) exige 24px;
+     44px es lo que recomienda 2.5.5 y lo que un pulgar acierta sin zoom. */
+  --toque: 2.75rem; /* 44px */
+
   --fs: clamp(13px, 1.55vw, 14.5px);
   --lh: 1.65;
 
@@ -86,6 +90,10 @@
   --text-lg: clamp(1.15em, 2.4vw, 1.45em);
   --text-xl: 1.5em;
   --text-2xl: 2em;
+  /* Letra del campo de escritura en táctil: iOS Safari hace zoom en todo campo
+     de menos de 16px al enfocarlo. Es un mínimo del sistema, no un tamaño de
+     diseño, por eso no sale de la escala de arriba. */
+  --text-input: 1rem;
   --lh-tight: 1.25;
   --lh-snug: 1.45;
   --lh-loose: 1.85;
