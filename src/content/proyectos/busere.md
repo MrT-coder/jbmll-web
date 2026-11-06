@@ -33,7 +33,7 @@ demo: https://busere.com
 borrador: false
 ---
 
-Construí BUSERE, una plataforma donde cada psicólogo diseña sus propias pruebas psicológicas y las usa con sus evaluados. El sistema no trae pruebas precargadas: el psicólogo arma la suya por secciones, cada una con sus ítems, escala, puntaje y categorías. Después envía un enlace al evaluado, que la responde sin crear cuenta, y descarga el informe en PDF. Las pruebas son privadas de su autor.
+Construí BUSERE, una plataforma donde cada psicólogo diseña sus propias pruebas psicológicas y las usa con sus evaluados. El sistema no trae pruebas precargadas: el psicólogo arma la suya por secciones, cada una con sus ítems, escala, puntaje y categorías. Después envía un enlace al evaluado, que la responde sin crear cuenta, y descarga el informe en PDF. Las pruebas son privadas de su autor. El sitio del producto está en [busere.com](https://busere.com).
 
 ![Listado de pruebas del psicólogo, con una prueba de ejemplo publicada y su precio por evaluación](/media/busere-tests.webp "El psicólogo crea sus pruebas y las publica para usarlas en sus enlaces.")
 
