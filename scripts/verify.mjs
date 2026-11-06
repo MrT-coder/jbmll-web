@@ -1429,19 +1429,51 @@ function tamanoPng(buf) {
   return firmaOk ? { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) } : null;
 }
 
-// El cuerpo vive entre el `<div class="prose">` de la plantilla y el
-// `<footer class="eof">` que le sigue siempre, en las dos páginas de detalle
-// (src/pages/proyectos/[slug].astro y .../publicaciones/[slug].astro): un
-// límite estable para no confundir esta prosa con cualquier otra <img> que la
-// página pudiera traer en otro lado.
+// El tamaño de un WebP, mismo criterio que tamanoWebp() en
+// src/lib/rehype-figuras.mjs: según su primer chunk (VP8, VP8L o VP8X).
+function tamanoWebp(buf) {
+  const firmaOk =
+    buf.length >= 30 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP';
+  if (!firmaOk) return null;
+  const chunk = buf.toString('ascii', 12, 16);
+  if (chunk === 'VP8 ') return { width: buf.readUInt16LE(26) & 0x3fff, height: buf.readUInt16LE(28) & 0x3fff };
+  if (chunk === 'VP8L') {
+    const bits = buf.readUInt32LE(21);
+    return { width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
+  }
+  if (chunk === 'VP8X') return { width: buf.readUIntLE(24, 3) + 1, height: buf.readUIntLE(27, 3) + 1 };
+  return null;
+}
+
+// El cuerpo vive entre el `<div class="prose">` de la plantilla y lo que le
+// sigue siempre en las dos páginas de detalle (src/pages/proyectos/[slug].astro
+// y .../publicaciones/[slug].astro): el Visor, con su comentario delante, o
+// directamente el `<footer class="eof">`. Un límite estable para no confundir
+// esta prosa con cualquier otra <img> que la página pudiera traer en otro lado.
 function prosaDe(htmlPagina) {
-  return (htmlPagina.match(/<div class="prose">([\s\S]*?)<\/div>\s*<footer class="eof">/) || ['', ''])[1];
+  const limite = /<div class="prose">([\s\S]*?)<\/div>\s*(?:<!--[\s\S]*?-->\s*)?(?:<dialog id="visor"|<footer class="eof">)/;
+  return (htmlPagina.match(limite) || ['', ''])[1];
 }
 
 const paginasConCuerpo = [
   ...proyectosSrc.map((p) => ({ id: p.id, ruta: `proyectos/${p.id}.html`, dir: 'proyectos' })),
   ...publicacionesSrc.filter(tieneCuerpoFuente).map((p) => ({ id: p.id, ruta: `publicaciones/${p.id}.html`, dir: 'publicaciones' })),
 ];
+
+// Astro no rompe el build cuando un plugin de Markdown lanza un error al
+// renderizar una entrada: lo registra y sirve la página con el cuerpo vacío.
+// Por eso se comprueba acá que todo cuerpo escrito en la fuente llegue al
+// HTML, en vez de confiar en que el build haya terminado.
+const cuerposPerdidos = [
+  ...proyectosSrc.filter(tieneCuerpoFuente).map((p) => ({ id: p.id, ruta: `proyectos/${p.id}.html` })),
+  ...publicacionesSrc.filter(tieneCuerpoFuente).map((p) => ({ id: p.id, ruta: `publicaciones/${p.id}.html` })),
+].filter((p) => prosaDe(leer(p.ruta)).trim() === '');
+check(
+  'todo cuerpo escrito en el Markdown aparece en su página de detalle',
+  cuerposPerdidos.length === 0,
+  cuerposPerdidos.map((p) => p.id).join(', ') +
+    ' — revisar el log del build: un error de render deja el cuerpo vacío sin romperlo',
+);
 // El visor flotante (Visor.astro) tiene que estar en la página, con
 // imágenes o sin ellas todavía: es infraestructura, no algo que dependa de
 // si el cuerpo ya trae una figura o un PDF propio. Sin él, el enlace que
@@ -1514,7 +1546,14 @@ if (imgsEnProsa.length === 0) {
     if (!existsSync(ruta)) return true;
     const buf = readFileSync(ruta);
     const ext = extname(ruta).toLowerCase();
-    const real = ext === '.png' ? tamanoPng(buf) : ext === '.jpg' || ext === '.jpeg' ? tamanoJpeg(buf) : null;
+    const real =
+      ext === '.png'
+        ? tamanoPng(buf)
+        : ext === '.jpg' || ext === '.jpeg'
+          ? tamanoJpeg(buf)
+          : ext === '.webp'
+            ? tamanoWebp(buf)
+            : null;
     return !real || real.width !== w || real.height !== h;
   });
   check(

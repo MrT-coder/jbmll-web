@@ -121,11 +121,34 @@ function tamanoPng(buf) {
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
 
+// Un WebP es un contenedor RIFF cuyo primer chunk dice cómo leer el tamaño:
+// VP8 (con pérdida) lo trae en 14 bits tras el código de inicio del cuadro,
+// VP8L (sin pérdida) empaqueta ancho-1 y alto-1 en 14 bits cada uno, y VP8X
+// (extendido) los guarda como ancho-1 y alto-1 en 24 bits.
+function tamanoWebp(buf) {
+  const firmaOk =
+    buf.length >= 30 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP';
+  if (!firmaOk) return null;
+  const chunk = buf.toString('ascii', 12, 16);
+  if (chunk === 'VP8 ') {
+    return { width: buf.readUInt16LE(26) & 0x3fff, height: buf.readUInt16LE(28) & 0x3fff };
+  }
+  if (chunk === 'VP8L') {
+    const bits = buf.readUInt32LE(21);
+    return { width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
+  }
+  if (chunk === 'VP8X') {
+    return { width: buf.readUIntLE(24, 3) + 1, height: buf.readUIntLE(27, 3) + 1 };
+  }
+  return null;
+}
+
 function tamanoReal(rutaAbsoluta) {
   const buf = readFileSync(rutaAbsoluta);
   const ext = extname(rutaAbsoluta).toLowerCase();
   if (ext === '.png') return tamanoPng(buf);
   if (ext === '.jpg' || ext === '.jpeg') return tamanoJpeg(buf);
+  if (ext === '.webp') return tamanoWebp(buf);
   return null;
 }
 
@@ -181,7 +204,7 @@ function crearFigura(img) {
     if (!tam) {
       throw new Error(
         `rehype-figuras: no se pudo leer el tamaño real de «${src}» (solo se ` +
-          `entienden PNG y JPEG — igual que la foto de perfil en Terminal.astro).`,
+          `entienden PNG, JPEG y WebP).`,
       );
     }
     width = tam.width;
