@@ -62,5 +62,3 @@ Genero los informes con plantillas Thymeleaf renderizadas en Chromium sin interf
 ## Frontend y sitio público
 
 El panel es una SPA en Nuxt 4 dividida en capas por área de negocio, con 194 archivos de pruebas en Vitest. Las guardas de ruta son solo para la experiencia de uso: la autorización la decide la API. El sitio público, en Astro, se publica en Cloudflare Pages.
-
-Pendiente: el entorno de producción, la pasarela de pago y la prueba con los primeros psicólogos. Hoy la plataforma corre en un entorno de pruebas con datos de prueba.
