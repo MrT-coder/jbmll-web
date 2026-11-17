@@ -847,12 +847,12 @@ function montarBarra() {
 
   const fijas = el('div', 'teclas-fijas');
   fijas.append(
-    boton('tecla-fija', 'tab', 'Tabulador', () => {
+    boton('tecla-fija', 'tab', 'Tab (Tabulador)', () => {
       if (!accionTab() && !input.value.trim()) sugerirComandos();
     }),
     boton('tecla-fija', '↑', 'Historial anterior', () => void accionFlecha(-1)),
     boton('tecla-fija', '↓', 'Historial siguiente', () => void accionFlecha(1)),
-    boton('tecla-fija', 'esc', 'Escape', () => accionEscape()),
+    boton('tecla-fija', 'esc', 'Esc (Escape)', () => accionEscape()),
     // Sin teclado abierto no hay otro Enter: recuperar un comando con ↑ y no
     // poder ejecutarlo sería una tecla a medias.
     boton('tecla-fija', '↵', 'Ejecutar', () => run()),

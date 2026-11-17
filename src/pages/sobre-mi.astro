@@ -136,6 +136,14 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
     <section class="bloque" id="certificaciones">
       <h2 class="bloque-t">certificaciones y cursos</h2>
       <table class="list list-certs">
+        <thead class="solo-lector">
+          <tr>
+            <th scope="col">nombre</th>
+            <th scope="col">fecha</th>
+            <th scope="col">emisor</th>
+            <th scope="col">archivo</th>
+          </tr>
+        </thead>
         <tbody>
           {
             certificaciones.map((c) => (

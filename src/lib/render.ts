@@ -36,7 +36,11 @@ export function renderSecciones(secciones: Seccion[]): string {
   </tr>`,
     )
     .join('\n');
-  return `<table class="list">\n${filas}\n</table>`;
+  // Encabezados solo para lectores de pantalla: la tabla ya se lee bien a la
+  // vista, pero sin <th> un lector no sabe qué es cada columna.
+  const cabecera =
+    '<thead class="solo-lector"><tr><th scope="col">sección</th><th scope="col">entradas</th><th scope="col">descripción</th></tr></thead>';
+  return `<table class="list">\n${cabecera}\n<tbody>\n${filas}\n</tbody>\n</table>`;
 }
 
 /**
