@@ -100,6 +100,16 @@
   font-size: var(--text-sm);
 }
 
+/* Texto que solo oye el lector de pantalla (encabezados de tabla). */
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* El campo real queda fuera de la vista: el cursor y el texto se dibujan a
    mano para que el prompt sea el de starship y no una caja del navegador. */
 .entry {
