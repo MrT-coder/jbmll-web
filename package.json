@@ -19,6 +19,7 @@
     "@astrojs/sitemap": "^3.7.3",
     "@sveltia/cms": "0.214.1",
     "astro": "^7.2.4",
+    "pdfmake": "^0.3.14",
     "typescript": "^6.0.3",
     "yaml": "2.9.0",
     "zod": "^4.6.5"

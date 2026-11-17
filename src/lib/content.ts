@@ -2,6 +2,8 @@ import { getCollection, getEntry, type CollectionEntry } from 'astro:content';
 import { enlacesDeContacto } from '../data/perfil';
 import type { Fila, Indice, Seccion, Tech, TipoDeSeccion, UsoDeStack, Workspace } from './tipos';
 import { slugTech } from './render';
+import { rutaLocal } from '../i18n/rutas';
+import { TEXTOS_CLIENTE } from '../i18n/cliente';
 
 // La única puerta a los datos. Todo el sitio lee por aquí y nada más sabe de
 // dónde sale el contenido. Cambiar los archivos por D1 es reescribir este
@@ -14,12 +16,36 @@ export type Educacion = CollectionEntry<'educacion'>;
 export type Certificacion = CollectionEntry<'certificaciones'>;
 export type Perfil = CollectionEntry<'perfil'>['data'];
 
+// ── Idioma ──────────────────────────────────────────────────────────────────
+// El español vive en la raíz de cada colección y el inglés en una subcarpeta
+// `en/` con el mismo nombre de archivo (`experiencia/en/firmaseguraec.md`). El
+// `id` de la entrada traducida llega como `en/firmaseguraec`; aquí se le quita
+// el prefijo para que el resto del sitio siga hablando de «firmaseguraec» sin
+// saber en qué idioma está. Lo que aún no tiene traducción cae al español: una
+// página a medio traducir es mejor que un hueco.
+export type Idioma = 'es' | 'en';
+export const IDIOMAS: Idioma[] = ['es', 'en'];
+
+const PREFIJO_EN = 'en/';
+
+export function deIdioma<T extends { id: string }>(todo: T[], lang: Idioma): T[] {
+  const base = todo.filter((e) => !e.id.startsWith(PREFIJO_EN));
+  if (lang === 'es') return base;
+  const traducidas = new Map(
+    todo.filter((e) => e.id.startsWith(PREFIJO_EN)).map((e) => [e.id.slice(PREFIJO_EN.length), e]),
+  );
+  return base.map((e) => {
+    const t = traducidas.get(e.id);
+    return t ? { ...t, id: e.id } : e;
+  });
+}
+
 // Más reciente primero. El orden lexicográfico de AAAA-MM ya es el cronológico.
 const porFecha = (a: string, b: string) => b.localeCompare(a);
 
 /** Un puesto sin fecha de fin sigue vigente y va siempre arriba. */
-export async function getExperiencia(): Promise<Experiencia[]> {
-  const todo = await getCollection('experiencia');
+export async function getExperiencia(lang: Idioma = 'es'): Promise<Experiencia[]> {
+  const todo = deIdioma(await getCollection('experiencia'), lang);
   return todo.sort((a, b) => {
     if (!a.data.fin && b.data.fin) return -1;
     if (a.data.fin && !b.data.fin) return 1;
@@ -27,23 +53,34 @@ export async function getExperiencia(): Promise<Experiencia[]> {
   });
 }
 
-export async function getProyectos(): Promise<Proyecto[]> {
-  const todo = await getCollection('proyectos', ({ data }) => !data.borrador);
+export async function getProyectos(lang: Idioma = 'es'): Promise<Proyecto[]> {
+  const todo = deIdioma(await getCollection('proyectos'), lang).filter((e) => !e.data.borrador);
   return todo.sort((a, b) => porFecha(a.data.fecha, b.data.fecha));
 }
 
-export async function getPublicaciones(): Promise<Publicacion[]> {
-  const todo = await getCollection('publicaciones', ({ data }) => !data.borrador);
+export async function getPublicaciones(lang: Idioma = 'es'): Promise<Publicacion[]> {
+  const todo = deIdioma(await getCollection('publicaciones'), lang).filter((e) => !e.data.borrador);
   return todo.sort((a, b) => b.data.anio - a.data.anio);
 }
 
-export async function getEducacion(): Promise<Educacion[]> {
-  const todo = await getCollection('educacion');
+export async function getEducacion(lang: Idioma = 'es'): Promise<Educacion[]> {
+  const todo = deIdioma(await getCollection('educacion'), lang);
   return todo.sort((a, b) => porFecha(a.data.inicio, b.data.inicio));
 }
 
-export async function getCertificaciones(): Promise<Certificacion[]> {
-  const todo = await getCollection('certificaciones');
+export async function getCertificaciones(lang: Idioma = 'es'): Promise<Certificacion[]> {
+  const todo = (await getCollection('certificaciones')).map((c) =>
+    lang === 'en'
+      ? {
+          ...c,
+          data: {
+            ...c.data,
+            nombre: c.data.nombre_en ?? c.data.nombre,
+            emisor: c.data.emisor_en ?? c.data.emisor,
+          },
+        }
+      : c,
+  );
   // Las que no tienen fecha van al final: sin fecha no hay dónde colocarlas y
   // el principio es el peor lugar para adivinar.
   return todo.sort((a, b) => {
@@ -74,8 +111,8 @@ export type { UsoDeStack } from './tipos';
  * Una entrada que enlaza a un proyecto no aporta su propio stack: es el mismo
  * trabajo contado dos veces.
  */
-export async function getStack(): Promise<UsoDeStack[]> {
-  const [experiencia, proyectos] = await Promise.all([getExperiencia(), getProyectos()]);
+export async function getStack(lang: Idioma = 'es'): Promise<UsoDeStack[]> {
+  const [experiencia, proyectos] = await Promise.all([getExperiencia(lang), getProyectos(lang)]);
 
   const acc = new Map<string, UsoDeStack>();
 
@@ -90,7 +127,7 @@ export async function getStack(): Promise<UsoDeStack[]> {
   };
 
   for (const e of experiencia) {
-    if (e.data.proyecto) continue;
+    if (e.data.proyectos.length > 0) continue;
     for (const tech of e.data.st) {
       sumar(tech, {
         tipo: 'experiencia',
@@ -98,7 +135,7 @@ export async function getStack(): Promise<UsoDeStack[]> {
         titulo: `${e.data.puesto} · ${e.data.organizacion}`,
         // Mismo formato que el `periodo()` de sobre-mi.astro: sin fecha de fin,
         // el puesto sigue vigente.
-        detalle: `${e.data.inicio} — ${e.data.fin ?? 'presente'}`,
+        detalle: `${e.data.inicio} — ${e.data.fin ?? (lang === 'en' ? 'present' : 'presente')}`,
       });
     }
   }
@@ -120,10 +157,31 @@ export async function getStack(): Promise<UsoDeStack[]> {
  * que un CMS basado en Git lo edite sin tocar TypeScript; los cálculos que sí
  * son código se quedan en src/data/perfil.ts.
  */
-export async function getPerfil() {
+export async function getPerfil(lang: Idioma = 'es') {
   const entrada = await getEntry('perfil', 'perfil');
   if (!entrada) throw new Error('getPerfil: falta la entrada «perfil» en src/content/perfil.yaml');
-  return { ...entrada.data, contacto: enlacesDeContacto(entrada.data) };
+  let datos = entrada.data;
+  if (lang === 'en') {
+    // Solo se superpone lo traducible; contacto y enlaces son el mismo dato.
+    const en = (await getEntry('perfilEn', 'perfil'))?.data;
+    if (en) {
+      datos = {
+        ...datos,
+        titular: en.titular ?? datos.titular,
+        ubicacion: en.ubicacion ?? datos.ubicacion,
+        disponibilidad: en.disponibilidad ?? datos.disponibilidad,
+        resumen: en.resumen ?? datos.resumen,
+        idiomas: en.idiomas.length ? en.idiomas : datos.idiomas,
+        foto: datos.foto && { ...datos.foto, alt: en.foto_alt ?? datos.foto.alt },
+        distribuidor: datos.distribuidor && {
+          ...datos.distribuidor,
+          etiqueta: en.distribuidor_etiqueta ?? datos.distribuidor.etiqueta,
+          divulgacion: en.distribuidor_divulgacion ?? datos.distribuidor.divulgacion,
+        },
+      };
+    }
+  }
+  return { ...datos, contacto: enlacesDeContacto(datos) };
 }
 
 type PerfilConContacto = Awaited<ReturnType<typeof getPerfil>>;
@@ -131,8 +189,8 @@ type PerfilConContacto = Awaited<ReturnType<typeof getPerfil>>;
 /** Una tecnología solo merece página propia si hay algo que listar en ella. */
 export const MINIMO_PARA_PAGINA_DE_STACK = 2;
 
-export async function getStackConPagina(): Promise<UsoDeStack[]> {
-  const stack = await getStack();
+export async function getStackConPagina(lang: Idioma = 'es'): Promise<UsoDeStack[]> {
+  const stack = await getStack(lang);
   return stack.filter((s) => s.usos >= MINIMO_PARA_PAGINA_DE_STACK);
 }
 
@@ -143,13 +201,13 @@ export async function getStackConPagina(): Promise<UsoDeStack[]> {
  * uno por su cuenta, y por eso enlazaban a páginas que `getStaticPaths` de
  * `/stack/[tech]` nunca generó.
  */
-export async function getTechsConPagina(): Promise<Set<string>> {
-  const stack = await getStackConPagina();
+export async function getTechsConPagina(lang: Idioma = 'es'): Promise<Set<string>> {
+  const stack = await getStackConPagina(lang);
   return new Set(stack.map((s) => s.tech));
 }
 
-function techDe(tech: string, conPagina: Set<string>): Tech {
-  return { tech, href: conPagina.has(tech) ? `/stack/${slugTech(tech)}` : null };
+function techDe(tech: string, conPagina: Set<string>, lang: Idioma): Tech {
+  return { tech, href: conPagina.has(tech) ? rutaLocal(lang, `/stack/${slugTech(tech)}`) : null };
 }
 
 // ── El índice ───────────────────────────────────────────────────────────────
@@ -173,23 +231,60 @@ export const SECCIONES: { slug: string; desc: string; tipo: TipoDeSeccion; titul
 ];
 
 /**
+ * Lo que cambia de cada sección según el idioma: la descripción de la barra
+ * lateral, el título de pestaña y el lead. Los slugs y el tipo no cambian.
+ */
+const TEXTOS_SECCION: Record<Idioma, Record<string, { desc: string; titulo: string; lead: string }>> = {
+  es: {
+    'sobre-mi': { desc: 'quién soy y con qué trabajo', titulo: 'Sobre mí — JBMLL', lead: '' },
+    proyectos: { desc: 'lo que he construido', titulo: 'Proyectos — JBMLL', lead: 'Lo que he construido.' },
+    publicaciones: {
+      desc: 'producción académica, con DOI',
+      titulo: 'Publicaciones — JBMLL',
+      lead: 'Producción académica, con DOI.',
+    },
+    contacto: { desc: 'dónde encontrarme', titulo: 'Contacto — JBMLL', lead: 'Dónde encontrarme.' },
+  },
+  en: {
+    'sobre-mi': { desc: 'who I am and what I work with', titulo: 'About — JBMLL', lead: '' },
+    proyectos: { desc: 'what I have built', titulo: 'Projects — JBMLL', lead: 'What I have built.' },
+    publicaciones: {
+      desc: 'academic output, with DOI',
+      titulo: 'Publications — JBMLL',
+      lead: 'Academic output, with DOI.',
+    },
+    contacto: { desc: 'where to find me', titulo: 'Contact — JBMLL', lead: 'Where to find me.' },
+  },
+};
+
+/**
+ * Cómo se llama cada sección a la vista. La URL y el slug son los mismos en los
+ * dos idiomas; lo que cambia es el nombre que se lee en la barra y en `ls`.
+ */
+const NOMBRE_EN: Record<string, string> = {
+  'sobre-mi': 'about',
+  proyectos: 'projects',
+  publicaciones: 'publications',
+  contacto: 'contact',
+};
+
+export function nombreDeSeccion(slug: string, lang: Idioma): string {
+  return lang === 'en' ? (NOMBRE_EN[slug] ?? slug) : slug;
+}
+
+/** Las secciones con sus textos en el idioma pedido. */
+export function seccionesDe(lang: Idioma) {
+  return SECCIONES.map((s) => ({ ...s, desc: TEXTOS_SECCION[lang][s.slug].desc, titulo: TEXTOS_SECCION[lang][s.slug].titulo }));
+}
+
+/**
  * El lead de cada sección. El de sobre-mi repite el nombre que ya trae el
  * perfil —no se vuelve a escribir a mano—; los demás no dependen de él y
  * quedan fijos aquí mismo.
  */
-function leadDeSeccion(slug: string, perfil: PerfilConContacto): string {
-  switch (slug) {
-    case 'sobre-mi':
-      return perfil.nombre;
-    case 'proyectos':
-      return 'Lo que he construido.';
-    case 'publicaciones':
-      return 'Producción académica, con DOI.';
-    case 'contacto':
-      return 'Dónde encontrarme.';
-    default:
-      return '';
-  }
+function leadDeSeccion(slug: string, perfil: PerfilConContacto, lang: Idioma): string {
+  if (slug === 'sobre-mi') return perfil.nombre;
+  return TEXTOS_SECCION[lang][slug]?.lead ?? '';
 }
 
 /**
@@ -197,10 +292,11 @@ function leadDeSeccion(slug: string, perfil: PerfilConContacto): string {
  * pareja para reponerlos al volver a `~` sin recargar; ambos se arman sobre el
  * perfil ya resuelto, no se vuelven a escribir a mano.
  */
-function inicioDe(perfil: PerfilConContacto): { titulo: string; lead: string } {
+function inicioDe(perfil: PerfilConContacto, lang: Idioma): { titulo: string; lead: string } {
+  const quien = `<strong>${perfil.nombre}</strong> (<span class="sig">${perfil.marca}</span>)`;
   return {
     titulo: `${perfil.nombre} — ${perfil.marca}`,
-    lead: `Soy <strong>${perfil.nombre}</strong> (<span class="sig">${perfil.marca}</span>), desarrollador backend.`,
+    lead: lang === 'en' ? `I am ${quien}, a backend developer.` : `Soy ${quien}, desarrollador backend.`,
   };
 }
 
@@ -209,11 +305,14 @@ function inicioDe(perfil: PerfilConContacto): { titulo: string; lead: string } {
  * páginas dejen de escribir esa pareja a mano: un slug que no existe es un
  * error de quien programa, no algo que la página deba tolerar en silencio.
  */
-export async function seccionDe(slug: string): Promise<{ titulo: string; lead: string }> {
+export async function seccionDe(
+  slug: string,
+  lang: Idioma = 'es',
+): Promise<{ titulo: string; lead: string }> {
   const s = SECCIONES.find((sec) => sec.slug === slug);
   if (!s) throw new Error(`seccionDe: no existe la sección «${slug}»`);
-  const perfil = await getPerfil();
-  return { titulo: s.titulo, lead: leadDeSeccion(slug, perfil) };
+  const perfil = await getPerfil(lang);
+  return { titulo: TEXTOS_SECCION[lang][slug].titulo, lead: leadDeSeccion(slug, perfil, lang) };
 }
 
 // ── Barra lateral ────────────────────────────────────────────────────────────
@@ -221,17 +320,27 @@ export async function seccionDe(slug: string): Promise<{ titulo: string; lead: s
 // otra vista que necesite listar secciones leen de aquí, no escriben su propia
 // copia.
 
-export const WORKSPACES: Workspace[] = [
-  { slug: '', ruta: '/', nombre: '~' },
-  ...SECCIONES.map((s) => ({ slug: s.slug, ruta: `/${s.slug}`, nombre: s.slug })),
-];
+/** Los workspaces con la ruta de cada idioma (`/proyectos` o `/en/proyectos`). */
+export function workspacesDe(lang: Idioma): Workspace[] {
+  return [
+    { slug: '', ruta: rutaLocal(lang, '/'), nombre: '~' },
+    ...SECCIONES.map((s) => ({
+      slug: s.slug,
+      ruta: rutaLocal(lang, `/${s.slug}`),
+      nombre: nombreDeSeccion(s.slug, lang),
+    })),
+  ];
+}
+
+export const WORKSPACES: Workspace[] = workspacesDe('es');
 
 /**
  * La segunda línea de cada workspace, como en herdr bajo cada repositorio. Los
  * conteos salen del índice, nunca escritos a mano: así no se pueden
  * desincronizar de lo que el sitio realmente lista.
  */
-export function subtituloDeWorkspace(slug: string, indice: Indice): string {
+export function subtituloDeWorkspace(slug: string, indice: Indice, lang: Idioma = 'es'): string {
+  const en = lang === 'en';
   switch (slug) {
     case '':
       return 'terminal';
@@ -239,14 +348,14 @@ export function subtituloDeWorkspace(slug: string, indice: Indice): string {
       return 'whoami · stack';
     case 'proyectos': {
       const n = indice.entradas.proyectos?.length ?? 0;
-      return `${n} ${n === 1 ? 'proyecto' : 'proyectos'}`;
+      return `${n} ${en ? (n === 1 ? 'project' : 'projects') : n === 1 ? 'proyecto' : 'proyectos'}`;
     }
     case 'publicaciones': {
       const n = indice.entradas.publicaciones?.length ?? 0;
-      return `${n} ${n === 1 ? 'publicación' : 'publicaciones'}`;
+      return `${n} ${en ? (n === 1 ? 'publication' : 'publications') : n === 1 ? 'publicación' : 'publicaciones'}`;
     }
     case 'contacto':
-      return 'correo · github';
+      return en ? 'email · github' : 'correo · github';
     default:
       return '';
   }
@@ -274,21 +383,44 @@ export const ETIQUETAS_CONTEXTO: Record<NonNullable<Proyecto['data']['contexto']
   academico: 'académico',
 };
 
-function filaDeProyecto(p: Proyecto, conPagina: Set<string>): Fila {
+/** Las mismas etiquetas, en inglés. El español sigue siendo la fuente que lee verify.mjs. */
+const ETIQUETAS_ESTADO_EN: Record<Proyecto['data']['estado'], string> = {
+  produccion: 'in production',
+  construyendo: 'building',
+  'prueba-de-concepto': 'proof of concept',
+  archivado: 'archived',
+  cancelado: 'cancelled',
+};
+const ETIQUETAS_CONTEXTO_EN: Record<NonNullable<Proyecto['data']['contexto']>, string> = {
+  tesis: 'thesis',
+  laboral: 'work',
+  personal: 'personal',
+  academico: 'academic',
+};
+
+export function etiquetaEstado(estado: Proyecto['data']['estado'], lang: Idioma = 'es'): string {
+  return (lang === 'en' ? ETIQUETAS_ESTADO_EN : ETIQUETAS_ESTADO)[estado];
+}
+
+export function etiquetaContexto(contexto: NonNullable<Proyecto['data']['contexto']>, lang: Idioma = 'es'): string {
+  return (lang === 'en' ? ETIQUETAS_CONTEXTO_EN : ETIQUETAS_CONTEXTO)[contexto];
+}
+
+function filaDeProyecto(p: Proyecto, conPagina: Set<string>, lang: Idioma): Fila {
   return {
     slug: p.id,
     titulo: p.data.titulo,
     desc: p.data.desc,
-    href: `/proyectos/${p.id}`,
-    st: p.data.st.map((tech) => techDe(tech, conPagina)),
+    href: rutaLocal(lang, `/proyectos/${p.id}`),
+    st: p.data.st.map((tech) => techDe(tech, conPagina, lang)),
     kw: [...p.data.kw],
-    estado: { clave: p.data.estado, etiqueta: ETIQUETAS_ESTADO[p.data.estado] },
-    contexto: p.data.contexto ? ETIQUETAS_CONTEXTO[p.data.contexto] : undefined,
+    estado: { clave: p.data.estado, etiqueta: etiquetaEstado(p.data.estado, lang) },
+    contexto: p.data.contexto ? etiquetaContexto(p.data.contexto, lang) : undefined,
     meta: [p.data.organizacion, p.data.fecha].filter(Boolean).join(' · '),
   };
 }
 
-function filaDePublicacion(pub: Publicacion): Fila {
+function filaDePublicacion(pub: Publicacion, lang: Idioma): Fila {
   // Sin cuerpo propio no hay página: solo la fila y el enlace al editor. Una
   // página que repite el título para mandarte a otro sitio compite consigo
   // misma en los buscadores.
@@ -299,37 +431,39 @@ function filaDePublicacion(pub: Publicacion): Fila {
     slug: pub.id,
     titulo: pub.data.titulo,
     desc: [pub.data.venue, pub.data.serie, pub.data.paginas].filter(Boolean).join(' · '),
-    href: propia ? `/publicaciones/${pub.id}` : null,
-    externo: doi ? { href: doi, etiqueta: pub.data.doi ? 'DOI' : 'enlace' } : undefined,
+    href: propia ? rutaLocal(lang, `/publicaciones/${pub.id}`) : null,
+    externo: doi ? { href: doi, etiqueta: pub.data.doi ? 'DOI' : lang === 'en' ? 'link' : 'enlace' } : undefined,
     st: [],
     kw: [...pub.data.kw],
     meta: `${pub.data.anio} · ${pub.data.autores.join('; ')}`,
   };
 }
 
-export async function getIndice(): Promise<Indice> {
+export async function getIndice(lang: Idioma = 'es'): Promise<Indice> {
   const [proyectos, publicaciones, stack, conPagina, perfil] = await Promise.all([
-    getProyectos(),
-    getPublicaciones(),
-    getStack(),
-    getTechsConPagina(),
-    getPerfil(),
+    getProyectos(lang),
+    getPublicaciones(lang),
+    getStack(lang),
+    getTechsConPagina(lang),
+    getPerfil(lang),
   ]);
 
   const entradas: Record<string, Fila[]> = {
     'sobre-mi': [],
-    proyectos: proyectos.map((p) => filaDeProyecto(p, conPagina)),
-    publicaciones: publicaciones.map(filaDePublicacion),
+    proyectos: proyectos.map((p) => filaDeProyecto(p, conPagina, lang)),
+    publicaciones: publicaciones.map((p) => filaDePublicacion(p, lang)),
     contacto: [],
   };
 
-  const secciones: Seccion[] = SECCIONES.map((s) => ({
+  const secciones: Seccion[] = seccionesDe(lang).map((s) => ({
     ...s,
-    lead: leadDeSeccion(s.slug, perfil),
+    lead: leadDeSeccion(s.slug, perfil, lang),
+    nombre: nombreDeSeccion(s.slug, lang),
+    href: rutaLocal(lang, `/${s.slug}`),
     n: entradas[s.slug]?.length ?? 0,
   }));
 
-  return { secciones, entradas, stack, inicio: inicioDe(perfil) };
+  return { lang, secciones, entradas, stack, inicio: inicioDe(perfil, lang), ui: TEXTOS_CLIENTE[lang] };
 }
 
 /**
@@ -358,7 +492,7 @@ export type Pagina = CollectionEntry<'paginas'>;
  * los bloques de datos los arma el sitio: así lo libre se escribe libre y lo
  * que se calcula no se puede desincronizar a mano.
  */
-export async function getPagina(id: string): Promise<Pagina | null> {
-  const todas = await getCollection('paginas');
+export async function getPagina(id: string, lang: Idioma = 'es'): Promise<Pagina | null> {
+  const todas = deIdioma(await getCollection('paginas'), lang);
   return todas.find((p) => p.id === id) ?? null;
 }

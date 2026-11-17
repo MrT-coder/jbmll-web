@@ -14,7 +14,14 @@ export default defineConfig({
   // y eso exigiría 'unsafe-inline' en style-src.
   build: { format: 'file', inlineStylesheets: 'never' },
 
-  integrations: [sitemap()],
+  // El sitemap declara cada página con su par en el otro idioma (hreflang). Los
+  // slugs son comunes y el inglés vive bajo /en/, así que basta con los
+  // prefijos; la 404 queda fuera igual que antes.
+  integrations: [
+    sitemap({
+      i18n: { defaultLocale: 'es', locales: { es: 'es-EC', en: 'en-US' } },
+    }),
+  ],
 
   // Convierte cada imagen del cuerpo (proyectos, publicaciones) en una figura
   // con pie, marca todo enlace a un PDF propio para el visor flotante, y

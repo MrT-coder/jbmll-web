@@ -1,4 +1,7 @@
 ---
+import type { Idioma } from '../lib/content';
+import { TEXTOS_CLIENTE } from '../i18n/cliente';
+
 interface Props {
   /** La ruta que muestra el segmento central: `~/` o `~/sección`. */
   ruta: string;
@@ -6,10 +9,12 @@ interface Props {
    * oculta en móvil. Es el valor sin JavaScript: 1 en una página de detalle,
    * 0 en una de sección. sidebar.ts lo corrige apenas fusiona la sesión. */
   abiertos: number;
+  lang?: Idioma;
 }
 
-const { ruta, abiertos } = Astro.props;
-const etiquetaAbiertos = `${abiertos} ${abiertos === 1 ? 'abierto' : 'abiertos'}`;
+const { ruta, abiertos, lang = 'es' } = Astro.props;
+const t = TEXTOS_CLIENTE[lang].sidebar;
+const etiquetaAbiertos = `${abiertos} ${abiertos === 1 ? t.abiertoUno : t.abiertoMuchos}`;
 ---
 
 <div class="status">

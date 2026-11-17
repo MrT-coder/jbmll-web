@@ -22,6 +22,11 @@ kw:
   - IA generativa
   - accesibilidad
   - validación con usuarios
+cv:
+  - Construí una herramienta de apoyo terapéutico con IA y visión computacional en tiempo real que detecta y ayuda a prevenir crisis sociales en personas con TEA.
+  - Implementé reconocimiento facial de emociones no intrusivo con MobileNetV2 cuantizado sobre TensorFlow Lite, OpenCV y MediaPipe.
+  - Integré un modelo generativo y síntesis de voz para entregar retroalimentación terapéutica después de cada sesión.
+  - Validé la herramienta con profesionales del área, con un tiempo medio entre fallos de 57,6 minutos y 70,5 en la escala SUS; publicada como capítulo en Lecture Notes in Computer Science.
 ---
 
 Construí una herramienta de apoyo terapéutico que detecta y ayuda a prevenir

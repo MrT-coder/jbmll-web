@@ -26,6 +26,15 @@ if (!(visor instanceof HTMLDialogElement) || !titulo || !cuerpo || !botonCerrar)
   throw new Error('visor: falta el andamiaje del documento');
 }
 
+// Los textos los escribe el servidor en el propio <dialog> (data-textos): este
+// módulo no hace fetch. Si faltan o no se pueden leer, queda el español.
+let textos = { abrirPdf: 'abrir el PDF', noPdf: 'El navegador no pudo mostrar el PDF. ' };
+try {
+  textos = { ...textos, ...JSON.parse(visor.dataset.textos ?? '{}') };
+} catch {
+  /* se queda con los de arriba */
+}
+
 const ES_PDF = /\.pdf(?:[?#]|$)/i;
 const ES_IMAGEN = /\.(png|jpe?g|webp|avif)(?:[?#]|$)/i;
 
@@ -47,8 +56,8 @@ function contenidoPara(href: string, nombre: string): HTMLElement | null {
     enlace.href = href;
     enlace.target = '_blank';
     enlace.rel = 'noopener';
-    enlace.textContent = 'abrir el PDF';
-    object.append('El navegador no pudo mostrar el PDF. ', enlace);
+    enlace.textContent = textos.abrirPdf;
+    object.append(textos.noPdf, enlace);
     return object;
   }
   if (ES_IMAGEN.test(href)) {

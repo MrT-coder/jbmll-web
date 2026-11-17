@@ -20,6 +20,11 @@ kw:
   - hackatón
 repo: https://github.com/MrT-coder/pewonu
 demo: https://pewonu.jbmllnube.com/
+cv:
+  - Lideré un equipo de cinco personas en un hackatón de dos días del NASA Space Apps Challenge 2026 y construí un prototipo de monitoreo de salud para astronautas.
+  - Implementé la comparación de cada astronauta con su propia línea base mediante reglas deterministas, sin IA en la ruta de alertas.
+  - Empaqueté los datos que el astronauta decide enviar como Bundle HL7 FHIR R4 y los validé con el validador oficial de HL7.
+  - Construí la base en Tierra con FastAPI y SQLite, y una app con Flet que funciona sin conexión.
 ---
 Lideré un equipo de cinco personas en un hackatón de dos días, el 14 y 15 de noviembre de 2026, para el reto «Create Health Monitoring Software for Astronauts on Space Missions» del NASA Space Apps Challenge. Construimos un prototipo de dos sistemas: una app para el astronauta y una base en Tierra. Todos los datos son simulados y el prototipo no diagnostica.
 

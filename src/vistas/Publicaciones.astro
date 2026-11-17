@@ -1,0 +1,23 @@
+---
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import { getIndice, seccionDe, type Idioma } from '../lib/content';
+import { renderEntradas } from '../lib/render';
+import { TEXTOS_PAGINAS } from '../i18n/paginas';
+
+interface Props {
+  lang: Idioma;
+}
+const { lang } = Astro.props;
+
+const indice = await getIndice(lang);
+const filas = indice.entradas.publicaciones;
+const { titulo, lead } = await seccionDe('publicaciones', lang);
+---
+
+<Base
+  title={titulo}
+  description={TEXTOS_PAGINAS[lang].publicaciones.descripcion}
+>
+  <Terminal lang={lang} seccion="publicaciones" lead={lead} salida={renderEntradas(filas, lang)} />
+</Base>
