@@ -19,6 +19,8 @@ export interface EtiquetasCv {
   horas: string;
   credencial: string;
   registro: string;
+  demo: string;
+  repo: string;
   /** Abreviaturas de mes, enero a diciembre. */
   meses: string[];
   /** Etiquetas de las categorías de habilidades, por clave (ver categorias-stack.ts). */
@@ -46,6 +48,8 @@ export const ETIQUETAS_CV: Record<Idioma, EtiquetasCv> = {
     horas: 'horas',
     credencial: 'ID de credencial',
     registro: 'Registro',
+    demo: 'Demo',
+    repo: 'Repositorio',
     meses: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
     categorias: {
       lenguajes: 'Lenguajes',
@@ -75,6 +79,8 @@ export const ETIQUETAS_CV: Record<Idioma, EtiquetasCv> = {
     horas: 'hours',
     credencial: 'Credential ID',
     registro: 'Registration',
+    demo: 'Demo',
+    repo: 'Repository',
     meses: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
     categorias: {
       lenguajes: 'Languages',

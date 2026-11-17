@@ -64,6 +64,16 @@ function entrada(x: CvEntrada, e: string, k: number): Nodo[] {
     { text: x.detalle, italics: true, color: GRIS, fontSize: 9 * k, margin: [0, 0, 0, 2], keepWithNext: x.puntos.length > 0 },
   ];
   if (x.puntos.length) salida.push({ ul: x.puntos, margin: [0, 0, 0, 2], markerColor: '#1a1a1a' });
+  if (x.enlaces.length) {
+    // El enlace se escribe completo y también es pulsable: un ATS lee el texto
+    // y una persona puede hacer clic. noWrap para que no se parta al final de línea.
+    const partes: Nodo[] = x.enlaces.flatMap((l, i) => [
+      ...(i ? [{ text: '  ·  ' }] : []),
+      { text: `${l.etiqueta}: `, bold: true },
+      { text: l.url.replace(/\/$/, ''), link: l.url, noWrap: true, color: '#1a1a1a' },
+    ]);
+    salida.push({ text: partes, fontSize: 9 * k, margin: [0, 0, 0, 2] });
+  }
   if (x.stack.length) {
     salida.push({
       text: [{ text: `${e}: `, bold: true }, x.stack.join(', ')],

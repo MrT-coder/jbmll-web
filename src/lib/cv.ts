@@ -22,6 +22,8 @@ export interface CvEntrada {
   detalle: string;
   puntos: string[];
   stack: string[];
+  /** Enlaces del proyecto (demo, repositorio), solo los que existen. */
+  enlaces: { etiqueta: string; url: string }[];
 }
 
 export interface Cv {
@@ -116,6 +118,7 @@ export async function armarCv(lang: Idioma): Promise<Cv> {
       // el primero; el resto vive en Proyectos.
       puntos: x.data.proyecto ? parrafos.slice(0, 1) : parrafos,
       stack: enlazado ? enlazado.data.st : x.data.st,
+      enlaces: [],
     };
   });
 
@@ -126,6 +129,10 @@ export async function armarCv(lang: Idioma): Promise<Cv> {
       detalle: [p.data.organizacion, formatoMes(p.data.fecha, e.meses)].filter(Boolean).join(' · '),
       puntos: p.data.cv,
       stack: p.data.st,
+      enlaces: [
+        p.data.demo ? { etiqueta: e.demo, url: p.data.demo } : null,
+        p.data.repo ? { etiqueta: e.repo, url: p.data.repo } : null,
+      ].filter((x): x is { etiqueta: string; url: string } => x !== null),
     }));
 
   const refs = publicaciones.map((p) => {
