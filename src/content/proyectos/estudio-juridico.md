@@ -4,6 +4,7 @@ desc: Plataforma full-stack que el personal no técnico administra sin tocar có
 estado: produccion
 fecha: 2025-01
 destacado: true
+demo: https://hartfirmadeabogados.com/
 st:
   - PHP
   - Laravel
