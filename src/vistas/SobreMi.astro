@@ -40,6 +40,14 @@ const [perfil, pagina, experiencia, educacion, certificaciones, stack, conPagina
 ]);
 const proyectoPorId = new Map(proyectos.map((p) => [p.id, p]));
 
+// El stack de un puesto que enlaza a proyectos es la unión de los suyos, sin
+// repetir (igual que en el CV). getStack() no lo cuenta dos veces: ahí un puesto
+// con proyectos no aporta stack propio; esto solo lo dibuja.
+const stackDe = (e: (typeof experiencia)[number]): string[] =>
+  e.data.proyectos.length
+    ? [...new Set(e.data.proyectos.flatMap((id) => proyectoPorId.get(id)?.data.st ?? []))]
+    : e.data.st;
+
 // La prosa la escribe el Markdown; los bloques de abajo salen de los datos.
 const Prosa = pagina ? (await render(pagina)).Content : null;
 const { titulo, lead } = await seccionDe('sobre-mi', lang);
@@ -124,9 +132,9 @@ const modalidad = (m: string) => TEXTOS_PAGINAS[lang].modalidad[m] ?? m;
                 </p>
               )
             }
-            {e.data.st.length > 0 && (
+            {stackDe(e).length > 0 && (
               <ul class="chips">
-                {e.data.st.map((t) => (
+                {stackDe(e).map((t) => (
                   <li>
                     {conPagina.has(t) ? (
                       <a class="chip" href={rutaLocal(lang, `/stack/${slugTech(t)}`)}>
