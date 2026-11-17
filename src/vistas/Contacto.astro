@@ -1,0 +1,75 @@
+---
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import DescargarCv from '../components/DescargarCv.astro';
+import { render } from 'astro:content';
+import { getPagina, getPerfil, seccionDe, type Idioma } from '../lib/content';
+import { renderContacto, propsExterno, marcaExterna } from '../lib/render';
+import { TEXTOS_PAGINAS } from '../i18n/paginas';
+
+interface Props {
+  lang: Idioma;
+}
+const { lang } = Astro.props;
+
+const [perfil, pagina] = await Promise.all([getPerfil(lang), getPagina('contacto', lang)]);
+const Prosa = pagina ? (await render(pagina)).Content : null;
+const { titulo, lead } = await seccionDe('contacto', lang);
+---
+
+<Base
+  title={titulo}
+  description={TEXTOS_PAGINAS[lang].contacto.descripcion(perfil.nombre)}
+>
+  <Terminal lang={lang} seccion="contacto" lead={lead} salida={renderContacto(perfil.contacto, lang)}>
+    {Prosa && <div class="prose intro"><Prosa /></div>}
+    <p class="out note"># {perfil.ubicacion} · {perfil.disponibilidad}</p>
+    <DescargarCv lang={lang} />
+    {
+      perfil.distribuidor && (
+        <>
+          {/* No pasa por renderContacto()/enlacesDeContacto(): es una oferta
+             comercial (afiliado), no una forma de contacto, así que no entra
+             en esa lista (ver `distribuidor` en src/content.config.ts). Misma
+             tabla .list que arma renderContacto() en src/lib/render.ts, para
+             que se vea como el resto de la página, pero armada acá porque el
+             dato no vive en `perfil.contacto`. */}
+          <table class="list">
+            <tbody>
+              <tr>
+                <td class="n">{perfil.distribuidor.etiqueta}</td>
+                <td class="d">
+                  {/* Sin rel="me": ese atributo declara que el perfil del otro
+                     extremo es el mismo de aquí (ver renderContacto()), y este
+                     enlace no es una identidad propia, es un enlace de
+                     distribuidor con comisión. En su lugar lleva
+                     rel="sponsored" (la indicación de Google para enlaces de
+                     afiliado), que propsExterno() fusiona con noopener en un
+                     solo rel. target/rel y el anuncio de pestaña nueva salen
+                     de propsExterno()/MARCA_EXTERNA en src/lib/render.ts, la
+                     misma decisión que ya usa renderContacto(): no se repiten
+                     a mano.
+
+                     La divulgación ya no es un párrafo: es una marca corta
+                     (perfil.distribuidor.divulgacion) en esta misma fila.
+                     aria-describedby la asocia al enlace, así que el lector de
+                     pantalla la anuncia junto a él y no solo se ve. */}
+                  <a
+                    class="go"
+                    href={perfil.distribuidor.href}
+                    aria-describedby="marca-distribuidor"
+                    {...propsExterno(perfil.distribuidor.href, 'sponsored')}
+                  >
+                    {perfil.distribuidor.href.replace(/^https?:\/\//, '')}
+                    <Fragment set:html={marcaExterna(lang)} />
+                  </a>
+                  <span class="marca-afiliado" id="marca-distribuidor">{perfil.distribuidor.divulgacion}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </>
+      )
+    }
+  </Terminal>
+</Base>

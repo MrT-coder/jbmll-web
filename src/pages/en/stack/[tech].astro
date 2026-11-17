@@ -1,0 +1,8 @@
+---
+import Tecnologia from '../../../vistas/Tecnologia.astro';
+import { rutasDeTecnologia } from '../../../lib/rutas-estaticas';
+
+export const getStaticPaths = () => rutasDeTecnologia('en');
+---
+
+<Tecnologia {...Astro.props} />

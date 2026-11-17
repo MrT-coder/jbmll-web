@@ -45,10 +45,12 @@ const experiencia = defineCollection({
     // cuál es, y tarde o temprano alguien lo compara con una fecha real.
     fin: opcional(mes),
 
-    // Un puesto cuyo trabajo ya está descrito como proyecto no declara stack:
+    // Un puesto cuyo trabajo ya está descrito como proyectos no declara stack:
     // lo hereda de ahí. Si declarara el suyo, cada tecnología contaría dos
-    // veces y el stack quedaría inflado sin que nadie mintiera.
-    proyecto: opcional(z.string()),
+    // veces y el stack quedaría inflado sin que nadie mintiera. Es una lista
+    // porque un trabajo independiente reúne varios proyectos (ids de la
+    // colección de proyectos).
+    proyectos: z.array(z.string()).default([]),
     st: z.array(z.string()).default([]),
     kw: z.array(z.string()).default([]),
   }),
@@ -79,6 +81,11 @@ const proyectos = defineCollection({
     st: z.array(z.string()).min(1),
     kw: z.array(z.string()).default([]),
 
+    // Las viñetas con que el proyecto entra al CV. Un CV no es el artículo
+    // del proyecto: son dos o tres líneas cortas. Sin viñetas el proyecto no
+    // entra al CV (el artículo largo no se resume solo sin inventar nada).
+    cv: z.array(z.string()).default([]),
+
     repo: opcional(z.url()),
     demo: opcional(z.url()),
     destacado: z.boolean().default(false),
@@ -108,6 +115,15 @@ const publicaciones = defineCollection({
   }),
 });
 
+// Un archivo que sube el CMS (PDF o imagen): lo abre el visor flotante. Es el
+// mismo candado que usa `foto` en `perfil`: `/media/` es el único
+// `public_folder` del CMS, así que una ruta pegada a mano no pasa el esquema. La
+// extensión decide, en el visor, si se incrusta como <object> o como <img>.
+const archivoMedia = z
+  .string()
+  .startsWith('/media/', 'Debe empezar con /media/')
+  .regex(/\.(pdf|png|jpe?g|webp|avif)$/i, 'Debe terminar en .pdf, .png, .jpg, .jpeg, .webp o .avif');
+
 const educacion = defineCollection({
   loader: base('educacion'),
   schema: z.object({
@@ -117,6 +133,8 @@ const educacion = defineCollection({
     inicio: mes,
     fin: opcional(mes),
     registro: opcional(z.string()),
+    // El título o certificado que respalda la entrada (ver `archivoMedia`).
+    archivo: opcional(archivoMedia),
   }),
 });
 
@@ -139,6 +157,9 @@ const certificaciones = defineCollection({
     id: z.string(),
     nombre: z.string(),
     emisor: opcional(z.string()),
+    // Solo cuando el nombre o el emisor cambian al traducirse; vacío = el mismo.
+    nombre_en: opcional(z.string()),
+    emisor_en: opcional(z.string()),
     // Varias certificaciones no traen fecha en el CV; exigirla obligaría a
     // inventarla.
     fecha: opcional(mes),
@@ -157,12 +178,7 @@ const certificaciones = defineCollection({
     // carácter «seguro» en el nombre — un espacio u otro carácter del archivo
     // real que suba el dueño se codifica al renderizar (rutaMedia(), en
     // src/lib/render.ts), no al guardar el dato.
-    archivo: opcional(
-      z
-        .string()
-        .startsWith('/media/', 'Debe empezar con /media/')
-        .regex(/\.(pdf|png|jpe?g|webp|avif)$/i, 'Debe terminar en .pdf, .png, .jpg, .jpeg, .webp o .avif'),
-    ),
+    archivo: opcional(archivoMedia),
   }),
 });
 
@@ -182,6 +198,12 @@ const perfil = defineCollection({
     titular: z.string(),
     ubicacion: z.string(),
     disponibilidad: z.string(),
+
+    // Para el CV. El párrafo de «Perfil profesional»: la web no tiene otro
+    // lugar donde esté escrito, y un CV sin él no pasa de una lista de datos.
+    resumen: opcional(z.string()),
+    idiomas: z.array(z.object({ idioma: z.string(), nivel: z.string() })).default([]),
+
     correo: z.email(),
     // E.164: el signo más y de 6 a 15 dígitos, sin separadores. Es lo que
     // espera wa.me y lo que evita que el enlace y el número visible se
@@ -252,6 +274,23 @@ const perfil = defineCollection({
   }),
 });
 
+// Lo que cambia del perfil al pasar al inglés. Todo lo demás (contacto, foto,
+// enlaces) es el mismo dato y no se escribe dos veces: getPerfil() superpone
+// esto sobre el perfil base. Cada campo es opcional: lo que falta cae al español.
+const perfilEn = defineCollection({
+  loader: file('./src/content/perfil.en.yaml'),
+  schema: z.object({
+    titular: opcional(z.string()),
+    ubicacion: opcional(z.string()),
+    disponibilidad: opcional(z.string()),
+    resumen: opcional(z.string()),
+    idiomas: z.array(z.object({ idioma: z.string(), nivel: z.string() })).default([]),
+    foto_alt: opcional(z.string()),
+    distribuidor_etiqueta: opcional(z.string()),
+    distribuidor_divulgacion: opcional(z.string().max(24)),
+  }),
+});
+
 export const collections = {
   paginas,
   experiencia,
@@ -260,4 +299,5 @@ export const collections = {
   educacion,
   certificaciones,
   perfil,
+  perfilEn,
 };

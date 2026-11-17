@@ -1,0 +1,83 @@
+---
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import type { Idioma } from '../lib/content';
+import type { UsoDeStack } from '../lib/tipos';
+import { slugTech, textoDeUsos } from '../lib/render';
+import { rutaLocal } from '../i18n/rutas';
+import { TEXTOS_PAGINAS } from '../i18n/paginas';
+
+// Qué tecnologías tienen página (dos o más usos) lo decide src/lib/rutas-estaticas.ts.
+interface Props {
+  lang: Idioma;
+  uso: UsoDeStack;
+}
+
+const { lang, uso } = Astro.props;
+const T = TEXTOS_PAGINAS[lang].stack;
+---
+
+<Base
+  title={`${uso.tech} — JBMLL`}
+  description={T.descripcion(uso.tech, uso.usos)}
+>
+  <Terminal
+    lang={lang}
+    seccion="sobre-mi"
+    salida=""
+    detalle
+    documento={{ href: rutaLocal(lang, `/stack/${slugTech(uso.tech)}`), titulo: uso.tech, tipo: 'stack' }}
+    comando="stack"
+  >
+    <article class="lectura">
+      <h1 class="lectura-t">{uso.tech}</h1>
+      <p class="lectura-m">{textoDeUsos(uso.usos, lang)}</p>
+      <ul class="fuentes">
+        {
+          uso.fuentes.map((f) => (
+            <li>
+              <a class="go" href={rutaLocal(lang, f.tipo === 'proyecto' ? `/proyectos/${f.id}` : '/sobre-mi#experiencia')}>
+                {f.titulo}
+              </a>
+              <span class="fuente-tipo">{T.fuente[f.tipo]}</span>
+              <span class="fuente-detalle">{f.detalle}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="lectura-fin">
+        <a class="go" href={rutaLocal(lang, '/sobre-mi#stack')}>{T.volver}</a>
+      </p>
+    </article>
+  </Terminal>
+</Base>
+
+<style>
+  .fuentes {
+    margin: var(--space-4) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .fuentes li {
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .fuente-tipo {
+    float: right;
+    color: var(--dim);
+    font-size: var(--text-sm);
+  }
+
+  /* Sin esta línea la fila era un título y un enlace desnudos: no decía nada
+     que la lista de origen no dijera ya. clear: both para no quedar debajo
+     del flotante de .fuente-tipo, en la misma línea a la derecha. */
+  .fuente-detalle {
+    display: block;
+    clear: both;
+    margin-top: var(--space-1);
+    color: var(--dim);
+    font-size: var(--text-sm);
+  }
+</style>
