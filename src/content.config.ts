@@ -79,6 +79,11 @@ const proyectos = defineCollection({
     st: z.array(z.string()).min(1),
     kw: z.array(z.string()).default([]),
 
+    // Las viñetas con que el proyecto entra al CV. Un CV no es el artículo
+    // del proyecto: son dos o tres líneas cortas. Sin viñetas el proyecto no
+    // entra al CV (el artículo largo no se resume solo sin inventar nada).
+    cv: z.array(z.string()).default([]),
+
     repo: opcional(z.url()),
     demo: opcional(z.url()),
     destacado: z.boolean().default(false),
@@ -139,6 +144,9 @@ const certificaciones = defineCollection({
     id: z.string(),
     nombre: z.string(),
     emisor: opcional(z.string()),
+    // Solo cuando el nombre o el emisor cambian al traducirse; vacío = el mismo.
+    nombre_en: opcional(z.string()),
+    emisor_en: opcional(z.string()),
     // Varias certificaciones no traen fecha en el CV; exigirla obligaría a
     // inventarla.
     fecha: opcional(mes),
@@ -182,6 +190,12 @@ const perfil = defineCollection({
     titular: z.string(),
     ubicacion: z.string(),
     disponibilidad: z.string(),
+
+    // Para el CV. El párrafo de «Perfil profesional»: la web no tiene otro
+    // lugar donde esté escrito, y un CV sin él no pasa de una lista de datos.
+    resumen: opcional(z.string()),
+    idiomas: z.array(z.object({ idioma: z.string(), nivel: z.string() })).default([]),
+
     correo: z.email(),
     // E.164: el signo más y de 6 a 15 dígitos, sin separadores. Es lo que
     // espera wa.me y lo que evita que el enlace y el número visible se
@@ -252,6 +266,23 @@ const perfil = defineCollection({
   }),
 });
 
+// Lo que cambia del perfil al pasar al inglés. Todo lo demás (contacto, foto,
+// enlaces) es el mismo dato y no se escribe dos veces: getPerfil() superpone
+// esto sobre el perfil base. Cada campo es opcional: lo que falta cae al español.
+const perfilEn = defineCollection({
+  loader: file('./src/content/perfil.en.yaml'),
+  schema: z.object({
+    titular: opcional(z.string()),
+    ubicacion: opcional(z.string()),
+    disponibilidad: opcional(z.string()),
+    resumen: opcional(z.string()),
+    idiomas: z.array(z.object({ idioma: z.string(), nivel: z.string() })).default([]),
+    foto_alt: opcional(z.string()),
+    distribuidor_etiqueta: opcional(z.string()),
+    distribuidor_divulgacion: opcional(z.string().max(24)),
+  }),
+});
+
 export const collections = {
   paginas,
   experiencia,
@@ -260,4 +291,5 @@ export const collections = {
   educacion,
   certificaciones,
   perfil,
+  perfilEn,
 };

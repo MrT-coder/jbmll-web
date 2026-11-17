@@ -14,12 +14,36 @@ export type Educacion = CollectionEntry<'educacion'>;
 export type Certificacion = CollectionEntry<'certificaciones'>;
 export type Perfil = CollectionEntry<'perfil'>['data'];
 
+// ── Idioma ──────────────────────────────────────────────────────────────────
+// El español vive en la raíz de cada colección y el inglés en una subcarpeta
+// `en/` con el mismo nombre de archivo (`experiencia/en/firmaseguraec.md`). El
+// `id` de la entrada traducida llega como `en/firmaseguraec`; aquí se le quita
+// el prefijo para que el resto del sitio siga hablando de «firmaseguraec» sin
+// saber en qué idioma está. Lo que aún no tiene traducción cae al español: una
+// página a medio traducir es mejor que un hueco.
+export type Idioma = 'es' | 'en';
+export const IDIOMAS: Idioma[] = ['es', 'en'];
+
+const PREFIJO_EN = 'en/';
+
+export function deIdioma<T extends { id: string }>(todo: T[], lang: Idioma): T[] {
+  const base = todo.filter((e) => !e.id.startsWith(PREFIJO_EN));
+  if (lang === 'es') return base;
+  const traducidas = new Map(
+    todo.filter((e) => e.id.startsWith(PREFIJO_EN)).map((e) => [e.id.slice(PREFIJO_EN.length), e]),
+  );
+  return base.map((e) => {
+    const t = traducidas.get(e.id);
+    return t ? { ...t, id: e.id } : e;
+  });
+}
+
 // Más reciente primero. El orden lexicográfico de AAAA-MM ya es el cronológico.
 const porFecha = (a: string, b: string) => b.localeCompare(a);
 
 /** Un puesto sin fecha de fin sigue vigente y va siempre arriba. */
-export async function getExperiencia(): Promise<Experiencia[]> {
-  const todo = await getCollection('experiencia');
+export async function getExperiencia(lang: Idioma = 'es'): Promise<Experiencia[]> {
+  const todo = deIdioma(await getCollection('experiencia'), lang);
   return todo.sort((a, b) => {
     if (!a.data.fin && b.data.fin) return -1;
     if (a.data.fin && !b.data.fin) return 1;
@@ -27,23 +51,34 @@ export async function getExperiencia(): Promise<Experiencia[]> {
   });
 }
 
-export async function getProyectos(): Promise<Proyecto[]> {
-  const todo = await getCollection('proyectos', ({ data }) => !data.borrador);
+export async function getProyectos(lang: Idioma = 'es'): Promise<Proyecto[]> {
+  const todo = deIdioma(await getCollection('proyectos'), lang).filter((e) => !e.data.borrador);
   return todo.sort((a, b) => porFecha(a.data.fecha, b.data.fecha));
 }
 
-export async function getPublicaciones(): Promise<Publicacion[]> {
-  const todo = await getCollection('publicaciones', ({ data }) => !data.borrador);
+export async function getPublicaciones(lang: Idioma = 'es'): Promise<Publicacion[]> {
+  const todo = deIdioma(await getCollection('publicaciones'), lang).filter((e) => !e.data.borrador);
   return todo.sort((a, b) => b.data.anio - a.data.anio);
 }
 
-export async function getEducacion(): Promise<Educacion[]> {
-  const todo = await getCollection('educacion');
+export async function getEducacion(lang: Idioma = 'es'): Promise<Educacion[]> {
+  const todo = deIdioma(await getCollection('educacion'), lang);
   return todo.sort((a, b) => porFecha(a.data.inicio, b.data.inicio));
 }
 
-export async function getCertificaciones(): Promise<Certificacion[]> {
-  const todo = await getCollection('certificaciones');
+export async function getCertificaciones(lang: Idioma = 'es'): Promise<Certificacion[]> {
+  const todo = (await getCollection('certificaciones')).map((c) =>
+    lang === 'en'
+      ? {
+          ...c,
+          data: {
+            ...c.data,
+            nombre: c.data.nombre_en ?? c.data.nombre,
+            emisor: c.data.emisor_en ?? c.data.emisor,
+          },
+        }
+      : c,
+  );
   // Las que no tienen fecha van al final: sin fecha no hay dónde colocarlas y
   // el principio es el peor lugar para adivinar.
   return todo.sort((a, b) => {
@@ -74,8 +109,8 @@ export type { UsoDeStack } from './tipos';
  * Una entrada que enlaza a un proyecto no aporta su propio stack: es el mismo
  * trabajo contado dos veces.
  */
-export async function getStack(): Promise<UsoDeStack[]> {
-  const [experiencia, proyectos] = await Promise.all([getExperiencia(), getProyectos()]);
+export async function getStack(lang: Idioma = 'es'): Promise<UsoDeStack[]> {
+  const [experiencia, proyectos] = await Promise.all([getExperiencia(lang), getProyectos(lang)]);
 
   const acc = new Map<string, UsoDeStack>();
 
@@ -120,10 +155,31 @@ export async function getStack(): Promise<UsoDeStack[]> {
  * que un CMS basado en Git lo edite sin tocar TypeScript; los cálculos que sí
  * son código se quedan en src/data/perfil.ts.
  */
-export async function getPerfil() {
+export async function getPerfil(lang: Idioma = 'es') {
   const entrada = await getEntry('perfil', 'perfil');
   if (!entrada) throw new Error('getPerfil: falta la entrada «perfil» en src/content/perfil.yaml');
-  return { ...entrada.data, contacto: enlacesDeContacto(entrada.data) };
+  let datos = entrada.data;
+  if (lang === 'en') {
+    // Solo se superpone lo traducible; contacto y enlaces son el mismo dato.
+    const en = (await getEntry('perfilEn', 'perfil'))?.data;
+    if (en) {
+      datos = {
+        ...datos,
+        titular: en.titular ?? datos.titular,
+        ubicacion: en.ubicacion ?? datos.ubicacion,
+        disponibilidad: en.disponibilidad ?? datos.disponibilidad,
+        resumen: en.resumen ?? datos.resumen,
+        idiomas: en.idiomas.length ? en.idiomas : datos.idiomas,
+        foto: datos.foto && { ...datos.foto, alt: en.foto_alt ?? datos.foto.alt },
+        distribuidor: datos.distribuidor && {
+          ...datos.distribuidor,
+          etiqueta: en.distribuidor_etiqueta ?? datos.distribuidor.etiqueta,
+          divulgacion: en.distribuidor_divulgacion ?? datos.distribuidor.divulgacion,
+        },
+      };
+    }
+  }
+  return { ...datos, contacto: enlacesDeContacto(datos) };
 }
 
 type PerfilConContacto = Awaited<ReturnType<typeof getPerfil>>;
@@ -358,7 +414,7 @@ export type Pagina = CollectionEntry<'paginas'>;
  * los bloques de datos los arma el sitio: así lo libre se escribe libre y lo
  * que se calcula no se puede desincronizar a mano.
  */
-export async function getPagina(id: string): Promise<Pagina | null> {
-  const todas = await getCollection('paginas');
+export async function getPagina(id: string, lang: Idioma = 'es'): Promise<Pagina | null> {
+  const todas = deIdioma(await getCollection('paginas'), lang);
   return todas.find((p) => p.id === id) ?? null;
 }

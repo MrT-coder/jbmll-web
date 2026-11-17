@@ -102,6 +102,14 @@ collections:
         }
       - { name: st, label: Stack, widget: list, min: 1 }
       - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
+      - {
+          name: cv,
+          label: Viñetas para el CV,
+          hint: 'Dos o tres líneas cortas. Sin viñetas, el proyecto no aparece en el CV descargable.',
+          widget: list,
+          required: false,
+          default: [],
+        }
       - { name: repo, label: Repositorio, widget: string, type: url, required: false }
       - { name: demo, label: Demo, widget: string, type: url, required: false }
       - { name: destacado, label: Destacado, widget: boolean, default: false }
@@ -226,6 +234,14 @@ collections:
               - { name: nombre, label: Nombre, widget: string }
               - { name: emisor, label: Emisor, widget: string, required: false }
               - {
+                  name: nombre_en,
+                  label: Nombre en inglés,
+                  hint: 'Solo si cambia al traducirse. Vacío = el mismo nombre.',
+                  widget: string,
+                  required: false,
+                }
+              - { name: emisor_en, label: Emisor en inglés, widget: string, required: false }
+              - {
                   name: fecha,
                   label: Fecha,
                   widget: string,
@@ -279,6 +295,22 @@ singletons:
           - { name: titular, label: Titular, widget: string }
           - { name: ubicacion, label: Ubicación, widget: string }
           - { name: disponibilidad, label: Disponibilidad, widget: string }
+          - {
+              name: resumen,
+              label: Perfil profesional (CV),
+              hint: 'El párrafo de «Perfil profesional» del CV en PDF.',
+              widget: text,
+              required: false,
+            }
+          - name: idiomas
+            label: Idiomas
+            label_singular: Idioma
+            widget: list
+            required: false
+            default: []
+            fields:
+              - { name: idioma, label: Idioma, widget: string }
+              - { name: nivel, label: Nivel, widget: string }
           - { name: correo, label: Correo, widget: string, type: email }
           - {
               name: telefono,
@@ -327,3 +359,36 @@ singletons:
                   widget: string,
                   required: false,
                 }
+  # Lo que cambia del perfil al inglés (ver `perfilEn` en src/content.config.ts).
+  # Contacto, foto y enlaces son el mismo dato que en «Perfil» y no se repiten.
+  - name: perfilEn
+    label: Perfil (inglés)
+    file: src/content/perfil.en.yaml
+    format: yaml
+    fields:
+      - name: perfil
+        label: Perfil (inglés)
+        widget: object
+        fields:
+          - { name: titular, label: Titular, widget: string, required: false }
+          - { name: ubicacion, label: Ubicación, widget: string, required: false }
+          - { name: disponibilidad, label: Disponibilidad, widget: string, required: false }
+          - { name: resumen, label: Perfil profesional (CV), widget: text, required: false }
+          - name: idiomas
+            label: Idiomas
+            label_singular: Idioma
+            widget: list
+            required: false
+            default: []
+            fields:
+              - { name: idioma, label: Idioma, widget: string }
+              - { name: nivel, label: Nivel, widget: string }
+          - { name: foto_alt, label: Texto alternativo de la foto, widget: string, required: false }
+          - { name: distribuidor_etiqueta, label: Etiqueta del distribuidor, widget: string, required: false }
+          - {
+              name: distribuidor_divulgacion,
+              label: Marca de afiliado,
+              hint: 'Máximo 24 caracteres.',
+              widget: string,
+              required: false,
+            }

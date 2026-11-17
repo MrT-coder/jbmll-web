@@ -2428,6 +2428,15 @@ const COLECCIONES_CMS = [
       return objeto?.fields?.map((f) => f.name);
     },
   },
+  {
+    // Igual que «perfil»: perfil.en.yaml envuelve sus campos en "perfil:".
+    astro: 'perfilEn',
+    campos: () => {
+      const singleton = cmsConfig.singletons?.find((s) => s.name === 'perfilEn');
+      const objeto = singleton?.fields?.find((f) => f.name === 'perfil' && f.widget === 'object');
+      return objeto?.fields?.map((f) => f.name);
+    },
+  },
 ];
 
 // export const collections = { paginas, experiencia, ... }; — la lista real de
