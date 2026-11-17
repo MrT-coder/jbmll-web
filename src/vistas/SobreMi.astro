@@ -188,25 +188,19 @@ const modalidad = (m: string) => TEXTOS_PAGINAS[lang].modalidad[m] ?? m;
 
     <section class="bloque" id="certificaciones">
       <h2 class="bloque-t">{T.certificaciones}</h2>
-      <table class="list list-certs">
-        <thead class="solo-lector">
-          <tr>
-            <th scope="col">{T.columnas.nombre}</th>
-            <th scope="col">{T.columnas.fecha}</th>
-            <th scope="col">{T.columnas.emisor}</th>
-            <th scope="col">{T.columnas.archivo}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {
-            certificaciones.map((c) => (
-              <tr>
-                <td class="n">{c.data.nombre}</td>
-                <td class="c">{c.data.fecha ?? '—'}</td>
-                <td class="d">
+      <ul class="certs">
+        {
+          certificaciones.map((c) => (
+            <li class="cert">
+              {c.data.fecha && <p class="cert-f">{c.data.fecha}</p>}
+              <h3 class="cert-t">{c.data.nombre}</h3>
+              {(c.data.emisor || c.data.horas) && (
+                <p class="cert-m">
                   {[c.data.emisor, c.data.horas && `${c.data.horas} ${T.horas}`].filter(Boolean).join(' · ')}
-                </td>
-                <td class="acc">
+                </p>
+              )}
+              {(c.data.archivo || c.data.url || c.data.credencial) && (
+                <p class="cert-acc">
                   {c.data.archivo && (
                     <a
                       class="go visor-abrir"
@@ -221,9 +215,8 @@ const modalidad = (m: string) => TEXTOS_PAGINAS[lang].modalidad[m] ?? m;
                   )}
                   {c.data.url && (
                     // A diferencia del enlace [ver] de arriba (que abre
-                    // /media/ en el visor flotante, ver el comentario de esa
-                    // columna en src/lib/tipos.ts / Visor.astro), este apunta
-                    // al emisor de la certificación: un sitio de verdad
+                    // /media/ en el visor flotante, ver Visor.astro), este
+                    // apunta al emisor de la certificación: un sitio de verdad
                     // externo, así que target/rel salen de propsExterno().
                     // El anuncio de pestaña nueva va DENTRO del propio
                     // aria-label —no como el <span class="sr-only"> que trae
@@ -242,12 +235,12 @@ const modalidad = (m: string) => TEXTOS_PAGINAS[lang].modalidad[m] ?? m;
                     </a>
                   )}
                   {c.data.credencial && <span class="cred">{c.data.credencial}</span>}
-                </td>
-              </tr>
-            ))
-          }
-        </tbody>
-      </table>
+                </p>
+              )}
+            </li>
+          ))
+        }
+      </ul>
       <Visor lang={lang} />
     </section>
   </Terminal>
@@ -293,48 +286,68 @@ const modalidad = (m: string) => TEXTOS_PAGINAS[lang].modalidad[m] ?? m;
     font-size: var(--text-sm);
   }
 
-  /* [ver]/[verificar] y la credencial, en la misma celda: flex y no una lista,
-     porque no siempre están los tres — una certificación puede traer solo uno
-     o ninguno. */
-  .acc {
+  /* Las certificaciones son tarjetas en una cuadrícula, no una tabla de cuatro
+     columnas: con nombres largos, un emisor de dos líneas y un id de credencial,
+     la tabla se apretaba y cada fila se leía pegada a la siguiente. Cada tarjeta
+     apila fecha, nombre, emisor y acciones; la cuadrícula se adapta sola al
+     ancho (una columna en el teléfono), sin un punto de quiebre aparte. */
+  .certs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 32ch), 1fr));
+    gap: var(--space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .cert {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--line2);
+  }
+
+  .cert-f {
+    margin: 0;
+    color: var(--dim);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wider);
+  }
+
+  .cert-t {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: 700;
+    line-height: var(--lh-snug);
+  }
+
+  .cert-m {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  /* [ver], [verificar] y la credencial al pie de la tarjeta, alineados entre
+     tarjetas de distinta altura. No siempre están los tres: una certificación
+     puede traer solo uno o ninguno. */
+  .cert-acc {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    gap: var(--space-3);
+    gap: var(--space-2) var(--space-4);
+    margin: auto 0 0;
+    padding-top: var(--space-3);
   }
 
   /* Discreta a propósito: el id de credencial no es información que alguien
-     lea primero, es una prueba que queda ahí para quien la necesite. */
+     lea primero, es una prueba que queda ahí para quien la necesite. En su
+     propia línea porque un folio largo no cabe junto a los enlaces. */
   .cred {
+    flex-basis: 100%;
     color: var(--dim);
     font-size: var(--text-xs);
-  }
-
-  /* Cuatro columnas no caben en un teléfono: a 390px los nombres largos se
-     partían carácter por carácter («Fund acio n Carl»). Solo esta tabla se
-     apila —.list también arma la de contacto y la de stack, que sí caben—, y
-     cada certificación pasa a ser un bloque con su nombre, su fecha, su
-     emisor y sus enlaces uno debajo del otro. Mismo punto de quiebre que el
-     resto del sitio. */
-  @media (max-width: 660px) {
-    .list-certs tr {
-      display: grid;
-      gap: var(--space-1);
-      padding: var(--space-3) 0;
-      border-bottom: 1px solid var(--line);
-    }
-
-    /* Apilada, la alineación de una columna deja de tener sentido: cada dato
-       arranca donde arranca el nombre. */
-    .list-certs td {
-      padding: 0;
-      text-align: left;
-    }
-
-    /* Una certificación sin emisor o sin enlaces dejaba una fila en blanco
-       dentro de su bloque, que se leía como un dato que falta cargar. */
-    .list-certs td:empty {
-      display: none;
-    }
+    overflow-wrap: anywhere;
   }
 </style>
