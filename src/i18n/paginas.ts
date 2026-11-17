@@ -27,6 +27,8 @@ export interface TextosPaginas {
     verificar: string;
     /** aria-label de [ver]. */
     verCertificado: (nombre: string) => string;
+    /** aria-label de [ver] en educación. */
+    verTitulo: (nombre: string) => string;
     /** aria-label de [verificar]. */
     verificarCertificado: (nombre: string) => string;
     horas: string;
@@ -67,6 +69,7 @@ export const TEXTOS_PAGINAS: Record<Idioma, TextosPaginas> = {
       ver: '[ver]',
       verificar: '[verificar]',
       verCertificado: (n) => `ver el certificado ${n}`,
+      verTitulo: (n) => `ver el título ${n}`,
       verificarCertificado: (n) => `verificar el certificado ${n} (se abre en una pestaña nueva)`,
       horas: 'h',
     },
@@ -115,6 +118,7 @@ export const TEXTOS_PAGINAS: Record<Idioma, TextosPaginas> = {
       ver: '[view]',
       verificar: '[verify]',
       verCertificado: (n) => `view the ${n} certificate`,
+      verTitulo: (n) => `view the ${n} degree`,
       verificarCertificado: (n) => `verify the ${n} certificate (opens in a new tab)`,
       horas: 'h',
     },

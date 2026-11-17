@@ -2554,13 +2554,16 @@ const certificacionesSrc = parseYaml(readFileSync('src/content/certificaciones.y
 const conArchivo = certificacionesSrc.filter((c) => c.archivo);
 const conUrl = certificacionesSrc.filter((c) => c.url);
 const conCredencial = certificacionesSrc.filter((c) => c.credencial);
+// El visor también abre el título de cada entrada de educación que trae archivo.
+const educacionConArchivo = listarColeccionMd('src/content/educacion').filter((e) => e.data.archivo);
 
 // Mismo criterio que rutaMedia() en src/lib/render.ts: una ruta ya codificada
 // (con un '%XX') se deja tal cual, para no codificarla dos veces.
 const rutaMedia = (ruta) => (/%[0-9a-fA-F]{2}/.test(ruta) ? ruta : encodeURI(ruta));
 const escRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const anchorsSobreMi = [...sobreMi.matchAll(/<a\b[^>]*>[^<]*<\/a>/g)].map((m) => m[0]);
+// Un enlace puede llevar <span> dentro (la marca de «se abre en pestaña nueva»).
+const anchorsSobreMi = [...sobreMi.matchAll(/<a\b[^>]*>(?:[^<]|<span\b[^>]*>[^<]*<\/span>)*<\/a>/g)].map((m) => m[0]);
 const anchorParaHref = (href) => anchorsSobreMi.find((a) => a.includes(`href="${href}"`));
 
 const versRenderizados = anchorsSobreMi.filter((a) => /class="[^"]*\bvisor-abrir\b[^"]*"/.test(a));
@@ -2570,8 +2573,8 @@ if (conArchivo.length === 0) {
 } else {
   check(
     'cada certificación con archivo (y solo esas) renderiza su enlace [ver]',
-    versRenderizados.length === conArchivo.length,
-    `${versRenderizados.length} enlaces [ver] · ${conArchivo.length} certificaciones con archivo`,
+    versRenderizados.length === conArchivo.length + educacionConArchivo.length,
+    `${versRenderizados.length} enlaces [ver] · ${conArchivo.length} certificaciones y ${educacionConArchivo.length} títulos con archivo`,
   );
   const verMal = conArchivo.filter((c) => {
     const a = anchorParaHref(rutaMedia(c.archivo));

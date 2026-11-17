@@ -115,6 +115,15 @@ const publicaciones = defineCollection({
   }),
 });
 
+// Un archivo que sube el CMS (PDF o imagen): lo abre el visor flotante. Es el
+// mismo candado que usa `foto` en `perfil`: `/media/` es el único
+// `public_folder` del CMS, así que una ruta pegada a mano no pasa el esquema. La
+// extensión decide, en el visor, si se incrusta como <object> o como <img>.
+const archivoMedia = z
+  .string()
+  .startsWith('/media/', 'Debe empezar con /media/')
+  .regex(/\.(pdf|png|jpe?g|webp|avif)$/i, 'Debe terminar en .pdf, .png, .jpg, .jpeg, .webp o .avif');
+
 const educacion = defineCollection({
   loader: base('educacion'),
   schema: z.object({
@@ -124,6 +133,8 @@ const educacion = defineCollection({
     inicio: mes,
     fin: opcional(mes),
     registro: opcional(z.string()),
+    // El título o certificado que respalda la entrada (ver `archivoMedia`).
+    archivo: opcional(archivoMedia),
   }),
 });
 
@@ -167,12 +178,7 @@ const certificaciones = defineCollection({
     // carácter «seguro» en el nombre — un espacio u otro carácter del archivo
     // real que suba el dueño se codifica al renderizar (rutaMedia(), en
     // src/lib/render.ts), no al guardar el dato.
-    archivo: opcional(
-      z
-        .string()
-        .startsWith('/media/', 'Debe empezar con /media/')
-        .regex(/\.(pdf|png|jpe?g|webp|avif)$/i, 'Debe terminar en .pdf, .png, .jpg, .jpeg, .webp o .avif'),
-    ),
+    archivo: opcional(archivoMedia),
   }),
 });
 

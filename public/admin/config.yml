@@ -189,6 +189,13 @@ collections:
           hint: 'AAAA o AAAA-MM',
         }
       - { name: registro, label: Número de registro, widget: string, required: false }
+      - {
+          name: archivo,
+          label: Archivo (PDF o imagen del título),
+          widget: file,
+          required: false,
+          accept: '.pdf,.png,.jpg,.jpeg,.webp,.avif',
+        }
 
   # --- La misma colección, en inglés ------------------------------------------
   # El inglés de cada entrada vive en una subcarpeta `en/` con el MISMO nombre de
@@ -361,6 +368,13 @@ collections:
           hint: 'AAAA o AAAA-MM',
         }
       - { name: registro, label: Número de registro, widget: string, required: false }
+      - {
+          name: archivo,
+          label: Archivo (PDF o imagen del título),
+          widget: file,
+          required: false,
+          accept: '.pdf,.png,.jpg,.jpeg,.webp,.avif',
+        }
 
   # --- Páginas: colección de archivos, sin creación (son exactamente dos) --
   # Sveltia no tiene una opción `create` para colecciones de archivos: la

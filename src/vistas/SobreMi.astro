@@ -165,6 +165,21 @@ const modalidad = (m: string) => TEXTOS_PAGINAS[lang].modalidad[m] ?? m;
             <p class="item-m">
               {periodo(e.data.inicio, e.data.fin)} · {e.data.ubicacion}
               {e.data.registro && ` · ${e.data.registro}`}
+              {e.data.archivo && (
+                <>
+                  {' · '}
+                  <a
+                    class="go visor-abrir"
+                    href={rutaMedia(e.data.archivo)}
+                    target="_blank"
+                    rel="noopener"
+                    aria-label={T.verTitulo(e.data.titulo)}
+                    data-nombre={e.data.titulo}
+                  >
+                    {T.ver}
+                  </a>
+                </>
+              )}
             </p>
           </article>
         ))
