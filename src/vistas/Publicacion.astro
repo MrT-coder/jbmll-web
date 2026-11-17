@@ -1,27 +1,24 @@
 ---
-import type { InferGetStaticPropsType } from 'astro';
 import { render } from 'astro:content';
-import Base from '../../layouts/Base.astro';
-import Terminal from '../../components/Terminal.astro';
-import Visor from '../../components/Visor.astro';
-import { getPublicaciones, tieneCuerpo, vecinos } from '../../lib/content';
-import { propsExterno, MARCA_EXTERNA } from '../../lib/render';
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import Visor from '../components/Visor.astro';
+import type { Idioma, Publicacion } from '../lib/content';
+import { propsExterno, marcaExterna } from '../lib/render';
+import { rutaLocal } from '../i18n/rutas';
+import { TEXTOS_PAGINAS } from '../i18n/paginas';
 
-// Solo las que tienen algo propio que decir. Una publicación que se agota en su
-// enlace al editor no genera página: sería un título repetido compitiendo con
-// el original en los buscadores.
-export const getStaticPaths = async () => {
-  const publicaciones = await getPublicaciones();
-  const conCuerpo = publicaciones.filter(tieneCuerpo);
-  return conCuerpo.map((p) => ({
-    params: { slug: p.id },
-    props: { publicacion: p, ...vecinos(conCuerpo, p.id) },
-  }));
-};
+// Solo las publicaciones con algo propio que decir tienen página; cuáles son lo
+// decide src/lib/rutas-estaticas.ts. Esta vista solo dibuja.
+interface Props {
+  lang: Idioma;
+  publicacion: Publicacion;
+  anterior: Publicacion | null;
+  siguiente: Publicacion | null;
+}
 
-type Props = InferGetStaticPropsType<typeof getStaticPaths>;
-
-const { publicacion, anterior, siguiente } = Astro.props;
+const { lang, publicacion, anterior, siguiente } = Astro.props;
+const T = TEXTOS_PAGINAS[lang].publicaciones;
 const { Content } = await render(publicacion);
 const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : publicacion.data.url;
 ---
@@ -31,10 +28,11 @@ const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : p
   description={`${publicacion.data.venue} · ${publicacion.data.anio}`}
 >
   <Terminal
+    lang={lang}
     seccion="publicaciones"
     salida=""
     detalle
-    documento={{ href: `/publicaciones/${publicacion.id}`, titulo: publicacion.data.titulo, tipo: 'publicacion' }}
+    documento={{ href: rutaLocal(lang, `/publicaciones/${publicacion.id}`), titulo: publicacion.data.titulo, tipo: 'publicacion' }}
   >
     <article class="lectura">
       <h1 class="lectura-t">{publicacion.data.titulo}</h1>
@@ -53,13 +51,13 @@ const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : p
       <!-- Mismo candado que en proyectos/[slug].astro: sin este componente,
            las figuras y los enlaces a PDF que arma rehype-figuras.mjs no
            tienen ningún <dialog id="visor"> que scripts/visor.ts pueda abrir. -->
-      <Visor />
+      <Visor lang={lang} />
 
       <footer class="eof">
         <p class="eof-mark">(END)</p>
         <ul class="eof-acts">
           <li>
-            <a href="/publicaciones"><kbd>q</kbd>volver a publicaciones</a>
+            <a href={rutaLocal(lang, '/publicaciones')}><kbd>q</kbd>{T.volver}</a>
           </li>
           {
             doi && (
@@ -69,8 +67,8 @@ const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : p
                    el resto del sitio. */}
                 <a href={doi} {...propsExterno(doi)}>
                   <kbd>o</kbd>
-                  {publicacion.data.doi ? 'abrir el DOI' : 'abrir el original'}
-                  <Fragment set:html={MARCA_EXTERNA} />
+                  {publicacion.data.doi ? T.abrirDoi : T.abrirOriginal}
+                  <Fragment set:html={marcaExterna(lang)} />
                 </a>
               </li>
             )
@@ -78,7 +76,7 @@ const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : p
           {
             anterior && (
               <li>
-                <a href={`/publicaciones/${anterior.id}`}>
+                <a href={rutaLocal(lang, `/publicaciones/${anterior.id}`)}>
                   <kbd>k</kbd>
                   {anterior.data.titulo}
                 </a>
@@ -88,7 +86,7 @@ const doi = publicacion.data.doi ? `https://doi.org/${publicacion.data.doi}` : p
           {
             siguiente && (
               <li>
-                <a href={`/publicaciones/${siguiente.id}`}>
+                <a href={rutaLocal(lang, `/publicaciones/${siguiente.id}`)}>
                   <kbd>j</kbd>
                   {siguiente.data.titulo}
                 </a>

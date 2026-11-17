@@ -1,3 +1,6 @@
+import type { Idioma } from './content';
+import type { TextosCliente } from '../i18n/cliente';
+
 // Las formas planas con las que trabaja el renderizador.
 //
 // Son planas a propósito: el mismo módulo de render corre en el servidor hoy y
@@ -16,6 +19,8 @@ export interface Seccion {
   titulo: string;
   /** El h1 de su página. Puede traer HTML de confianza, como el del inicio. */
   lead: string;
+  /** Su ruta en el idioma del índice (`/proyectos` o `/en/proyectos`). */
+  href: string;
 }
 
 export interface Tech {
@@ -64,11 +69,15 @@ export interface UsoDeStack {
 }
 
 export interface Indice {
+  /** El idioma de todo lo que trae el índice: textos, etiquetas y rutas. */
+  lang: Idioma;
   secciones: Seccion[];
   entradas: Record<string, Fila[]>;
   stack: UsoDeStack[];
   /** El <title> y el h1 del inicio: la única sección que no vive en SECCIONES. */
   inicio: { titulo: string; lead: string };
+  /** Los textos que necesita la terminal del navegador, en el idioma del índice. */
+  ui: TextosCliente;
 }
 
 // ── Barra lateral ────────────────────────────────────────────────────────────

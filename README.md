@@ -45,9 +45,37 @@ src/lib/content.ts      la única puerta a los datos
 src/lib/render.ts       de datos a HTML, sin tocar el DOM
 src/layouts/            cabecera del documento y metadatos
 src/components/         la terminal, mi única isla interactiva
-src/pages/              un archivo aquí es una URL
+src/pages/              un archivo aquí es una URL (y `src/pages/en/` es su par en inglés)
+src/vistas/             cada página dibujada una sola vez, para los dos idiomas
+src/i18n/               textos por idioma, rutas y el CV
 scripts/verify.mjs      verificaciones sobre el sitio compilado
 ```
+
+## Dos idiomas y un CV
+
+El sitio está en español (`/`) y en inglés (`/en`). Los slugs son los mismos
+(`/sobre-mi`, `/en/sobre-mi`), así que cada página tiene su par y `hreflang` lo
+declara.
+
+- **Contenido.** El español vive en la raíz de cada colección y el inglés en una
+  subcarpeta `en/` con el **mismo nombre de archivo**
+  (`src/content/proyectos/en/busere.md`). Ese nombre es el vínculo: lo que aún
+  no tiene traducción se muestra en español, nunca un hueco. El perfil traducible
+  está en `src/content/perfil.en.yaml`. El panel (`/admin`) tiene una colección
+  «(inglés)» por cada una.
+- **Textos de la interfaz.** `src/i18n/paginas.ts` (páginas), `componentes.ts` y
+  `cliente.ts` (componentes y terminal). La terminal recibe los suyos en
+  `indice.json` / `en/indice.json`, así que no hay scripts en línea.
+- **CV.** Se genera **en el build**, en Node con pdfmake, desde las mismas
+  colecciones: `/cv/<nombre>-cv-es.pdf` y `/cv/<nombre>-cv-en.pdf`. Cada página
+  enlaza al de su idioma. Cumple lo que pide un ATS: una columna, texto real con
+  fuente incrustada, Letter, DOI sin cortar y sin última página huérfana
+  (`src/lib/cv-pdf.ts`). Para que algo entre al CV:
+  - el stack sale de lo que declaran los trabajos y proyectos, agrupado por
+    `src/data/categorias-stack.ts` (lo que no esté ahí cae en «otras»);
+  - los proyectos entran con su campo `cv` (2–4 viñetas; sin él, no entran);
+  - el resumen y los idiomas están en `perfil.yaml` / `perfil.en.yaml`.
+  Los CV adaptados a una vacante concreta siguen fuera de la web.
 
 El sitio vive en **jbmllnube.com**. Ese dominio está en `astro.config.mjs` y de
 ahí salen la etiqueta canónica, las etiquetas para compartir y el sitemap.

@@ -3,22 +3,28 @@ import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
 import DescargarCv from '../components/DescargarCv.astro';
 import { render } from 'astro:content';
-import { getPagina, getPerfil, seccionDe } from '../lib/content';
-import { renderContacto, propsExterno, MARCA_EXTERNA } from '../lib/render';
+import { getPagina, getPerfil, seccionDe, type Idioma } from '../lib/content';
+import { renderContacto, propsExterno, marcaExterna } from '../lib/render';
+import { TEXTOS_PAGINAS } from '../i18n/paginas';
 
-const [perfil, pagina] = await Promise.all([getPerfil(), getPagina('contacto')]);
+interface Props {
+  lang: Idioma;
+}
+const { lang } = Astro.props;
+
+const [perfil, pagina] = await Promise.all([getPerfil(lang), getPagina('contacto', lang)]);
 const Prosa = pagina ? (await render(pagina)).Content : null;
-const { titulo, lead } = await seccionDe('contacto');
+const { titulo, lead } = await seccionDe('contacto', lang);
 ---
 
 <Base
   title={titulo}
-  description="Correo, WhatsApp, GitHub, LinkedIn y ORCID de Josue Bladimir Morales Llanganate."
+  description={TEXTOS_PAGINAS[lang].contacto.descripcion(perfil.nombre)}
 >
-  <Terminal seccion="contacto" lead={lead} salida={renderContacto(perfil.contacto)}>
+  <Terminal lang={lang} seccion="contacto" lead={lead} salida={renderContacto(perfil.contacto, lang)}>
     {Prosa && <div class="prose intro"><Prosa /></div>}
     <p class="out note"># {perfil.ubicacion} · {perfil.disponibilidad}</p>
-    <DescargarCv />
+    <DescargarCv lang={lang} />
     {
       perfil.distribuidor && (
         <>
@@ -55,7 +61,7 @@ const { titulo, lead } = await seccionDe('contacto');
                     {...propsExterno(perfil.distribuidor.href, 'sponsored')}
                   >
                     {perfil.distribuidor.href.replace(/^https?:\/\//, '')}
-                    <Fragment set:html={MARCA_EXTERNA} />
+                    <Fragment set:html={marcaExterna(lang)} />
                   </a>
                   <span class="marca-afiliado" id="marca-distribuidor">{perfil.distribuidor.divulgacion}</span>
                 </td>

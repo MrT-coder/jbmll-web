@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import '../styles/terminal.css';
 import bannerRaw from '../data/banner.txt?raw';
 import arranqueGate from '../scripts/arranque-gate.js?url';
-import { SECCIONES } from '../lib/content';
+import { SECCIONES, type Idioma } from '../lib/content';
+import { BASE_DE } from '../i18n/rutas';
+import { TEXTOS_COMPONENTES } from '../i18n/componentes';
 import Sidebar from './Sidebar.astro';
 import Statusline from './Statusline.astro';
 import type { DocumentoAbierto } from '../lib/tipos';
@@ -36,6 +38,9 @@ interface Props {
    * perfil.yaml (campo opcional `foto`); ausente, el arranque cae al banner
    * ASCII de siempre. */
   foto?: { src: string; alt: string } | null;
+  /** El idioma de la página. Lo reciben también la barra y la statusline, y
+   * terminal.ts lo lee de data-lang para no mezclar rutas ni textos. */
+  lang?: Idioma;
 }
 
 const {
@@ -47,7 +52,10 @@ const {
   documento = null,
   comando: comandoProp,
   foto = null,
+  lang = 'es',
 } = Astro.props;
+
+const t = TEXTOS_COMPONENTES[lang];
 
 // Los espacios finales son parte del dibujo y los editores los borran, así que
 // el ancho se restituye acá. El \r se limpia por finales de línea de Windows.
@@ -104,10 +112,10 @@ const BRAIN = '';
 // dejar el script en línea, y un script en línea exige aflojar la CSP.
 
 const BOOT = [
-  ['0.000000', 'jbsh 1.0 — arrancando'],
-  ['0.118431', 'montando ' + SECCIONES.map((s) => '/' + s.slug).join(' ')],
-  ['0.240902', 'FiraCode Nerd Font Mono · subconjunto de 432 glifos'],
-  ['0.402118', 'listo'],
+  ['0.000000', t.boot.arrancando],
+  ['0.118431', t.boot.montando + ' ' + SECCIONES.map((s) => '/' + s.slug).join(' ')],
+  ['0.240902', t.boot.fuente],
+  ['0.402118', t.boot.listo],
 ];
 
 const ruta = seccion ? `~/${seccion}` : '~/';
@@ -127,12 +135,12 @@ const abiertosSsr = documento ? 1 : 0;
 <!-- Primero en el orden de tabulación: sin él, quien navega con teclado
      atraviesa toda la barra lateral en cada página antes de llegar al
      contenido. #term ya lleva tabindex="-1", así que recibe el foco. -->
-<a class="saltar" href="#term">saltar al contenido</a>
+<a class="saltar" href="#term">{t.saltar}</a>
 
 <div class="shell">
-  <Sidebar actual={seccion} detalle={detalle} documento={documento} />
+  <Sidebar actual={seccion} detalle={detalle} documento={documento} lang={lang} />
 
-  <main class="term" id="term" tabindex="-1" data-brain={BRAIN} data-seccion={seccion ?? ''} data-detalle={detalle ? '1' : ''}>
+  <main class="term" id="term" tabindex="-1" data-brain={BRAIN} data-seccion={seccion ?? ''} data-detalle={detalle ? '1' : ''} data-lang={lang} data-base={BASE_DE[lang]}>
     {
       /* Clásico y bloqueante a propósito: tiene que correr antes de que el
          contenido se pinte (ver el comentario de arranque-gate.js). is:inline
@@ -148,10 +156,10 @@ const abiertosSsr = documento ? 1 : 0;
         {
           boot && (
             <div class="boot">
-              {BOOT.map(([t, msg]) => (
+              {BOOT.map(([hora, msg], i) => (
                 <div class="out">
-                  <span class="t">[ {t} ] </span>{msg}
-                  {msg === 'listo' && <span class="ok">  ok</span>}
+                  <span class="t">[ {hora} ] </span>{msg}
+                  {i === BOOT.length - 1 && <span class="ok">  ok</span>}
                 </div>
               ))}
             </div>
@@ -199,7 +207,7 @@ const abiertosSsr = documento ? 1 : 0;
   </main>
 </div>
 
-<Statusline ruta={ruta} abiertos={abiertosSsr} />
+<Statusline ruta={ruta} abiertos={abiertosSsr} lang={lang} />
 
 <footer class="foot">
   <span>© 2026 Josue Bladimir Morales Llanganate</span>
@@ -208,7 +216,7 @@ const abiertosSsr = documento ? 1 : 0;
      del sitio); propsExterno() le suma target="_blank"/noopener sin
      reemplazarlo, igual que en renderContacto() (src/lib/render.ts). */}
   <a href="https://github.com/MrT-coder" {...propsExterno('https://github.com/MrT-coder', 'me')}>
-    github
+    {t.pie.github}
     <Fragment set:html={MARCA_EXTERNA} />
   </a>
 </footer>

@@ -14,40 +14,50 @@ import {
   getTechsConPagina,
   MINIMO_PARA_PAGINA_DE_STACK,
   seccionDe,
+  type Idioma,
 } from '../lib/content';
-import { renderStack, slugTech, rutaMedia, propsExterno, MARCA_EXTERNA } from '../lib/render';
+import { renderStack, slugTech, rutaMedia, propsExterno, marcaExterna } from '../lib/render';
 import { iconoDe } from '../data/iconos';
+import { rutaLocal } from '../i18n/rutas';
+import { TEXTOS_PAGINAS } from '../i18n/paginas';
+
+interface Props {
+  lang: Idioma;
+}
+const { lang } = Astro.props;
+const T = TEXTOS_PAGINAS[lang].sobreMi;
 
 const [perfil, pagina, experiencia, educacion, certificaciones, stack, conPagina] = await Promise.all([
-  getPerfil(),
-  getPagina('sobre-mi'),
-  getExperiencia(),
-  getEducacion(),
-  getCertificaciones(),
-  getStack(),
-  getTechsConPagina(),
+  getPerfil(lang),
+  getPagina('sobre-mi', lang),
+  getExperiencia(lang),
+  getEducacion(lang),
+  getCertificaciones(lang),
+  getStack(lang),
+  getTechsConPagina(lang),
 ]);
 
 // La prosa la escribe el Markdown; los bloques de abajo salen de los datos.
 const Prosa = pagina ? (await render(pagina)).Content : null;
-const { titulo, lead } = await seccionDe('sobre-mi');
+const { titulo, lead } = await seccionDe('sobre-mi', lang);
 
 // Experiencia, certificaciones y educación son colecciones separadas en los
 // datos y bloques de una sola página en la vista. El día que crezcan se
 // independizan sin migrar nada.
-const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'presente'}`;
+const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? T.presente}`;
+const modalidad = (m: string) => TEXTOS_PAGINAS[lang].modalidad[m] ?? m;
 ---
 
 <Base
   title={titulo}
-  description={`${perfil.titular}. Experiencia, formación, certificaciones y el stack calculado desde los datos.`}
+  description={T.descripcion(perfil.titular)}
 >
-  <Terminal seccion="sobre-mi" salida="">
+  <Terminal lang={lang} seccion="sobre-mi" salida="">
     <section class="bloque">
       <h1 class="out lead">{lead}</h1>
       <p class="out note"># {perfil.titular} · {perfil.ubicacion}</p>
       {Prosa && <div class="prose intro"><Prosa /></div>}
-      <DescargarCv />
+      <DescargarCv lang={lang} />
       {
         // Una sola línea, no un bloque propio: la ficha completa (etiqueta +
         // enlace + marca de afiliado) ya vive en /contacto — ver
@@ -68,7 +78,7 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
               {...propsExterno(perfil.distribuidor.href, 'sponsored')}
             >
               {perfil.distribuidor.href.replace(/^https?:\/\//, '')}
-              <Fragment set:html={MARCA_EXTERNA} />
+              <Fragment set:html={marcaExterna(lang)} />
             </a>
             <span class="marca-afiliado" id="marca-distribuidor">{perfil.distribuidor.divulgacion}</span>
           </p>
@@ -77,15 +87,13 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
     </section>
 
     <section class="bloque" id="stack">
-      <h2 class="bloque-t">stack</h2>
-      <p class="out note">
-        # no está escrito a mano: se suma desde lo que declara cada trabajo y cada proyecto
-      </p>
-      <div set:html={renderStack(stack, MINIMO_PARA_PAGINA_DE_STACK)} />
+      <h2 class="bloque-t">{T.stack}</h2>
+      <p class="out note">{T.notaStack}</p>
+      <div set:html={renderStack(stack, MINIMO_PARA_PAGINA_DE_STACK, lang)} />
     </section>
 
     <section class="bloque" id="experiencia">
-      <h2 class="bloque-t">experiencia</h2>
+      <h2 class="bloque-t">{T.experiencia}</h2>
       {
         experiencia.map((e) => (
           <article class="item">
@@ -94,14 +102,14 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
             </h3>
             <p class="item-m">
               {periodo(e.data.inicio, e.data.fin)} · {e.data.ubicacion}
-              {e.data.modalidad && ` · ${e.data.modalidad}`}
+              {e.data.modalidad && ` · ${modalidad(e.data.modalidad)}`}
             </p>
             {e.data.st.length > 0 && (
               <ul class="chips">
                 {e.data.st.map((t) => (
                   <li>
                     {conPagina.has(t) ? (
-                      <a class="chip" href={`/stack/${slugTech(t)}`}>
+                      <a class="chip" href={rutaLocal(lang, `/stack/${slugTech(t)}`)}>
                         <span class="ico" aria-hidden="true">{iconoDe(t)}</span>{t}
                       </a>
                     ) : (
@@ -119,7 +127,7 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
     </section>
 
     <section class="bloque" id="educacion">
-      <h2 class="bloque-t">educación</h2>
+      <h2 class="bloque-t">{T.educacion}</h2>
       {
         educacion.map((e) => (
           <article class="item">
@@ -136,14 +144,14 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
     </section>
 
     <section class="bloque" id="certificaciones">
-      <h2 class="bloque-t">certificaciones y cursos</h2>
+      <h2 class="bloque-t">{T.certificaciones}</h2>
       <table class="list list-certs">
         <thead class="solo-lector">
           <tr>
-            <th scope="col">nombre</th>
-            <th scope="col">fecha</th>
-            <th scope="col">emisor</th>
-            <th scope="col">archivo</th>
+            <th scope="col">{T.columnas.nombre}</th>
+            <th scope="col">{T.columnas.fecha}</th>
+            <th scope="col">{T.columnas.emisor}</th>
+            <th scope="col">{T.columnas.archivo}</th>
           </tr>
         </thead>
         <tbody>
@@ -153,7 +161,7 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
                 <td class="n">{c.data.nombre}</td>
                 <td class="c">{c.data.fecha ?? '—'}</td>
                 <td class="d">
-                  {[c.data.emisor, c.data.horas && `${c.data.horas} h`].filter(Boolean).join(' · ')}
+                  {[c.data.emisor, c.data.horas && `${c.data.horas} ${T.horas}`].filter(Boolean).join(' · ')}
                 </td>
                 <td class="acc">
                   {c.data.archivo && (
@@ -162,10 +170,10 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
                       href={rutaMedia(c.data.archivo)}
                       target="_blank"
                       rel="noopener"
-                      aria-label={`ver el certificado ${c.data.nombre}`}
+                      aria-label={T.verCertificado(c.data.nombre)}
                       data-nombre={c.data.nombre}
                     >
-                      [ver]
+                      {T.ver}
                     </a>
                   )}
                   {c.data.url && (
@@ -184,9 +192,9 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
                       class="go"
                       href={c.data.url}
                       {...propsExterno(c.data.url)}
-                      aria-label={`verificar el certificado ${c.data.nombre} (se abre en una pestaña nueva)`}
+                      aria-label={T.verificarCertificado(c.data.nombre)}
                     >
-                      [verificar]
+                      {T.verificar}
                       <span class="externo" aria-hidden="true"> ↗</span>
                     </a>
                   )}
@@ -197,7 +205,7 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
           }
         </tbody>
       </table>
-      <Visor />
+      <Visor lang={lang} />
     </section>
   </Terminal>
 </Base>

@@ -1,51 +1,52 @@
 ---
-import type { InferGetStaticPropsType } from 'astro';
-import Base from '../../layouts/Base.astro';
-import Terminal from '../../components/Terminal.astro';
-import { getStackConPagina } from '../../lib/content';
-import { slugTech } from '../../lib/render';
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import type { Idioma } from '../lib/content';
+import type { UsoDeStack } from '../lib/tipos';
+import { slugTech, textoDeUsos } from '../lib/render';
+import { rutaLocal } from '../i18n/rutas';
+import { TEXTOS_PAGINAS } from '../i18n/paginas';
 
-// Solo con dos o más usos. Una página que lista una sola cosa no aporta nada
-// que la lista de origen no diga ya.
-export const getStaticPaths = async () => {
-  const stack = await getStackConPagina();
-  return stack.map((s) => ({ params: { tech: slugTech(s.tech) }, props: { uso: s } }));
-};
+// Qué tecnologías tienen página (dos o más usos) lo decide src/lib/rutas-estaticas.ts.
+interface Props {
+  lang: Idioma;
+  uso: UsoDeStack;
+}
 
-type Props = InferGetStaticPropsType<typeof getStaticPaths>;
-
-const { uso } = Astro.props;
+const { lang, uso } = Astro.props;
+const T = TEXTOS_PAGINAS[lang].stack;
 ---
 
 <Base
   title={`${uso.tech} — JBMLL`}
-  description={`Dónde he usado ${uso.tech}: ${uso.usos} trabajos o proyectos.`}
+  description={T.descripcion(uso.tech, uso.usos)}
 >
   <Terminal
+    lang={lang}
     seccion="sobre-mi"
     salida=""
     detalle
-    documento={{ href: `/stack/${slugTech(uso.tech)}`, titulo: uso.tech, tipo: 'stack' }}
+    documento={{ href: rutaLocal(lang, `/stack/${slugTech(uso.tech)}`), titulo: uso.tech, tipo: 'stack' }}
     comando="stack"
   >
     <article class="lectura">
       <h1 class="lectura-t">{uso.tech}</h1>
-      <p class="lectura-m">{uso.usos} {uso.usos === 1 ? 'uso' : 'usos'}</p>
+      <p class="lectura-m">{textoDeUsos(uso.usos, lang)}</p>
       <ul class="fuentes">
         {
           uso.fuentes.map((f) => (
             <li>
-              <a class="go" href={f.tipo === 'proyecto' ? `/proyectos/${f.id}` : '/sobre-mi#experiencia'}>
+              <a class="go" href={rutaLocal(lang, f.tipo === 'proyecto' ? `/proyectos/${f.id}` : '/sobre-mi#experiencia')}>
                 {f.titulo}
               </a>
-              <span class="fuente-tipo">{f.tipo}</span>
+              <span class="fuente-tipo">{T.fuente[f.tipo]}</span>
               <span class="fuente-detalle">{f.detalle}</span>
             </li>
           ))
         }
       </ul>
       <p class="lectura-fin">
-        <a class="go" href="/sobre-mi#stack">← volver al stack</a>
+        <a class="go" href={rutaLocal(lang, '/sobre-mi#stack')}>{T.volver}</a>
       </p>
     </article>
   </Terminal>

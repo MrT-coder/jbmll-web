@@ -1,4 +1,7 @@
 import type { Indice } from '../lib/tipos';
+import type { TextosTerminal } from '../i18n/cliente';
+import { TEXTOS_CLIENTE } from '../i18n/cliente';
+import { rutaLocal } from '../i18n/rutas';
 import { renderSecciones, renderEntradas, renderStack } from '../lib/render';
 
 // La terminal.
@@ -33,9 +36,44 @@ const scroll = nodoScroll;
 const term = nodoTerm;
 
 const BRAIN = term.dataset.brain ?? '';
-const SECCIONES: string[] = [...(workspaces?.querySelectorAll('a') ?? [])].map((a) =>
-  (a.getAttribute('href') ?? '').slice(1),
+
+// El idioma de la página y su prefijo de URL (vacío en español, `/en` en
+// inglés) los escribe el servidor en #term. Todo lo que construye o interpreta
+// una ruta pasa por acá, para no mezclar los dos árboles de URLs.
+const LANG: 'es' | 'en' = term.dataset.lang === 'en' ? 'en' : 'es';
+const BASE = term.dataset.base ?? '';
+const HOME = rutaLocal(LANG, '/');
+
+/** La ruta de una sección (`''` es el inicio) en el idioma de la página. */
+const urlDe = (seccion: string): string => rutaLocal(LANG, seccion ? '/' + seccion : '/');
+
+/**
+ * El slug de un enlace interno de ESTE idioma (`''` para el inicio), o null si
+ * el enlace no es una ruta interna o cae fuera del árbol de este idioma (el
+ * selector de idioma, por ejemplo): ese se navega con una carga normal.
+ */
+function slugDeHref(href: string): string | null {
+  if (!href.startsWith('/')) return null;
+  let ruta = href;
+  if (BASE) {
+    if (ruta !== BASE && !ruta.startsWith(BASE + '/')) return null;
+    ruta = ruta.slice(BASE.length) || '/';
+  }
+  return ruta.slice(1);
+}
+
+const SECCIONES: string[] = [...(workspaces?.querySelectorAll('a') ?? [])].map(
+  (a) => slugDeHref(a.getAttribute('href') ?? '') ?? '',
 );
+
+// Los textos. Hasta que llegue indice.json valen los incorporados (la terminal
+// tiene que responder antes de que cargue el índice); al llegar, indice.ui los
+// reemplaza por los que sirve el servidor.
+let T: TextosTerminal = TEXTOS_CLIENTE[LANG].terminal;
+
+/** Rellena los huecos {0}, {1}... de una plantilla de texto. */
+const llenar = (plantilla: string, ...args: string[]): string =>
+  plantilla.replace(/\{(\d+)\}/g, (_, i: string) => args[Number(i)] ?? '');
 
 /** Sección montada. Cambia al navegar sin recargar. */
 let aqui = term.dataset.seccion ?? '';
@@ -83,7 +121,7 @@ const TOUCH = matchMedia('(hover: none) and (pointer: coarse)').matches;
 // de la línea (.entry-vivo en terminal.css, con letra de --text-input para que
 // iOS no haga zoom): prompt() lo mueve a la línea viva en cada pantalla nueva.
 const input = el('input', TOUCH ? 'entry-vivo' : 'entry');
-input.setAttribute('aria-label', 'Línea de comandos');
+input.setAttribute('aria-label', T.campo);
 input.type = 'text';
 input.autocomplete = 'off';
 input.spellcheck = false;
@@ -93,7 +131,7 @@ input.setAttribute('inputmode', 'text');
 input.setAttribute('enterkeyhint', 'go');
 input.setAttribute('autocapitalize', 'off');
 input.setAttribute('autocorrect', 'off');
-if (TOUCH) input.placeholder = 'toque aquí para escribir';
+if (TOUCH) input.placeholder = T.tocar;
 if (!TOUCH) document.body.append(input);
 
 /** True entre compositionstart y compositionend (teclados con predicción o IME). */
@@ -312,7 +350,7 @@ function prompt() {
       brain,
       el('span', 'typed', ''),
       el('span', 'caret'),
-      el('span', 'tap-hint', 'toque aquí para escribir'),
+      el('span', 'tap-hint', T.tocar),
     );
   }
   push(l);
@@ -326,17 +364,7 @@ function prompt() {
 
 // ── Comandos ───────────────────────────────────────────────────────────────
 
-const HELP: [string, string][] = [
-  ['ls', 'Listar lo que hay aquí'],
-  ['cd <sección>', 'Entrar en una sección'],
-  ['cd ~', 'Volver al inicio'],
-  ['whoami', 'Quién soy'],
-  ['stack', 'Con qué trabajo, contado desde los datos'],
-  ['contacto', 'Dónde encontrarme'],
-  ['pwd', 'Dónde estoy'],
-  ['c', 'Limpiar y volver al inicio'],
-  ['help', 'Esto'],
-];
+// La tabla de ayuda vive en T.ayuda (src/i18n/cliente.ts), por idioma.
 
 // Todo lo que se puede completar con Tab, en el contexto actual. Sin repetidos y
 // sin la sección vacía: HELP repite `cd`, `contacto` ya es una sección y el
@@ -346,7 +374,7 @@ const completables = (): string[] => {
   const secciones = SECCIONES.filter(Boolean);
   return [
     ...new Set([
-      ...HELP.map(([c]) => c.split(' ')[0]),
+      ...T.ayuda.map(([c]) => c.split(' ')[0]),
       ...secciones,
       ...secciones.map((s) => 'cd ' + s),
       ...(indice?.entradas[aqui] ?? []).map((f) => 'cat ' + f.slug),
@@ -362,7 +390,7 @@ const completables = (): string[] => {
  * navegación normal. El servidor ya sabe renderizar cualquiera de estas URLs.
  */
 function navegar(seccion: string, empujar = true): boolean {
-  const url = seccion ? '/' + seccion : '/';
+  const url = urlDe(seccion);
 
   // El inicio no es una sección más: su pantalla es el arranque, la foto y el
   // bloque de datos, y eso solo lo tiene el HTML que entregó el servidor.
@@ -397,7 +425,7 @@ function navegar(seccion: string, empujar = true): boolean {
   const typed = el('span', 'typed', comando);
   linea.append(el('span', 'brain ok', BRAIN), typed);
   push(linea);
-  const salida = fragmento(seccion ? renderEntradas(indice.entradas[seccion] ?? []) : renderSecciones(indice.secciones));
+  const salida = fragmento(seccion ? renderEntradas(indice.entradas[seccion] ?? [], indice.lang) : renderSecciones(indice.secciones, indice.lang));
   // Las filas de la salida, para la cascada. Se toman antes de push(): al
   // insertar el fragmento deja de tener hijos.
   const entradas = [...salida.querySelectorAll('.panels > *, tr')];
@@ -441,7 +469,10 @@ const irFuera = (href: string): boolean => {
 
 function exec(raw: string): boolean {
   const partes = raw.trim().split(/\s+/);
-  const cmd = partes[0];
+  // Lo que se escribió, para los mensajes, y el comando al que equivale: en
+  // inglés `contact` es el `contacto` de siempre.
+  const escrito = partes[0];
+  const cmd = T.alias[escrito] ?? escrito;
   const arg = partes[1];
   if (!cmd) return true;
 
@@ -449,7 +480,7 @@ function exec(raw: string): boolean {
     case 'help':
     case '?': {
       const t = el('table', 'list');
-      HELP.forEach(([c, d]) => {
+      T.ayuda.forEach(([c, d]) => {
         const tr = el('tr');
         tr.append(el('td', 'n', c), el('td', 'd', d));
         t.append(tr);
@@ -461,10 +492,10 @@ function exec(raw: string): boolean {
     case 'ls':
     case 'll':
     case 'dir': {
-      if (!indice) return irFuera(aqui ? '/' + aqui : '/');
+      if (!indice) return irFuera(urlDe(aqui));
       const html = aqui
-        ? renderEntradas(indice.entradas[aqui] ?? [])
-        : renderSecciones(indice.secciones);
+        ? renderEntradas(indice.entradas[aqui] ?? [], indice.lang)
+        : renderSecciones(indice.secciones, indice.lang);
       push(fragmento(html));
       return true;
     }
@@ -474,8 +505,8 @@ function exec(raw: string): boolean {
       if (!arg || arg === '~' || arg === '/') return navegar('');
       const destino = arg.replace(/^\/+|\/+$/g, '');
       if (SECCIONES.includes(destino)) return navegar(destino);
-      line('fg-red', `cd: ${destino}: no existe`);
-      line('fg-dim', "Escriba 'ls' para ver qué hay.");
+      line('fg-red', llenar(T.cdNoExiste, destino));
+      line('fg-dim', T.pistaLs);
       return false;
     }
 
@@ -493,35 +524,35 @@ function exec(raw: string): boolean {
     case 'less':
     case 'open': {
       if (!arg) {
-        line('fg-red', `${cmd}: falta el argumento`);
+        line('fg-red', llenar(T.faltaArg, escrito));
         return false;
       }
       const fila = (indice?.entradas[aqui] ?? []).find((f) => f.slug === arg);
       if (!fila) {
-        line('fg-red', `${cmd}: ${arg}: no existe`);
+        line('fg-red', llenar(T.noExiste, escrito, arg));
         return false;
       }
       // El cuerpo se lee en su propia URL, con el Markdown ya procesado por
       // Astro. Traerlo acá obligaría a mandar un analizador al navegador.
       const destino = fila.href ?? fila.externo?.href;
       if (!destino) {
-        line('fg-dim', `${arg}: no tiene cuerpo propio`);
+        line('fg-dim', llenar(T.sinCuerpo, arg));
         return false;
       }
       return irFuera(destino);
     }
 
     case 'stack': {
-      if (!indice) return irFuera('/sobre-mi#stack');
-      push(fragmento(renderStack(indice.stack)));
+      if (!indice) return irFuera(urlDe('sobre-mi') + '#stack');
+      push(fragmento(renderStack(indice.stack, undefined, indice.lang)));
       return true;
     }
 
     case 'whoami':
-      return irFuera('/sobre-mi');
+      return irFuera(urlDe('sobre-mi'));
 
     case 'contacto':
-      return irFuera('/contacto');
+      return irFuera(urlDe('contacto'));
 
     case 'c':
     case 'clear':
@@ -542,12 +573,12 @@ function exec(raw: string): boolean {
       return irFuera('https://github.com/MrT-coder');
 
     case 'date':
-      line('fg-muted', new Date().toLocaleString('es-EC'));
+      line('fg-muted', new Date().toLocaleString(T.locale));
       return true;
 
     default:
-      line('fg-red', cmd + ': comando no encontrado');
-      line('fg-dim', "Escriba 'help', o pulse Tab para ver qué hay.");
+      line('fg-red', llenar(T.noCmd, escrito));
+      line('fg-dim', T.pistaHelp);
       return false;
   }
 }
@@ -557,7 +588,8 @@ function exec(raw: string): boolean {
  * hace falta pedirla al servidor, que es quien tiene ese HTML.
  */
 function reiniciar(): boolean {
-  if (location.pathname !== '/') return irFuera('/');
+  // El inicio inglés es `/en`, pero `/en/` cuenta igual como inicio.
+  if ((location.pathname.replace(/\/+$/, '') || '/') !== (HOME.replace(/\/+$/, '') || '/')) return irFuera(HOME);
   // Volver al inicio también reproduce el arranque (decisión del dueño,
   // 2026-10-07: antes era solo de la primera carga). Orden: se corta lo que
   // estuviera animando (sin relojes encimados si se repite `c`) y se pone
@@ -638,7 +670,7 @@ function abrirListView(opciones: string[]) {
   const caja = el('div', 'lv');
   caja.id = 'lv-lista';
   caja.setAttribute('role', 'listbox');
-  caja.setAttribute('aria-label', 'Sugerencias');
+  caja.setAttribute('aria-label', T.sugerencias);
   lvOpciones = opciones.slice(0, 6);
   lvEscrito = input.value;
   lvOpciones.forEach((o, i) => {
@@ -833,7 +865,7 @@ function montarBarra() {
 
   const barra = el('div', 'teclas');
   barra.setAttribute('role', 'toolbar');
-  barra.setAttribute('aria-label', 'Teclas y comandos rápidos');
+  barra.setAttribute('aria-label', T.barraTeclas);
 
   const boton = (cls: string, texto: string, etiqueta: string, alTocar: () => void) => {
     const b = el('button', 'tecla ' + cls, texto);
@@ -847,15 +879,15 @@ function montarBarra() {
 
   const fijas = el('div', 'teclas-fijas');
   fijas.append(
-    boton('tecla-fija', 'tab', 'Tab (Tabulador)', () => {
+    boton('tecla-fija', 'tab', T.teclaTab, () => {
       if (!accionTab() && !input.value.trim()) sugerirComandos();
     }),
-    boton('tecla-fija', '↑', 'Historial anterior', () => void accionFlecha(-1)),
-    boton('tecla-fija', '↓', 'Historial siguiente', () => void accionFlecha(1)),
-    boton('tecla-fija', 'esc', 'Esc (Escape)', () => accionEscape()),
+    boton('tecla-fija', '↑', T.teclaArriba, () => void accionFlecha(-1)),
+    boton('tecla-fija', '↓', T.teclaAbajo, () => void accionFlecha(1)),
+    boton('tecla-fija', 'esc', T.teclaEsc, () => accionEscape()),
     // Sin teclado abierto no hay otro Enter: recuperar un comando con ↑ y no
     // poder ejecutarlo sería una tecla a medias.
-    boton('tecla-fija', '↵', 'Ejecutar', () => run()),
+    boton('tecla-fija', '↵', T.teclaEjecutar, () => run()),
   );
 
   // Las secciones salen de la barra lateral (SECCIONES), no de una lista
@@ -865,7 +897,7 @@ function montarBarra() {
   const comandos = ['ls', ...SECCIONES.filter(Boolean).map((s) => 'cd ' + s), 'whoami', 'help', 'c'];
   const cmds = el('div', 'teclas-cmds');
   for (const c of comandos) {
-    cmds.append(boton('tecla-cmd', c, 'Ejecutar ' + c, () => ejecutarRapido(c)));
+    cmds.append(boton('tecla-cmd', c, llenar(T.ejecutar, c), () => ejecutarRapido(c)));
   }
   barra.append(fijas, cmds);
 
@@ -894,8 +926,9 @@ document.addEventListener('click', (ev) => {
   if (a) {
     const mouse = ev as MouseEvent;
     if (mouse.metaKey || mouse.ctrlKey || mouse.shiftKey || mouse.button !== 0) return;
-    const href = a.getAttribute('href') ?? '';
-    const destino = href.startsWith('/') ? href.slice(1) : null;
+    // El selector de idioma lleva a otro árbol de URLs: carga normal.
+    if (a.closest('.sidebar-idioma')) return;
+    const destino = slugDeHref(a.getAttribute('href') ?? '');
     if (destino !== null && SECCIONES.includes(destino) && indice) {
       ev.preventDefault();
       escribirComando('cd ' + destino);
@@ -984,7 +1017,12 @@ addEventListener('popstate', (ev) => {
 
 /** La sección de la URL actual, o null si es una página que no renderizamos. */
 function rutaActual(): string | null {
-  const p = location.pathname.replace(/^\/+|\/+$/g, '');
+  let ruta = location.pathname;
+  if (BASE) {
+    if (ruta !== BASE && !ruta.startsWith(BASE + '/')) return null;
+    ruta = ruta.slice(BASE.length);
+  }
+  const p = ruta.replace(/^\/+|\/+$/g, '');
   if (p === '') return '';
   return SECCIONES.includes(p) ? p : null;
 }
@@ -1039,10 +1077,11 @@ arrancando = false;
 
 // El índice llega después del primer pintado: la página ya es legible sin él y
 // solo hace falta cuando alguien navega o completa con Tab.
-fetch('/indice.json')
+fetch(BASE + '/indice.json')
   .then((r) => (r.ok ? (r.json() as Promise<Indice>) : null))
   .then((datos) => {
     indice = datos;
+    if (datos?.ui?.terminal) T = datos.ui.terminal;
   })
   .catch(() => {
     // Sin índice la terminal sigue funcionando: cada comando cae a una

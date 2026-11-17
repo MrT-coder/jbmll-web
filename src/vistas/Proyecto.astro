@@ -1,23 +1,25 @@
 ---
-import type { InferGetStaticPropsType } from 'astro';
 import { render } from 'astro:content';
-import Base from '../../layouts/Base.astro';
-import Terminal from '../../components/Terminal.astro';
-import Visor from '../../components/Visor.astro';
-import { getProyectos, getTechsConPagina, vecinos, ETIQUETAS_ESTADO, ETIQUETAS_CONTEXTO } from '../../lib/content';
-import { slugTech } from '../../lib/render';
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import Visor from '../components/Visor.astro';
+import { etiquetaEstado, etiquetaContexto, type Idioma, type Proyecto } from '../lib/content';
+import { slugTech } from '../lib/render';
+import { rutaLocal } from '../i18n/rutas';
+import { TEXTOS_PAGINAS } from '../i18n/paginas';
 
-export const getStaticPaths = async () => {
-  const [proyectos, conPagina] = await Promise.all([getProyectos(), getTechsConPagina()]);
-  return proyectos.map((p) => ({
-    params: { slug: p.id },
-    props: { proyecto: p, conPagina, ...vecinos(proyectos, p.id) },
-  }));
-};
+// Las rutas y las props las arma la página de cada idioma (src/lib/rutas-estaticas.ts):
+// esta vista solo dibuja.
+interface Props {
+  lang: Idioma;
+  proyecto: Proyecto;
+  conPagina: Set<string>;
+  anterior: Proyecto | null;
+  siguiente: Proyecto | null;
+}
 
-type Props = InferGetStaticPropsType<typeof getStaticPaths>;
-
-const { proyecto, conPagina, anterior, siguiente } = Astro.props;
+const { lang, proyecto, conPagina, anterior, siguiente } = Astro.props;
+const T = TEXTOS_PAGINAS[lang].proyectos;
 
 // El cuerpo lo procesa Astro al compilar. Al navegador no llega ni un byte de
 // analizador de Markdown.
@@ -27,17 +29,18 @@ const { Content } = await render(proyecto);
 // esta página de detalle lean exactamente lo mismo: el estado va coloreado y
 // aparte, el contexto (si existe) justo después, y el resto de la línea
 // (organización, fecha) cierra igual que antes.
-const estadoEtiqueta = ETIQUETAS_ESTADO[proyecto.data.estado];
-const contextoEtiqueta = proyecto.data.contexto ? ETIQUETAS_CONTEXTO[proyecto.data.contexto] : null;
+const estadoEtiqueta = etiquetaEstado(proyecto.data.estado, lang);
+const contextoEtiqueta = proyecto.data.contexto ? etiquetaContexto(proyecto.data.contexto, lang) : null;
 const meta = [proyecto.data.organizacion, proyecto.data.fecha].filter(Boolean).join(' · ');
 ---
 
 <Base title={`${proyecto.data.titulo} — JBMLL`} description={proyecto.data.desc}>
   <Terminal
+    lang={lang}
     seccion="proyectos"
     salida=""
     detalle
-    documento={{ href: `/proyectos/${proyecto.id}`, titulo: proyecto.data.titulo, tipo: 'proyecto' }}
+    documento={{ href: rutaLocal(lang, `/proyectos/${proyecto.id}`), titulo: proyecto.data.titulo, tipo: 'proyecto' }}
   >
     <article class="lectura">
       <h1 class="lectura-t">{proyecto.data.titulo}</h1>
@@ -52,7 +55,7 @@ const meta = [proyecto.data.organizacion, proyecto.data.fecha].filter(Boolean).j
           proyecto.data.st.map((t) => (
             <li>
               {conPagina.has(t) ? (
-                <a class="chip" href={`/stack/${slugTech(t)}`}>
+                <a class="chip" href={rutaLocal(lang, `/stack/${slugTech(t)}`)}>
                   {t}
                 </a>
               ) : (
@@ -72,18 +75,18 @@ const meta = [proyecto.data.organizacion, proyecto.data.fecha].filter(Boolean).j
            este componente aquí, esos enlaces existen en el HTML pero no hay
            ningún <dialog id="visor"> que scripts/visor.ts pueda abrir — el
            mismo candado que ya hace falta en /sobre-mi para certificados. -->
-      <Visor />
+      <Visor lang={lang} />
 
       <footer class="eof">
         <p class="eof-mark">(END)</p>
         <ul class="eof-acts">
           <li>
-            <a href="/proyectos"><kbd>q</kbd>volver a proyectos</a>
+            <a href={rutaLocal(lang, '/proyectos')}><kbd>q</kbd>{T.volver}</a>
           </li>
           {
             anterior && (
               <li>
-                <a href={`/proyectos/${anterior.id}`}>
+                <a href={rutaLocal(lang, `/proyectos/${anterior.id}`)}>
                   <kbd>k</kbd>
                   {anterior.data.titulo}
                 </a>
@@ -93,7 +96,7 @@ const meta = [proyecto.data.organizacion, proyecto.data.fecha].filter(Boolean).j
           {
             siguiente && (
               <li>
-                <a href={`/proyectos/${siguiente.id}`}>
+                <a href={rutaLocal(lang, `/proyectos/${siguiente.id}`)}>
                   <kbd>j</kbd>
                   {siguiente.data.titulo}
                 </a>

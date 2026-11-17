@@ -1,5 +1,41 @@
 import type { Fila, Indice, Seccion, UsoDeStack } from './tipos';
 import { iconoDe } from '../data/iconos';
+import type { Idioma } from './content';
+
+// Los textos que este módulo escribe por su cuenta. Lo comparten el servidor
+// (HTML inicial) y la terminal (navegación sin recarga), así que viven aquí y
+// no en cada página: si el inglés dijera algo distinto según quién lo pinte,
+// el contenido cambiaría al hacer clic.
+const TEXTOS: Record<
+  Idioma,
+  {
+    cabecera: [string, string, string];
+    vacio: string;
+    uso: [string, string];
+    noExiste: (seccion: string) => string;
+    externo: string;
+  }
+> = {
+  es: {
+    cabecera: ['sección', 'entradas', 'descripción'],
+    vacio: '# todavía no hay nada acá',
+    uso: ['uso', 'usos'],
+    noExiste: (seccion) => `cd: ${seccion}: no existe`,
+    externo: '(se abre en una pestaña nueva)',
+  },
+  en: {
+    cabecera: ['section', 'entries', 'description'],
+    vacio: '# nothing here yet',
+    uso: ['use', 'uses'],
+    noExiste: (seccion) => `cd: ${seccion}: no such directory`,
+    externo: '(opens in a new tab)',
+  },
+};
+
+/** `1 uso`, `2 usos`; `1 use`, `2 uses`. */
+export function textoDeUsos(n: number, lang: Idioma = 'es'): string {
+  return `${n} ${TEXTOS[lang].uso[n === 1 ? 0 : 1]}`;
+}
 
 // Funciones puras: entran datos, sale HTML. No tocan el DOM ni leen nada.
 //
@@ -26,11 +62,11 @@ export function esc(s: string): string {
  * Cada fila es un enlace de verdad. Ahí muere la barrera de entrada: quien sabe
  * escribe `cd proyectos`, quien no, hace clic. Mismo destino, misma URL.
  */
-export function renderSecciones(secciones: Seccion[]): string {
+export function renderSecciones(secciones: Seccion[], lang: Idioma = 'es'): string {
   const filas = secciones
     .map(
       (s) => `<tr class="row-go">
-    <td class="n"><a class="go" href="/${esc(s.slug)}">${esc(s.slug)}/</a></td>
+    <td class="n"><a class="go" href="${esc(s.href)}">${esc(s.slug)}/</a></td>
     <td class="c">${s.tipo === 'coleccion' ? s.n : '&mdash;'}</td>
     <td class="d">${esc(s.desc)}</td>
   </tr>`,
@@ -38,8 +74,8 @@ export function renderSecciones(secciones: Seccion[]): string {
     .join('\n');
   // Encabezados solo para lectores de pantalla: la tabla ya se lee bien a la
   // vista, pero sin <th> un lector no sabe qué es cada columna.
-  const cabecera =
-    '<thead class="solo-lector"><tr><th scope="col">sección</th><th scope="col">entradas</th><th scope="col">descripción</th></tr></thead>';
+  const [c1, c2, c3] = TEXTOS[lang].cabecera;
+  const cabecera = `<thead class="solo-lector"><tr><th scope="col">${c1}</th><th scope="col">${c2}</th><th scope="col">${c3}</th></tr></thead>`;
   return `<table class="list">\n${cabecera}\n<tbody>\n${filas}\n</tbody>\n</table>`;
 }
 
@@ -69,7 +105,7 @@ function metaDeFila(f: Fila): string {
   return partes.join(' · ');
 }
 
-function panel(f: Fila): string {
+function panel(f: Fila, lang: Idioma): string {
   const destino = f.href ?? f.externo?.href;
   // f.href es siempre una ruta propia; f.externo?.href (un DOI, cuando la
   // publicación no tiene página propia — ver filaDePublicacion() en
@@ -77,7 +113,7 @@ function panel(f: Fila): string {
   // esExterno() y no asumiendo uno de los dos casos.
   const destinoExterno = destino ? esExterno(destino) : false;
   const titulo = destino
-    ? `<a class="go" href="${esc(destino)}"${destinoExterno ? ' target="_blank" rel="noopener"' : ''}>${esc(f.titulo)}${destinoExterno ? MARCA_EXTERNA : ''}</a>`
+    ? `<a class="go" href="${esc(destino)}"${destinoExterno ? ' target="_blank" rel="noopener"' : ''}>${esc(f.titulo)}${destinoExterno ? marcaExterna(lang) : ''}</a>`
     : esc(f.titulo);
 
   // Mismo patrón que el título de arriba: una tecnología sin página propia se
@@ -101,11 +137,11 @@ function panel(f: Fila): string {
 </article>`;
 }
 
-export function renderEntradas(filas: Fila[]): string {
+export function renderEntradas(filas: Fila[], lang: Idioma = 'es'): string {
   if (filas.length === 0) {
-    return `<div class="out fg-dim"># todavía no hay nada acá</div>`;
+    return `<div class="out fg-dim">${TEXTOS[lang].vacio}</div>`;
   }
-  return `<div class="panels">\n${filas.map(panel).join('\n')}\n</div>`;
+  return `<div class="panels">\n${filas.map((f) => panel(f, lang)).join('\n')}\n</div>`;
 }
 
 /**
@@ -122,13 +158,13 @@ export function renderEntradas(filas: Fila[]): string {
  * de hoy: así el mapa no se recolorea entero la próxima vez que se agregue un
  * proyecto, y una celda con 2 usos ya se pinta en su lugar final de la escala.
  */
-export function renderStack(stack: UsoDeStack[], minimoParaPagina = 2): string {
+export function renderStack(stack: UsoDeStack[], minimoParaPagina = 2, lang: Idioma = 'es'): string {
   const celdas = stack
     .map((s) => {
       const nivel = Math.min(s.usos, 5);
       const conPagina = s.usos >= minimoParaPagina;
       const nombre = esc(s.tech);
-      const texto = `${s.usos} ${s.usos === 1 ? 'uso' : 'usos'}`;
+      const texto = textoDeUsos(s.usos, lang);
 
       // aria-hidden: el icono es decorativo y su nombre ya está al lado. Un
       // lector de pantalla leería el codepoint del Área de Uso Privado, que no
@@ -141,7 +177,7 @@ export function renderStack(stack: UsoDeStack[], minimoParaPagina = 2): string {
       // el número adentro para que no haga falta ver el color de fondo para
       // saber cuántos usos tiene.
       const celda = conPagina
-        ? `<a class="stack-celda nivel-${nivel}" href="/stack/${esc(slugTech(s.tech))}" aria-label="${nombre}, ${texto}">${contenido}</a>`
+        ? `<a class="stack-celda nivel-${nivel}" href="${lang === 'en' ? '/en' : ''}/stack/${esc(slugTech(s.tech))}" aria-label="${nombre}, ${texto}">${contenido}</a>`
         : `<div class="stack-celda nivel-${nivel}">${contenido}</div>`;
 
       return `<li>${celda}</li>`;
@@ -154,7 +190,7 @@ export function renderStack(stack: UsoDeStack[], minimoParaPagina = 2): string {
   const leyenda = [1, 2, 3, 4, 5]
     .map((n) => {
       const etiqueta = n === 5 ? '5+' : String(n);
-      const texto = `${etiqueta} ${n === 1 ? 'uso' : 'usos'}`;
+      const texto = `${etiqueta} ${TEXTOS[lang].uso[n === 1 ? 0 : 1]}`;
       return `<li><span class="stack-swatch nivel-${n}" aria-hidden="true"></span><span class="stack-leyenda-t">${texto}</span></li>`;
     })
     .join('');
@@ -231,6 +267,11 @@ export function esExterno(href: string): boolean {
 export const MARCA_EXTERNA =
   '<span class="externo" aria-hidden="true"> ↗</span><span class="sr-only"> (se abre en una pestaña nueva)</span>';
 
+/** La misma marca en el idioma de la página. */
+export function marcaExterna(lang: Idioma = 'es'): string {
+  return `<span class="externo" aria-hidden="true"> ↗</span><span class="sr-only"> ${TEXTOS[lang].externo}</span>`;
+}
+
 /** target/rel para un enlace externo, listos para un spread de props JSX
  * (`<a {...propsExterno(href)}>`). Un enlace que no es externo no recibe
  * ninguno de los dos: no hace falta "apagar" nada porque nunca se puso.
@@ -248,7 +289,7 @@ export interface EnlaceDeContacto {
   texto?: string;
 }
 
-export function renderContacto(enlaces: EnlaceDeContacto[]): string {
+export function renderContacto(enlaces: EnlaceDeContacto[], lang: Idioma = 'es'): string {
   const filas = enlaces
     .map((e) => {
       // rel="me" declara que el perfil del otro extremo es el mismo de aquí:
@@ -258,7 +299,7 @@ export function renderContacto(enlaces: EnlaceDeContacto[]): string {
       // misma pestaña, como siempre.
       const externo = esExterno(e.href);
       const rel = externo ? ' rel="me noopener" target="_blank"' : '';
-      const marca = externo ? MARCA_EXTERNA : '';
+      const marca = externo ? marcaExterna(lang) : '';
       return `<tr>
     <td class="n">${esc(e.etiqueta)}</td>
     <td class="d"><a class="go" href="${esc(e.href)}"${rel}>${esc(e.texto ?? e.href)}${marca}</a></td>
@@ -270,8 +311,8 @@ export function renderContacto(enlaces: EnlaceDeContacto[]): string {
 
 /** La salida inicial de una URL: lo que la terminal ya tendría en pantalla. */
 export function renderSalida(indice: Indice, seccion: string | null): string {
-  if (!seccion) return renderSecciones(indice.secciones);
+  if (!seccion) return renderSecciones(indice.secciones, indice.lang);
   const filas = indice.entradas[seccion];
-  if (!filas) return `<div class="out fg-red">cd: ${esc(seccion)}: no existe</div>`;
-  return renderEntradas(filas);
+  if (!filas) return `<div class="out fg-red">${esc(TEXTOS[indice.lang].noExiste(seccion))}</div>`;
+  return renderEntradas(filas, indice.lang);
 }

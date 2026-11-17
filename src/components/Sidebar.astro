@@ -1,8 +1,11 @@
 ---
 import '../styles/sidebar.css';
 import marcaRaw from '../data/marca.txt?raw';
-import { WORKSPACES, subtituloDeWorkspace, getIndice } from '../lib/content';
-import type { DocumentoAbierto, TipoDocumentoAbierto } from '../lib/tipos';
+import { workspacesDe, subtituloDeWorkspace, getIndice, type Idioma } from '../lib/content';
+import type { DocumentoAbierto } from '../lib/tipos';
+import { rutaLocal, rutaAlternativa } from '../i18n/rutas';
+import { TEXTOS_COMPONENTES } from '../i18n/componentes';
+import { TEXTOS_CLIENTE } from '../i18n/cliente';
 
 interface Props {
   /** Workspace montado: '' es la raíz, o uno de los slugs de SECCIONES. */
@@ -14,9 +17,17 @@ interface Props {
   /** El documento propio, cuando la página es de detalle. Sin él, «abiertos»
    * sirve su estado vacío: sin sesión no hay nada que listar todavía. */
   documento?: DocumentoAbierto | null;
+  lang?: Idioma;
 }
 
-const { actual = null, detalle = false, documento = null } = Astro.props;
+const { actual = null, detalle = false, documento = null, lang = 'es' } = Astro.props;
+const t = TEXTOS_COMPONENTES[lang].barra;
+const tc = TEXTOS_CLIENTE[lang].sidebar;
+// sidebar.ts no hace fetch: sus textos viajan en el propio elemento.
+const textos = JSON.stringify(tc);
+const otro: Idioma = lang === 'es' ? 'en' : 'es';
+// La página 404 no tiene gemela en el otro idioma: sin selector ahí.
+const sin404 = /^\/404(\.html)?\/?$/.test(Astro.url.pathname);
 
 // Los espacios del final de cada fila son parte del dibujo y los editores los
 // borran, así que el ancho se restituye acá — igual que con el banner en
@@ -28,17 +39,11 @@ const filasMarca = marcaRaw
 const anchoMarca = Math.max(...filasMarca.map((f) => f.length));
 const marca = filasMarca.map((f) => f.padEnd(anchoMarca)).join('\n');
 
-const indice = await getIndice();
-
-const ETIQUETA_TIPO: Record<TipoDocumentoAbierto, string> = {
-  proyecto: 'proyecto',
-  publicacion: 'publicación',
-  stack: 'stack',
-};
+const indice = await getIndice(lang);
 ---
 
 <button id="sidebar-toggle" class="sidebar-alterna" type="button" aria-expanded="false" aria-controls="sidebar">
-  <span aria-hidden="true">☰</span> menú
+  <span aria-hidden="true">☰</span> {t.menu}
 </button>
 
 <button id="sidebar-scrim" class="sidebar-scrim" type="button" tabindex="-1" aria-hidden="true"></button>
@@ -46,8 +51,8 @@ const ETIQUETA_TIPO: Record<TipoDocumentoAbierto, string> = {
 <!-- Sin aria-label fijo: un nombre accesible estático sobre un elemento sin
      role es un aria-prohibited-attr de axe. sidebar.ts lo pone junto con
      role="dialog" solo mientras la cortina móvil está abierta (ver abrir()/cerrar()). -->
-<div id="sidebar" class="sidebar">
-  <button id="sidebar-cerrar" class="sidebar-cerrar" type="button" aria-label="Cerrar menú">
+<div id="sidebar" class="sidebar" data-lang={lang} data-textos={textos}>
+  <button id="sidebar-cerrar" class="sidebar-cerrar" type="button" aria-label={t.cerrar}>
     <span aria-hidden="true">✕</span>
   </button>
 
@@ -57,18 +62,18 @@ const ETIQUETA_TIPO: Record<TipoDocumentoAbierto, string> = {
        al lector de pantalla para que no lea las filas carácter por carácter.
        El ancho (19 columnas) cabe en los 24ch de la barra: lo comprueba
        scripts/verify.mjs. -->
-  <a class="sidebar-marca" href="/" aria-label="JBMLL, volver al inicio">
+  <a class="sidebar-marca" href={rutaLocal(lang, '/')} aria-label={t.marca}>
     <pre class="sidebar-marca-dibujo" aria-hidden="true">{marca}</pre>
   </a>
 
-  <nav id="sidebar-workspaces" class="sidebar-workspaces" aria-label="Workspaces">
-    <h2 class="sidebar-subt">workspaces</h2>
+  <nav id="sidebar-workspaces" class="sidebar-workspaces" aria-label={t.navegacion}>
+    <h2 class="sidebar-subt">{t.workspaces}</h2>
     <ul>
       {
-        WORKSPACES.map((w) => {
+        workspacesDe(lang).map((w) => {
           const esActual = w.slug === actual;
           const glifo = esActual ? '◉' : '○';
-          const estado = esActual ? 'actual' : 'sin visitar';
+          const estado = esActual ? tc.actual : tc.sinVisitar;
           return (
             <li>
               <a
@@ -82,7 +87,7 @@ const ETIQUETA_TIPO: Record<TipoDocumentoAbierto, string> = {
                   <span class="ws-glifo" aria-hidden="true">{glifo}</span>
                   <span class="ws-nombre">{w.nombre}</span>
                 </span>
-                <span class="ws-sub">{subtituloDeWorkspace(w.slug, indice)}</span>
+                <span class="ws-sub">{subtituloDeWorkspace(w.slug, indice, lang)}</span>
               </a>
             </li>
           );
@@ -92,7 +97,7 @@ const ETIQUETA_TIPO: Record<TipoDocumentoAbierto, string> = {
   </nav>
 
   <section class="sidebar-abiertos" aria-labelledby="sidebar-abiertos-t">
-    <h2 id="sidebar-abiertos-t" class="sidebar-subt">abiertos</h2>
+    <h2 id="sidebar-abiertos-t" class="sidebar-subt">{t.abiertos}</h2>
     <ul id="sidebar-abiertos-lista">
       {
         documento ? (
@@ -102,15 +107,33 @@ const ETIQUETA_TIPO: Record<TipoDocumentoAbierto, string> = {
                 <span class="ab-glifo" aria-hidden="true">◉</span>
                 <span class="ab-titulo">{documento.titulo}</span>
               </span>
-              <span class="ab-sub">leyendo · {ETIQUETA_TIPO[documento.tipo]}</span>
+              <span class="ab-sub">{tc.leyendo} · {tc.tipos[documento.tipo]}</span>
             </a>
           </li>
         ) : (
-          <li class="ab-vacio">nada abierto</li>
+          <li class="ab-vacio">{tc.nadaAbierto}</li>
         )
       }
     </ul>
   </section>
+
+  <!-- Un enlace normal, sin JavaScript: lleva a la misma página en el otro
+       idioma. hreflang y lang describen el DESTINO, que es lo que dice el texto. -->
+  {
+    !sin404 && (
+      <div class="sidebar-idioma">
+        <a
+          class="idioma-enlace"
+          href={rutaAlternativa(Astro.url.pathname, lang)}
+          hreflang={otro}
+          lang={otro}
+          aria-label={t.selectorNombre}
+        >
+          {t.selectorTexto}
+        </a>
+      </div>
+    )
+  }
 </div>
 
 <script>
