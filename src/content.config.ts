@@ -45,10 +45,12 @@ const experiencia = defineCollection({
     // cuál es, y tarde o temprano alguien lo compara con una fecha real.
     fin: opcional(mes),
 
-    // Un puesto cuyo trabajo ya está descrito como proyecto no declara stack:
+    // Un puesto cuyo trabajo ya está descrito como proyectos no declara stack:
     // lo hereda de ahí. Si declarara el suyo, cada tecnología contaría dos
-    // veces y el stack quedaría inflado sin que nadie mintiera.
-    proyecto: opcional(z.string()),
+    // veces y el stack quedaría inflado sin que nadie mintiera. Es una lista
+    // porque un trabajo independiente reúne varios proyectos (ids de la
+    // colección de proyectos).
+    proyectos: z.array(z.string()).default([]),
     st: z.array(z.string()).default([]),
     kw: z.array(z.string()).default([]),
   }),

@@ -127,7 +127,7 @@ export async function getStack(lang: Idioma = 'es'): Promise<UsoDeStack[]> {
   };
 
   for (const e of experiencia) {
-    if (e.data.proyecto) continue;
+    if (e.data.proyectos.length > 0) continue;
     for (const tech of e.data.st) {
       sumar(tech, {
         tipo: 'experiencia',

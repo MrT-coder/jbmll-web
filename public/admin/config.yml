@@ -63,7 +63,14 @@ collections:
           pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
           hint: 'AAAA o AAAA-MM. Vacío significa "hasta hoy".',
         }
-      - { name: proyecto, label: Proyecto relacionado, widget: string, required: false }
+      - {
+          name: proyectos,
+          label: Proyectos relacionados,
+          hint: 'Los nombres de archivo de los proyectos (sin .md). Si hay alguno, el stack de este puesto es el de ellos.',
+          widget: list,
+          required: false,
+          default: [],
+        }
       - { name: st, label: Stack, widget: list, required: false, default: [] }
       - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
 
@@ -228,7 +235,14 @@ collections:
           pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
           hint: 'AAAA o AAAA-MM. Vacío significa "hasta hoy".',
         }
-      - { name: proyecto, label: Proyecto relacionado, widget: string, required: false }
+      - {
+          name: proyectos,
+          label: Proyectos relacionados,
+          hint: 'Los nombres de archivo de los proyectos (sin .md). Si hay alguno, el stack de este puesto es el de ellos.',
+          widget: list,
+          required: false,
+          default: [],
+        }
       - { name: st, label: Stack, widget: list, required: false, default: [] }
       - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
 

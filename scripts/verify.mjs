@@ -98,14 +98,14 @@ const publicacionesSrc = listarColeccionMd('src/content/publicaciones')
 
 // Mismo orden que getExperiencia(): sin fecha de fin primero (sigue vigente),
 // luego por fecha de inicio descendente. Una entrada que solo enlaza a un
-// proyecto (`proyecto:`) no declara su propio stack — igual que en getStack().
+// proyecto (`proyectos:`) no declara su propio stack — igual que en getStack().
 const experienciaSrc = listarColeccionMd('src/content/experiencia').sort((a, b) => {
   if (!a.data.fin && b.data.fin) return -1;
   if (a.data.fin && !b.data.fin) return 1;
   return String(b.data.inicio ?? '').localeCompare(String(a.data.inicio ?? ''));
 });
 const experienciaConStack = experienciaSrc.find(
-  (e) => !e.data.proyecto && Array.isArray(e.data.st) && e.data.st.length > 0,
+  (e) => !(e.data.proyectos ?? []).length && Array.isArray(e.data.st) && e.data.st.length > 0,
 );
 
 const perfilYamlData = parseYaml(readFileSync('src/content/perfil.yaml', 'utf8'))?.perfil ?? {};

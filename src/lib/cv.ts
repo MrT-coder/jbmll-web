@@ -24,6 +24,8 @@ export interface CvEntrada {
   stack: string[];
   /** Enlaces del proyecto (demo, repositorio), solo los que existen. */
   enlaces: { etiqueta: string; url: string }[];
+  /** Los proyectos que cuelgan de este puesto (trabajo independiente). */
+  subentradas?: CvEntrada[];
 }
 
 export interface Cv {
@@ -103,37 +105,50 @@ export async function armarCv(lang: Idioma): Promise<Cv> {
 
   const proyectoPorId = new Map(proyectos.map((p) => [p.id, p]));
 
+  const entradaDeProyecto = (p: (typeof proyectos)[number]): CvEntrada => ({
+    titulo: p.data.titulo,
+    detalle: [p.data.organizacion, formatoMes(p.data.fecha, e.meses)].filter(Boolean).join(' · '),
+    puntos: p.data.cv,
+    stack: p.data.st,
+    enlaces: [
+      p.data.demo ? { etiqueta: e.demo, url: p.data.demo } : null,
+      p.data.repo ? { etiqueta: e.repo, url: p.data.repo } : null,
+    ].filter((x): x is { etiqueta: string; url: string } => x !== null),
+  });
+
+  // Los proyectos que cuelgan de un puesto salen dentro de él, no otra vez en
+  // «Proyectos»: un trabajo independiente ES esos proyectos.
+  const colgados = new Set(experiencia.flatMap((x) => x.data.proyectos));
+
   const entradasDeExperiencia: CvEntrada[] = experiencia.map((x) => {
     const parrafos = parrafosPlanos(x.body);
-    const enlazado = x.data.proyecto ? proyectoPorId.get(x.data.proyecto) : undefined;
+    const enlazados = x.data.proyectos
+      .map((id) => proyectoPorId.get(id))
+      .filter((p): p is NonNullable<typeof p> => p !== undefined);
     return {
       titulo: `${x.data.puesto} — ${x.data.organizacion}`,
       detalle: [
         x.data.modalidad ? `${x.data.ubicacion} (${x.data.modalidad})` : x.data.ubicacion,
         periodo(x.data.inicio, x.data.fin, e),
       ].join(' · '),
-      // Un puesto que enlaza a un proyecto dice en su segundo párrafo «el
-      // trabajo está descrito en el proyecto»: en la web es un puente, en un
-      // CV de una sola página sería una referencia a otra sección. Solo pasa
-      // el primero; el resto vive en Proyectos.
-      puntos: x.data.proyecto ? parrafos.slice(0, 1) : parrafos,
-      stack: enlazado ? enlazado.data.st : x.data.st,
+      // Un puesto que enlaza a proyectos dice en su segundo párrafo «el trabajo
+      // está descrito en los proyectos»: en la web es un puente, en un CV sería
+      // una referencia a otra sección. Solo pasa el primero; los proyectos
+      // cuelgan debajo como subentradas.
+      puntos: enlazados.length ? parrafos.slice(0, 1) : parrafos,
+      // El resumen del puesto es la unión de los stacks de sus proyectos, sin
+      // repetir; cada subentrada no vuelve a listar el suyo.
+      stack: enlazados.length ? [...new Set(enlazados.flatMap((p) => p.data.st))] : x.data.st,
       enlaces: [],
+      subentradas: enlazados
+        .filter((p) => p.data.cv.length > 0)
+        .map((p) => ({ ...entradaDeProyecto(p), stack: [] })),
     };
   });
 
   const entradasDeProyecto: CvEntrada[] = proyectos
-    .filter((p) => p.data.cv.length > 0)
-    .map((p) => ({
-      titulo: p.data.titulo,
-      detalle: [p.data.organizacion, formatoMes(p.data.fecha, e.meses)].filter(Boolean).join(' · '),
-      puntos: p.data.cv,
-      stack: p.data.st,
-      enlaces: [
-        p.data.demo ? { etiqueta: e.demo, url: p.data.demo } : null,
-        p.data.repo ? { etiqueta: e.repo, url: p.data.repo } : null,
-      ].filter((x): x is { etiqueta: string; url: string } => x !== null),
-    }));
+    .filter((p) => p.data.cv.length > 0 && !colgados.has(p.id))
+    .map(entradaDeProyecto);
 
   const refs = publicaciones.map((p) => {
     const partes = [

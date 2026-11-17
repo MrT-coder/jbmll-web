@@ -58,12 +58,15 @@ function seccion(titulo: string, k: number): Nodo[] {
   ];
 }
 
-function entrada(x: CvEntrada, e: string, k: number): Nodo[] {
+function entrada(x: CvEntrada, e: string, k: number, sub = false): Nodo[] {
+  // Una subentrada (un proyecto dentro de un puesto) va con sangría y un título
+  // algo menor, para que se lea como parte del puesto y no como otro.
+  const sangria = sub ? 10 : 0;
   const salida: Nodo[] = [
-    { text: x.titulo, bold: true, fontSize: 10.5 * k, margin: [0, 6 * k, 0, 0], keepWithNext: true },
-    { text: x.detalle, italics: true, color: GRIS, fontSize: 9 * k, margin: [0, 0, 0, 2], keepWithNext: x.puntos.length > 0 },
+    { text: x.titulo, bold: true, fontSize: (sub ? 10 : 10.5) * k, margin: [sangria, (sub ? 4 : 6) * k, 0, 0], keepWithNext: true },
+    { text: x.detalle, italics: true, color: GRIS, fontSize: 9 * k, margin: [sangria, 0, 0, 2], keepWithNext: x.puntos.length > 0 },
   ];
-  if (x.puntos.length) salida.push({ ul: x.puntos, margin: [0, 0, 0, 2], markerColor: '#1a1a1a' });
+  if (x.puntos.length) salida.push({ ul: x.puntos, margin: [sangria, 0, 0, 2], markerColor: '#1a1a1a' });
   if (x.enlaces.length) {
     // El enlace se escribe completo y también es pulsable: un ATS lee el texto
     // y una persona puede hacer clic. noWrap para que no se parta al final de línea.
@@ -72,15 +75,16 @@ function entrada(x: CvEntrada, e: string, k: number): Nodo[] {
       { text: `${l.etiqueta}: `, bold: true },
       { text: l.url.replace(/\/$/, ''), link: l.url, noWrap: true, color: '#1a1a1a' },
     ]);
-    salida.push({ text: partes, fontSize: 9 * k, margin: [0, 0, 0, 2] });
+    salida.push({ text: partes, fontSize: 9 * k, margin: [sangria, 0, 0, 2] });
   }
   if (x.stack.length) {
     salida.push({
       text: [{ text: `${e}: `, bold: true }, x.stack.join(', ')],
       fontSize: 9 * k,
-      margin: [0, 0, 0, 3],
+      margin: [sangria, 0, 0, 3],
     });
   }
+  for (const s of x.subentradas ?? []) salida.push(...entrada(s, e, k, true));
   return salida;
 }
 

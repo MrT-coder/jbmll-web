@@ -18,6 +18,7 @@ export interface TextosPaginas {
     notaStack: string;
     stack: string;
     experiencia: string;
+    proyectosDelPuesto: string;
     educacion: string;
     certificaciones: string;
     presente: string;
@@ -58,6 +59,7 @@ export const TEXTOS_PAGINAS: Record<Idioma, TextosPaginas> = {
       notaStack: '# no está escrito a mano: se suma desde lo que declara cada trabajo y cada proyecto',
       stack: 'stack',
       experiencia: 'experiencia',
+      proyectosDelPuesto: 'proyectos',
       educacion: 'educación',
       certificaciones: 'certificaciones y cursos',
       presente: 'presente',
@@ -105,6 +107,7 @@ export const TEXTOS_PAGINAS: Record<Idioma, TextosPaginas> = {
       notaStack: '# not written by hand: it is summed from what each job and each project declares',
       stack: 'stack',
       experiencia: 'experience',
+      proyectosDelPuesto: 'projects',
       educacion: 'education',
       certificaciones: 'certifications and courses',
       presente: 'present',

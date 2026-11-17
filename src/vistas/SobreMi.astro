@@ -11,6 +11,7 @@ import {
   getEducacion,
   getCertificaciones,
   getStack,
+  getProyectos,
   getTechsConPagina,
   MINIMO_PARA_PAGINA_DE_STACK,
   seccionDe,
@@ -27,7 +28,7 @@ interface Props {
 const { lang } = Astro.props;
 const T = TEXTOS_PAGINAS[lang].sobreMi;
 
-const [perfil, pagina, experiencia, educacion, certificaciones, stack, conPagina] = await Promise.all([
+const [perfil, pagina, experiencia, educacion, certificaciones, stack, conPagina, proyectos] = await Promise.all([
   getPerfil(lang),
   getPagina('sobre-mi', lang),
   getExperiencia(lang),
@@ -35,7 +36,9 @@ const [perfil, pagina, experiencia, educacion, certificaciones, stack, conPagina
   getCertificaciones(lang),
   getStack(lang),
   getTechsConPagina(lang),
+  getProyectos(lang),
 ]);
+const proyectoPorId = new Map(proyectos.map((p) => [p.id, p]));
 
 // La prosa la escribe el Markdown; los bloques de abajo salen de los datos.
 const Prosa = pagina ? (await render(pagina)).Content : null;
@@ -104,6 +107,23 @@ const modalidad = (m: string) => TEXTOS_PAGINAS[lang].modalidad[m] ?? m;
               {periodo(e.data.inicio, e.data.fin)} · {e.data.ubicacion}
               {e.data.modalidad && ` · ${modalidad(e.data.modalidad)}`}
             </p>
+            {
+              e.data.proyectos.length > 0 && (
+                <p class="item-m">
+                  {T.proyectosDelPuesto}:{' '}
+                  {e.data.proyectos
+                    .flatMap((id) => proyectoPorId.get(id) ?? [])
+                    .map((p, i) => (
+                      <>
+                        {i > 0 && ' · '}
+                        <a class="go" href={rutaLocal(lang, `/proyectos/${p.id}`)}>
+                          {p.data.titulo}
+                        </a>
+                      </>
+                    ))}
+                </p>
+              )
+            }
             {e.data.st.length > 0 && (
               <ul class="chips">
                 {e.data.st.map((t) => (
