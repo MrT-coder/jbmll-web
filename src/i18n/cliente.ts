@@ -25,6 +25,8 @@ export interface TextosTerminal {
   ayuda: [string, string][];
   /** El nombre de «contacto» en este idioma y sus sinónimos → comando interno. */
   alias: Record<string, string>;
+  /** Nombres a la vista de las secciones → su slug, para `cd`. */
+  seccionAlias: Record<string, string>;
   cdNoExiste: string;
   pistaLs: string;
   faltaArg: string;
@@ -85,6 +87,7 @@ export const TEXTOS_CLIENTE: Record<Idioma, TextosCliente> = {
         ['help', 'Esto'],
       ],
       alias: {},
+      seccionAlias: {},
       cdNoExiste: 'cd: {0}: no existe',
       pistaLs: "Escriba 'ls' para ver qué hay.",
       faltaArg: '{0}: falta el argumento',
@@ -135,6 +138,12 @@ export const TEXTOS_CLIENTE: Record<Idioma, TextosCliente> = {
         ['help', 'This'],
       ],
       alias: { contact: 'contacto' },
+      seccionAlias: {
+        about: 'sobre-mi',
+        projects: 'proyectos',
+        publications: 'publicaciones',
+        contact: 'contacto',
+      },
       cdNoExiste: 'cd: {0}: no such section',
       pistaLs: "Type 'ls' to see what is here.",
       faltaArg: '{0}: missing argument',

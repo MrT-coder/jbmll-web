@@ -249,7 +249,9 @@
  * una fila más. min-height de 24px (WCAG 2.5.8) y --muted sobre --bg, que ya
  * cumple el contraste de texto. */
 .sidebar-idioma {
+  display: flex;
   flex: 0 0 auto;
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--line);
 }

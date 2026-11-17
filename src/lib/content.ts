@@ -257,6 +257,21 @@ const TEXTOS_SECCION: Record<Idioma, Record<string, { desc: string; titulo: stri
   },
 };
 
+/**
+ * Cómo se llama cada sección a la vista. La URL y el slug son los mismos en los
+ * dos idiomas; lo que cambia es el nombre que se lee en la barra y en `ls`.
+ */
+const NOMBRE_EN: Record<string, string> = {
+  'sobre-mi': 'about',
+  proyectos: 'projects',
+  publicaciones: 'publications',
+  contacto: 'contact',
+};
+
+export function nombreDeSeccion(slug: string, lang: Idioma): string {
+  return lang === 'en' ? (NOMBRE_EN[slug] ?? slug) : slug;
+}
+
 /** Las secciones con sus textos en el idioma pedido. */
 export function seccionesDe(lang: Idioma) {
   return SECCIONES.map((s) => ({ ...s, desc: TEXTOS_SECCION[lang][s.slug].desc, titulo: TEXTOS_SECCION[lang][s.slug].titulo }));
@@ -309,7 +324,11 @@ export async function seccionDe(
 export function workspacesDe(lang: Idioma): Workspace[] {
   return [
     { slug: '', ruta: rutaLocal(lang, '/'), nombre: '~' },
-    ...SECCIONES.map((s) => ({ slug: s.slug, ruta: rutaLocal(lang, `/${s.slug}`), nombre: s.slug })),
+    ...SECCIONES.map((s) => ({
+      slug: s.slug,
+      ruta: rutaLocal(lang, `/${s.slug}`),
+      nombre: nombreDeSeccion(s.slug, lang),
+    })),
   ];
 }
 
@@ -439,6 +458,7 @@ export async function getIndice(lang: Idioma = 'es'): Promise<Indice> {
   const secciones: Seccion[] = seccionesDe(lang).map((s) => ({
     ...s,
     lead: leadDeSeccion(s.slug, perfil, lang),
+    nombre: nombreDeSeccion(s.slug, lang),
     href: rutaLocal(lang, `/${s.slug}`),
     n: entradas[s.slug]?.length ?? 0,
   }));

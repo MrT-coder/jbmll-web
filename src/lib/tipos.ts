@@ -19,6 +19,8 @@ export interface Seccion {
   titulo: string;
   /** El h1 de su página. Puede traer HTML de confianza, como el del inicio. */
   lead: string;
+  /** Cómo se llama a la vista en el idioma del índice (el slug no cambia). */
+  nombre: string;
   /** Su ruta en el idioma del índice (`/proyectos` o `/en/proyectos`). */
   href: string;
 }

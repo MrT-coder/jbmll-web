@@ -1,7 +1,9 @@
 ---
 import '../styles/sidebar.css';
 import marcaRaw from '../data/marca.txt?raw';
-import { workspacesDe, subtituloDeWorkspace, getIndice, type Idioma } from '../lib/content';
+import { workspacesDe, subtituloDeWorkspace, getIndice, getPerfil, type Idioma } from '../lib/content';
+import { rutaDeCv } from '../lib/cv-nombre';
+import { ETIQUETAS_CV } from '../i18n/cv';
 import type { DocumentoAbierto } from '../lib/tipos';
 import { rutaLocal, rutaAlternativa } from '../i18n/rutas';
 import { TEXTOS_COMPONENTES } from '../i18n/componentes';
@@ -40,6 +42,7 @@ const anchoMarca = Math.max(...filasMarca.map((f) => f.length));
 const marca = filasMarca.map((f) => f.padEnd(anchoMarca)).join('\n');
 
 const indice = await getIndice(lang);
+const perfil = await getPerfil(lang);
 ---
 
 <button id="sidebar-toggle" class="sidebar-alterna" type="button" aria-expanded="false" aria-controls="sidebar">
@@ -130,6 +133,14 @@ const indice = await getIndice(lang);
           aria-label={t.selectorNombre}
         >
           {t.selectorTexto}
+        </a>
+        <a
+          class="idioma-enlace cv-enlace"
+          href={rutaDeCv(perfil.nombre, lang)}
+          download
+          aria-label={ETIQUETAS_CV[lang].descargar}
+        >
+          CV
         </a>
       </div>
     )

@@ -66,7 +66,7 @@ export function renderSecciones(secciones: Seccion[], lang: Idioma = 'es'): stri
   const filas = secciones
     .map(
       (s) => `<tr class="row-go">
-    <td class="n"><a class="go" href="${esc(s.href)}">${esc(s.slug)}/</a></td>
+    <td class="n"><a class="go" href="${esc(s.href)}">${esc(s.nombre)}/</a></td>
     <td class="c">${s.tipo === 'coleccion' ? s.n : '&mdash;'}</td>
     <td class="d">${esc(s.desc)}</td>
   </tr>`,

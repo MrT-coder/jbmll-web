@@ -503,7 +503,8 @@ function exec(raw: string): boolean {
     case 'cd':
     case 'z': {
       if (!arg || arg === '~' || arg === '/') return navegar('');
-      const destino = arg.replace(/^\/+|\/+$/g, '');
+      const escrito = arg.replace(/^\/+|\/+$/g, '');
+      const destino = T.seccionAlias[escrito] ?? escrito;
       if (SECCIONES.includes(destino)) return navegar(destino);
       line('fg-red', llenar(T.cdNoExiste, destino));
       line('fg-dim', T.pistaLs);
