@@ -382,7 +382,9 @@ console.log('\nFoto de perfil (bloque de arranque)');
 // el width/height que puso el HTML: comparar el HTML contra sí mismo no
 // probaría nada.
 function tamanoJpeg(ruta) {
-  const buf = readFileSync(ruta);
+  // Acepta la ruta o el búfer ya leído: la comprobación de imágenes del cuerpo
+  // pasa el búfer, la de la foto de perfil pasa la ruta.
+  const buf = Buffer.isBuffer(ruta) ? ruta : readFileSync(ruta);
   let i = 2;
   while (i < buf.length) {
     if (buf[i] !== 0xff) {
