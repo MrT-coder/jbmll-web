@@ -1,3 +1,12 @@
+- id: nasa-space-apps-2026
+  nombre: Galactic Problem Solver, NASA Space Apps Challenge 2026
+  emisor: NASA Space Apps Challenge
+  fecha: 2026-11
+  horas: null
+  credencial: ''
+  url: ''
+  archivo: /media/nasa-space-apps-2026-certificado.png
+  tipo: certificacion
 - id: nasa-open-science-101
   nombre: Open Science 101
   emisor: NASA
