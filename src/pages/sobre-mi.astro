@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
 import Visor from '../components/Visor.astro';
+import DescargarCv from '../components/DescargarCv.astro';
 import { render } from 'astro:content';
 import {
   getPagina,
@@ -46,6 +47,7 @@ const periodo = (inicio: string, fin?: string) => `${inicio} — ${fin ?? 'prese
       <h1 class="out lead">{lead}</h1>
       <p class="out note"># {perfil.titular} · {perfil.ubicacion}</p>
       {Prosa && <div class="prose intro"><Prosa /></div>}
+      <DescargarCv />
       {
         // Una sola línea, no un bloque propio: la ficha completa (etiqueta +
         // enlace + marca de afiliado) ya vive en /contacto — ver

@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
+import DescargarCv from '../components/DescargarCv.astro';
 import { render } from 'astro:content';
 import { getPagina, getPerfil, seccionDe } from '../lib/content';
 import { renderContacto, propsExterno, MARCA_EXTERNA } from '../lib/render';
@@ -17,6 +18,7 @@ const { titulo, lead } = await seccionDe('contacto');
   <Terminal seccion="contacto" lead={lead} salida={renderContacto(perfil.contacto)}>
     {Prosa && <div class="prose intro"><Prosa /></div>}
     <p class="out note"># {perfil.ubicacion} · {perfil.disponibilidad}</p>
+    <DescargarCv />
     {
       perfil.distribuidor && (
         <>

@@ -3498,8 +3498,54 @@ check(
     /class="foot"/.test(html),
 );
 
+// --- El CV en PDF ----------------------------------------------------------
+// Se genera en el build desde las colecciones (src/pages/cv/[archivo].pdf.ts).
+// Un PDF que falta o sale vacío no rompe nada a la vista: el enlace sigue ahí y
+// el visitante se lleva un 404. Por eso se comprueba el archivo y no solo el
+// enlace. Nada de lo que se compara es contenido: el nombre del archivo y los
+// idiomas salen del perfil y de IDIOMAS en src/lib/content.ts.
+console.log('\nCV en PDF');
+const idiomasCv = ((readFileSync('src/lib/content.ts', 'utf8').match(/IDIOMAS: Idioma\[\] = \[([^\]]*)\]/) || [])[1] || '')
+  .split(',')
+  .map((s) => s.replace(/['"\s]/g, ''))
+  .filter(Boolean);
+check('IDIOMAS declara al menos un idioma', idiomasCv.length > 0);
+
+const slugCv = nombreEsperado
+  .normalize('NFD')
+  .replace(/[̀-ͯ]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-|-$/g, '');
+for (const lang of idiomasCv) {
+  const ruta = join(DIST, 'cv', `${slugCv}-cv-${lang}.pdf`);
+  const existe = existsSync(ruta);
+  check(`el CV en ${lang} existe en dist/cv/`, existe, ruta);
+  if (!existe) continue;
+  const pdf = readFileSync(ruta);
+  check(`el CV en ${lang} es un PDF`, pdf.subarray(0, 5).toString() === '%PDF-');
+  // /Type /Page (no /Pages): una por hoja.
+  const hojas = (pdf.toString('latin1').match(/\/Type\s*\/Page\b(?!s)/g) || []).length;
+  check(`el CV en ${lang} cabe en 1 a 3 hojas`, hojas >= 1 && hojas <= 3, `${hojas} hojas`);
+  check(`el CV en ${lang} pesa menos de 200 KB`, pdf.length < 200 * 1024, (pdf.length / 1024).toFixed(1) + ' KB');
+}
+
+// Todo enlace a un PDF del CV apunta a un archivo que existe, y trae download.
+const enlacesCv = paginasHtml.flatMap((p) =>
+  [...readFileSync(p, 'utf8').matchAll(/<a\b[^>]*href="(\/cv\/[^"]+\.pdf)"[^>]*>/g)].map((m) => ({
+    pagina: relative(DIST, p),
+    href: m[1],
+    etiqueta: m[0],
+  })),
+);
+check('alguna página enlaza al CV', enlacesCv.length > 0);
+const rotosCv = enlacesCv.filter((e) => !existsSync(join(DIST, e.href)));
+check('todo enlace al CV apunta a un archivo que existe', rotosCv.length === 0, rotosCv.map((e) => e.pagina + ' → ' + e.href).join(', '));
+const sinDownload = enlacesCv.filter((e) => !/\sdownload[\s>=]/.test(e.etiqueta));
+check('todo enlace al CV lleva download', sinDownload.length === 0, sinDownload.map((e) => e.pagina).join(', '));
+
 console.log('\nPeso');
-const kb = (n) => (n / 1024).toFixed(1) + ' KB';
+const kb =(n) => (n / 1024).toFixed(1) + ' KB';
 const htmlSize = Buffer.byteLength(html);
 console.log('  html  ' + kb(htmlSize));
 console.log('  css   ' + kb(Buffer.byteLength(css)));
