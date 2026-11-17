@@ -8,7 +8,7 @@ import { getIndice } from '../lib/content';
 // para todas, y así se descarga una vez y el navegador lo cachea. `connect-src
 // 'self'` ya lo permite, sin tocar la política de seguridad.
 export const GET: APIRoute = async () => {
-  const indice = await getIndice();
+  const indice = await getIndice('es');
   return new Response(JSON.stringify(indice), {
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   });

@@ -1,0 +1,48 @@
+---
+import Base from '../layouts/Base.astro';
+import Terminal from '../components/Terminal.astro';
+import { getIndice, getPerfil, type Idioma } from '../lib/content';
+import { renderSecciones } from '../lib/render';
+import { TEXTOS_PAGINAS } from '../i18n/paginas';
+
+interface Props {
+  lang: Idioma;
+}
+const { lang } = Astro.props;
+const T = TEXTOS_PAGINAS[lang].inicio;
+
+const indice = await getIndice(lang);
+const perfil = await getPerfil(lang);
+
+const INFO = [
+  [T.autor, perfil.nombre],
+  [T.rol, perfil.titular],
+  [T.ubicacion, perfil.ubicacion],
+  [T.stack, T.stackValor(indice.stack.length)],
+];
+---
+
+<Base
+  title={indice.inicio.titulo}
+  description={T.descripcion}
+>
+  <Terminal
+    lang={lang}
+    seccion=""
+    boot
+    lead={indice.inicio.lead}
+    salida={renderSecciones(indice.secciones, lang)}
+    foto={perfil.foto}
+  >
+    <dl slot="info">
+      {
+        INFO.map(([k, v]) => (
+          <>
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </>
+        ))
+      }
+    </dl>
+  </Terminal>
+</Base>

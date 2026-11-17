@@ -98,14 +98,14 @@ const publicacionesSrc = listarColeccionMd('src/content/publicaciones')
 
 // Mismo orden que getExperiencia(): sin fecha de fin primero (sigue vigente),
 // luego por fecha de inicio descendente. Una entrada que solo enlaza a un
-// proyecto (`proyecto:`) no declara su propio stack — igual que en getStack().
+// proyecto (`proyectos:`) no declara su propio stack — igual que en getStack().
 const experienciaSrc = listarColeccionMd('src/content/experiencia').sort((a, b) => {
   if (!a.data.fin && b.data.fin) return -1;
   if (a.data.fin && !b.data.fin) return 1;
   return String(b.data.inicio ?? '').localeCompare(String(a.data.inicio ?? ''));
 });
 const experienciaConStack = experienciaSrc.find(
-  (e) => !e.data.proyecto && Array.isArray(e.data.st) && e.data.st.length > 0,
+  (e) => !(e.data.proyectos ?? []).length && Array.isArray(e.data.st) && e.data.st.length > 0,
 );
 
 const perfilYamlData = parseYaml(readFileSync('src/content/perfil.yaml', 'utf8'))?.perfil ?? {};
@@ -991,6 +991,11 @@ noTextual('.brain.err (símbolo del prompt)', colorTokenPara(terminalCssSrc, '.b
 const terminalTs = existsSync('src/scripts/terminal.ts')
   ? readFileSync('src/scripts/terminal.ts', 'utf8')
   : '';
+// Los textos que la terminal muestra (ayuda, nombres de las teclas) viven en un
+// diccionario por idioma: src/i18n/cliente.ts. Lo que se comprueba de ellos
+// existe en cada idioma, no en uno solo.
+const clienteTs = existsSync('src/i18n/cliente.ts') ? readFileSync('src/i18n/cliente.ts', 'utf8') : '';
+const idiomasCliente = [...clienteTs.matchAll(/^  (es|en): \{/gm)].map((m) => m[1]);
 // Al cargar, la salida ya viene escrita por el servidor, así que desplazarse
 // al prompt deja a quien llega en la mitad del texto: en el inicio eran 251 px
 // hacia abajo. push() tiene que llevar el desplazamiento solo cuando ya hay
@@ -1448,7 +1453,7 @@ function tamanoWebp(buf) {
 }
 
 // El cuerpo vive entre el `<div class="prose">` de la plantilla y lo que le
-// sigue siempre en las dos páginas de detalle (src/pages/proyectos/[slug].astro
+// sigue siempre en las dos páginas de detalle (src/vistas/Proyecto.astro
 // y .../publicaciones/[slug].astro): el Visor, con su comentario delante, o
 // directamente el `<footer class="eof">`. Un límite estable para no confundir
 // esta prosa con cualquier otra <img> que la página pudiera traer en otro lado.
@@ -1854,7 +1859,17 @@ console.log('\nBarra lateral');
 // porque se escribió en rojo antes de implementar la barra, siguiendo TDD.
 
 const navSidebarSrc = '<nav[^>]*aria-label="Workspaces"[^>]*>[\\s\\S]*?<\\/nav>';
-const WORKSPACES_ESPERADOS = ['/', ...SECCIONES_SLUGS.map((s) => `/${s}`)];
+// El español vive en la raíz y el inglés bajo /en (su portada es /en, sin barra:
+// Astro la emite como en.html). Las rutas esperadas dependen del idioma de la
+// página que se mira, no de un literal.
+const prefijoDe = (archivo) => {
+  const r = relative(DIST, archivo).replaceAll('\\', '/');
+  return r === 'en.html' || r.startsWith('en/') ? '/en' : '';
+};
+const workspacesEsperados = (archivo) => {
+  const base = prefijoDe(archivo);
+  return [base || '/', ...SECCIONES_SLUGS.map((s) => `${base}/${s}`)];
+};
 
 function navsDeWorkspaces(contenido) {
   return contenido.match(new RegExp(navSidebarSrc, 'g')) || [];
@@ -1870,7 +1885,7 @@ for (const archivo of paginasHtml) {
     continue;
   }
   const hrefs = [...navs[0].matchAll(/<a[^>]*\shref="([^"]+)"/g)].map((m) => m[1]).slice(0, 5);
-  if (JSON.stringify(hrefs) !== JSON.stringify(WORKSPACES_ESPERADOS)) {
+  if (JSON.stringify(hrefs) !== JSON.stringify(workspacesEsperados(archivo))) {
     navOrdenIncorrecto.push(`${relative(DIST, archivo)}: ${hrefs.join(' ')}`);
   }
 }
@@ -2026,7 +2041,7 @@ const bloqueCerrarSidebar = sidebarTs.slice(
 check(
   'abrir() declara aria-label junto con role="dialog"',
   /setAttribute\('role',\s*'dialog'\)/.test(bloqueAbrirSidebar) &&
-    /setAttribute\('aria-label',\s*'Menú'\)/.test(bloqueAbrirSidebar),
+    /setAttribute\('aria-label',\s*\S/.test(bloqueAbrirSidebar),
 );
 check(
   'cerrar() retira aria-label junto con role/aria-modal',
@@ -2428,6 +2443,15 @@ const COLECCIONES_CMS = [
       return objeto?.fields?.map((f) => f.name);
     },
   },
+  {
+    // Igual que «perfil»: perfil.en.yaml envuelve sus campos en "perfil:".
+    astro: 'perfilEn',
+    campos: () => {
+      const singleton = cmsConfig.singletons?.find((s) => s.name === 'perfilEn');
+      const objeto = singleton?.fields?.find((f) => f.name === 'perfil' && f.widget === 'object');
+      return objeto?.fields?.map((f) => f.name);
+    },
+  },
 ];
 
 // export const collections = { paginas, experiencia, ... }; — la lista real de
@@ -2530,13 +2554,16 @@ const certificacionesSrc = parseYaml(readFileSync('src/content/certificaciones.y
 const conArchivo = certificacionesSrc.filter((c) => c.archivo);
 const conUrl = certificacionesSrc.filter((c) => c.url);
 const conCredencial = certificacionesSrc.filter((c) => c.credencial);
+// El visor también abre el título de cada entrada de educación que trae archivo.
+const educacionConArchivo = listarColeccionMd('src/content/educacion').filter((e) => e.data.archivo);
 
 // Mismo criterio que rutaMedia() en src/lib/render.ts: una ruta ya codificada
 // (con un '%XX') se deja tal cual, para no codificarla dos veces.
 const rutaMedia = (ruta) => (/%[0-9a-fA-F]{2}/.test(ruta) ? ruta : encodeURI(ruta));
 const escRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const anchorsSobreMi = [...sobreMi.matchAll(/<a\b[^>]*>[^<]*<\/a>/g)].map((m) => m[0]);
+// Un enlace puede llevar <span> dentro (la marca de «se abre en pestaña nueva»).
+const anchorsSobreMi = [...sobreMi.matchAll(/<a\b[^>]*>(?:[^<]|<span\b[^>]*>[^<]*<\/span>)*<\/a>/g)].map((m) => m[0]);
 const anchorParaHref = (href) => anchorsSobreMi.find((a) => a.includes(`href="${href}"`));
 
 const versRenderizados = anchorsSobreMi.filter((a) => /class="[^"]*\bvisor-abrir\b[^"]*"/.test(a));
@@ -2546,8 +2573,8 @@ if (conArchivo.length === 0) {
 } else {
   check(
     'cada certificación con archivo (y solo esas) renderiza su enlace [ver]',
-    versRenderizados.length === conArchivo.length,
-    `${versRenderizados.length} enlaces [ver] · ${conArchivo.length} certificaciones con archivo`,
+    versRenderizados.length === conArchivo.length + educacionConArchivo.length,
+    `${versRenderizados.length} enlaces [ver] · ${conArchivo.length} certificaciones y ${educacionConArchivo.length} títulos con archivo`,
   );
   const verMal = conArchivo.filter((c) => {
     const a = anchorParaHref(rutaMedia(c.archivo));
@@ -2609,7 +2636,7 @@ check(
 );
 check(
   '/sobre-mi incluye el componente Visor',
-  existsSync('src/pages/sobre-mi.astro') && readFileSync('src/pages/sobre-mi.astro', 'utf8').includes('<Visor'),
+  existsSync('src/vistas/SobreMi.astro') && readFileSync('src/vistas/SobreMi.astro', 'utf8').includes('<Visor'),
 );
 
 console.log('\nRutas de medios (/media/)');
@@ -2706,7 +2733,9 @@ check(
 // nombre accesible entero (ver [verificar] en sobre-mi.astro): cualquiera de
 // los dos cumple WCAG 3.2.5, así que la comprobación acepta ambos.
 const externosSinAviso = externos.filter(
-  (e) => !e.interior.includes('se abre en una pestaña nueva') && !/aria-label="[^"]*pestaña nueva[^"]*"/.test(e.atributos),
+  (e) =>
+    !/se abre en una pestaña nueva|opens in a new tab/.test(e.interior) &&
+    !/aria-label="[^"]*(pestaña nueva|new tab)[^"]*"/.test(e.atributos),
 );
 check(
   'todo enlace externo anuncia, en su propio nombre accesible, que abre en pestaña nueva (WCAG 3.2.5)',
@@ -2921,9 +2950,9 @@ check(
 check(
   'el logo y «~» llegan a reiniciar() (o a una carga completa de «/» que el guion anima)',
   /class="sidebar-marca" href="\/"/.test(html) &&
-    /href\.startsWith\('\/'\) \? href\.slice\(1\)/.test(terminalTs) &&
+    /function slugDeHref\(/.test(terminalTs) &&
     /if \(!seccion\) return reiniciar\(\);/.test(terminalTs) &&
-    /if \(location\.pathname !== '\/'\) return irFuera\('\/'\);/.test(terminalTs),
+    /function reiniciar\(\)[\s\S]*?return irFuera\(HOME\);/.test(terminalTs),
 );
 const totalSsTerminal = (terminalTs.match(/sessionStorage\./g) || []).length;
 const ssEnTryTerminal = (terminalTs.match(/try\s*\{[\s\S]*?\}\s*catch/g) || []).reduce(
@@ -2938,6 +2967,9 @@ check(
 // Toda página montada en la terminal (las que tienen #scroll) carga el guion
 // previo; el modo lo dice la propia etiqueta: el inicio arranca, el resto entra.
 const paginasTerminal = paginasHtml.filter((r) => /id="scroll"/.test(readFileSync(r, 'utf8')));
+// La portada de cada idioma: /index.html en español, /en.html en inglés (con
+// build.format 'file' Astro emite /en como en.html).
+const esPortada = (r) => r === join(DIST, 'index.html') || r === join(DIST, 'en.html');
 const modoDeGate = (r) =>
   (readFileSync(r, 'utf8').match(/<script[^>]*\ssrc="[^"]*arranque-gate[^"]*"[^>]*>/) || [])[0]?.match(
     /data-modo="(\w+)"/,
@@ -2945,11 +2977,9 @@ const modoDeGate = (r) =>
 check(
   'el inicio carga el guion previo en modo arranque; el resto de páginas de la terminal, en modo entrada',
   paginasTerminal.length > 1 &&
-    paginasTerminal.every(
-      (r) => modoDeGate(r) === (r === join(DIST, 'index.html') ? 'arranque' : 'entrada'),
-    ),
+    paginasTerminal.every((r) => modoDeGate(r) === (esPortada(r) ? 'arranque' : 'entrada')),
   paginasTerminal
-    .filter((r) => modoDeGate(r) !== (r === join(DIST, 'index.html') ? 'arranque' : 'entrada'))
+    .filter((r) => modoDeGate(r) !== (esPortada(r) ? 'arranque' : 'entrada'))
     .map((r) => relative(DIST, r))
     .join(', '),
 );
@@ -3220,7 +3250,11 @@ check(
 );
 check(
   'la ayuda describe c como volver al inicio',
-  /\['c',\s*'[^']*inicio[^']*'\]/.test(terminalTs),
+  // Cada idioma lleva su fila `['c', '…']`, con el texto de su propia lengua: el
+  // español nombra el «inicio», el inglés el «start».
+  idiomasCliente.length > 1 &&
+    (clienteTs.match(/\['c',\s*'[^']+'\]/g) || []).length === idiomasCliente.length &&
+    /\['c',\s*'[^']*inicio[^']*'\]/.test(clienteTs),
 );
 
 console.log('\nTerminal en el teléfono: campo de escritura (M1)');
@@ -3321,8 +3355,13 @@ check(
 check(
   'la barra es un toolbar con nombre y sus teclas son botones con aria-label',
   /setAttribute\('role',\s*'toolbar'\)/.test(barraFuente) &&
-    /setAttribute\('aria-label',\s*'[^']+'\)/.test(barraFuente) &&
-    ['Tabulador', 'Historial anterior', 'Historial siguiente', 'Escape'].every((t) => barraFuente.includes(t)) &&
+    // El nombre de la barra también sale del diccionario (T.barraTeclas).
+    /setAttribute\('aria-label',\s*T\.barraTeclas\)/.test(barraFuente) &&
+    // Los nombres de las teclas salen del diccionario de cada idioma, no de un
+    // literal en la barra: cada una tiene que existir en los dos.
+    ['teclaTab', 'teclaArriba', 'teclaAbajo', 'teclaEsc'].every(
+      (k) => barraFuente.includes(k) && (clienteTs.match(new RegExp(`\\b${k}:`, 'g')) || []).length > idiomasCliente.length,
+    ) &&
     /type = 'button'/.test(terminalTs),
 );
 const rapidoFuente = (terminalTs.match(/function ejecutarRapido\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [])[1] || '';
@@ -3488,6 +3527,122 @@ check(
     /id="st-clock"/.test(html) &&
     /class="foot"/.test(html),
 );
+
+// --- El CV en PDF ----------------------------------------------------------
+// Se genera en el build desde las colecciones (src/pages/cv/[archivo].pdf.ts).
+// Un PDF que falta o sale vacío no rompe nada a la vista: el enlace sigue ahí y
+// el visitante se lleva un 404. Por eso se comprueba el archivo y no solo el
+// enlace. Nada de lo que se compara es contenido: el nombre del archivo y los
+// idiomas salen del perfil y de IDIOMAS en src/lib/content.ts.
+console.log('\nCV en PDF');
+const idiomasCv = ((readFileSync('src/lib/content.ts', 'utf8').match(/IDIOMAS: Idioma\[\] = \[([^\]]*)\]/) || [])[1] || '')
+  .split(',')
+  .map((s) => s.replace(/['"\s]/g, ''))
+  .filter(Boolean);
+check('IDIOMAS declara al menos un idioma', idiomasCv.length > 0);
+
+const slugCv = nombreEsperado
+  .normalize('NFD')
+  .replace(/[̀-ͯ]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-|-$/g, '');
+for (const lang of idiomasCv) {
+  const ruta = join(DIST, 'cv', `${slugCv}-cv-${lang}.pdf`);
+  const existe = existsSync(ruta);
+  check(`el CV en ${lang} existe en dist/cv/`, existe, ruta);
+  if (!existe) continue;
+  const pdf = readFileSync(ruta);
+  check(`el CV en ${lang} es un PDF`, pdf.subarray(0, 5).toString() === '%PDF-');
+  // /Type /Page (no /Pages): una por hoja.
+  const hojas = (pdf.toString('latin1').match(/\/Type\s*\/Page\b(?!s)/g) || []).length;
+  check(`el CV en ${lang} cabe en 1 a 3 hojas`, hojas >= 1 && hojas <= 3, `${hojas} hojas`);
+  check(`el CV en ${lang} pesa menos de 200 KB`, pdf.length < 200 * 1024, (pdf.length / 1024).toFixed(1) + ' KB');
+}
+
+// Todo enlace a un PDF del CV apunta a un archivo que existe, y trae download.
+const enlacesCv = paginasHtml.flatMap((p) =>
+  [...readFileSync(p, 'utf8').matchAll(/<a\b[^>]*href="(\/cv\/[^"]+\.pdf)"[^>]*>/g)].map((m) => ({
+    pagina: relative(DIST, p),
+    href: m[1],
+    etiqueta: m[0],
+  })),
+);
+check('alguna página enlaza al CV', enlacesCv.length > 0);
+const rotosCv = enlacesCv.filter((e) => !existsSync(join(DIST, e.href)));
+check('todo enlace al CV apunta a un archivo que existe', rotosCv.length === 0, rotosCv.map((e) => e.pagina + ' → ' + e.href).join(', '));
+const sinDownload = enlacesCv.filter((e) => !/\sdownload[\s>=]/.test(e.etiqueta));
+check('todo enlace al CV lleva download', sinDownload.length === 0, sinDownload.map((e) => e.pagina).join(', '));
+
+// --- Idiomas ---------------------------------------------------------------
+// El español vive en la raíz y el inglés bajo /en (portada: en.html). Nada de lo
+// que se compara es texto: el idioma lo dice la ruta, y de ahí salen el
+// atributo lang, los pares hreflang, el CV enlazado y el índice de la terminal.
+console.log('\nIdiomas');
+const idiomaDeArchivo = (archivo) => (prefijoDe(archivo) === '/en' ? 'en' : 'es');
+const rutaDeArchivo = (archivo) => {
+  const r = relative(DIST, archivo).replaceAll('\\', '/').replace(/\.html$/, '');
+  return r === 'index' ? '/' : '/' + r;
+};
+const sinPrefijo = (ruta) => (ruta === '/en' ? '/' : ruta.replace(/^\/en(?=\/)/, ''));
+const paginasDeSitio = paginasHtml.filter((r) => relative(DIST, r) !== '404.html');
+
+const langMal = paginasHtml.filter((r) => {
+  const lang = (readFileSync(r, 'utf8').match(/<html[^>]*\slang="([^"]+)"/) || [])[1];
+  return lang !== idiomaDeArchivo(r);
+});
+check('el atributo lang de cada página es el idioma de su ruta', langMal.length === 0, langMal.map((r) => relative(DIST, r)).join(', '));
+
+// Cada página existe en los dos idiomas: mismas rutas, con y sin /en.
+const rutasEs = new Set(paginasDeSitio.filter((r) => idiomaDeArchivo(r) === 'es').map((r) => rutaDeArchivo(r)));
+const rutasEn = new Set(paginasDeSitio.filter((r) => idiomaDeArchivo(r) === 'en').map((r) => sinPrefijo(rutaDeArchivo(r))));
+const soloEs = [...rutasEs].filter((r) => !rutasEn.has(r));
+const soloEn = [...rutasEn].filter((r) => !rutasEs.has(r));
+check('toda página en español tiene su par en inglés, y al revés', soloEs.length === 0 && soloEn.length === 0, `solo es: ${soloEs.join(' ')} · solo en: ${soloEn.join(' ')}`);
+
+// hreflang: cada página se declara a sí misma y a su par, y el par existe.
+const hrefDe = (html, hreflang) =>
+  (html.match(new RegExp(`<link[^>]*rel="alternate"[^>]*hreflang="${hreflang}"[^>]*href="([^"]+)"`)) || [])[1];
+const sinPar = [];
+for (const archivo of paginasDeSitio) {
+  const html = readFileSync(archivo, 'utf8');
+  const lang = idiomaDeArchivo(archivo);
+  const otro = lang === 'es' ? 'en' : 'es';
+  const propia = hrefDe(html, lang);
+  const par = hrefDe(html, otro);
+  const rutaPar = par ? new URL(par).pathname : '';
+  const existePar = par && paginasDeSitio.some((r) => rutaDeArchivo(r) === (rutaPar === '/' ? '/' : rutaPar.replace(/\/$/, '')));
+  if (!propia || !par || !existePar) sinPar.push(relative(DIST, archivo));
+}
+check('toda página declara hreflang de sí misma y de su par, y el par existe', sinPar.length === 0, sinPar.join(', '));
+
+// El CV que se enlaza es el del idioma de la página.
+const cvMal = [];
+for (const archivo of paginasDeSitio) {
+  const lang = idiomaDeArchivo(archivo);
+  for (const m of readFileSync(archivo, 'utf8').matchAll(/href="\/cv\/([^"]+)\.pdf"/g)) {
+    if (!m[1].endsWith(`-cv-${lang}`)) cvMal.push(`${relative(DIST, archivo)} → ${m[1]}`);
+  }
+}
+check('cada página enlaza al CV de su propio idioma', cvMal.length === 0, cvMal.join(', '));
+
+// El índice de la terminal: uno por idioma, con su idioma declarado y con las
+// rutas dentro de su propio árbol.
+for (const [archivo, lang] of [['indice.json', 'es'], [join('en', 'indice.json'), 'en']]) {
+  const ruta = join(DIST, archivo);
+  const nombre = archivo.replaceAll('\\', '/');
+  const existe = existsSync(ruta);
+  check(`${nombre} existe`, existe);
+  if (!existe) continue;
+  const indice = JSON.parse(readFileSync(ruta, 'utf8'));
+  check(`${nombre} declara lang ${lang} y trae sus textos`, indice.lang === lang && !!indice.ui?.terminal);
+  const hrefsIndice = [
+    ...indice.secciones.map((s) => s.href),
+    ...Object.values(indice.entradas).flat().map((f) => f.href).filter(Boolean),
+  ];
+  const fuera = hrefsIndice.filter((h) => (lang === 'en') !== (h === '/en' || h.startsWith('/en/')));
+  check(`las rutas de ${nombre} están en el árbol de su idioma`, fuera.length === 0, fuera.join(', '));
+}
 
 console.log('\nPeso');
 const kb = (n) => (n / 1024).toFixed(1) + ' KB';

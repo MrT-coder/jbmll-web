@@ -59,6 +59,12 @@
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
 
+# El CV en PDF se regenera con cada despliegue (src/pages/cv/[archivo].pdf.ts).
+# Una hora y no un año: el dueño lo actualiza cambiando el contenido y el
+# archivo conserva el mismo nombre.
+/cv/*
+  Cache-Control: public, max-age=3600
+
 # Los certificados y la foto. Cloudflare Pages aplica las cabeceras a TODAS las
 # respuestas, incluida la del PDF, así que el propio archivo llegaba diciendo
 # `frame-ancestors 'none'`: el visor lo incrusta en un marco y el navegador se

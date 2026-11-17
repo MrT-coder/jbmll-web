@@ -18,6 +18,7 @@
   tipo: certificacion
 - id: metadocencia-ciencia-abierta
   nombre: Herramientas de Ciencia Abierta
+  nombre_en: Open Science Tools
   emisor: MetaDocencia
   fecha: 2026-07
   horas: null
@@ -72,15 +73,18 @@
   tipo: certificacion
 - id: computo-en-la-nube
   nombre: Fundamentos del Cómputo en la Nube
+  nombre_en: Cloud Computing Fundamentals
   emisor: Fundación Carlos Slim «Aprende»
+  emisor_en: Carlos Slim Foundation "Aprende"
   fecha: 2025-06
   horas: 45
-  credencial: ''
-  url: ''
-  archivo: ''
+  credencial: 8212609C-7704-47CE-AA41-81E1B134112D
+  url: https://capacitateparaelempleo.org/verifica/cb223a93-62f2-466c-854a-10c2709f79eb/8212609c-7704-47ce-aa41-81e1b134112d
+  archivo: /media/fundamentos-computo-nube-certificado.pdf
   tipo: curso
 - id: workshop-10000-becas-ia
   nombre: El Workshop 10.000 Becas IA
+  nombre_en: The 10,000 AI Scholarships Workshop
   emisor: ''
   fecha: ''
   horas: null
@@ -96,4 +100,15 @@
   credencial: ''
   url: ''
   archivo: /media/Certificate_GCI_World_2026_april.pdf
+  tipo: curso
+- id: nodo-transformacion-digital-ia
+  nombre: Transformación Digital con IA y Automatización
+  nombre_en: Digital Transformation with AI and Automation
+  emisor: Nodo · Academia Desafío Latam
+  emisor_en: ''
+  fecha: 2026-09
+  horas: 150
+  credencial: ''
+  url: ''
+  archivo: /media/nodo-transformacion-digital-ia-certificado.jpg
   tipo: curso

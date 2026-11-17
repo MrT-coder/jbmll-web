@@ -1,0 +1,8 @@
+---
+import Publicacion from '../../../vistas/Publicacion.astro';
+import { rutasDePublicacion } from '../../../lib/rutas-estaticas';
+
+export const getStaticPaths = () => rutasDePublicacion('en');
+---
+
+<Publicacion {...Astro.props} />

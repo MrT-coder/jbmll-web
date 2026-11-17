@@ -1,0 +1,23 @@
+# Lo que cambia del perfil al inglés. Contacto, foto y enlaces son el mismo dato
+# que en perfil.yaml y no se repiten aquí. Un campo en blanco cae al español.
+perfil:
+  titular: Java Backend Developer
+  ubicacion: Salcedo, Cotopaxi, Ecuador
+  disponibilidad: Available for remote work
+  resumen: >-
+    Backend software engineer specialized in Java and Spring Boot, with
+    experience building scalable systems, REST APIs and AI-powered modules on
+    PostgreSQL and cloud services. I integrate LLMs into production backends
+    with Spring AI and work with a specification-driven (SDD) and test-driven
+    (TDD) workflow with a human-in-the-loop approach. I also deliver
+    end-to-end full-stack products, from architecture and CI/CD to
+    container-based deployment. Comfortable with remote teams, code reviews and
+    clear technical documentation.
+  idiomas:
+    - idioma: Spanish
+      nivel: Native
+    - idioma: English
+      nivel: Intermediate (B1)
+  foto_alt: 'Cyberpunk-style illustrated portrait of a young man with dark hair swept to one side, wearing a dark suit and a teal tie, under pink and blue neon lights against a night-city backdrop with glowing vertical signs.'
+  distribuidor_etiqueta: electronic signatures
+  distribuidor_divulgacion: affiliate

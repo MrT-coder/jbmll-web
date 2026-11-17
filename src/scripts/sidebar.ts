@@ -42,8 +42,45 @@ raiz.classList.add('js');
 // almacenamiento (ventana privada, permisos) no es motivo para que la barra
 // deje de funcionar, solo para que olvide el estado entre páginas.
 
+// Los textos los escribe el servidor en #sidebar (data-textos): este módulo no
+// hace fetch. Si faltan o no se leen, quedan los del español.
+interface Textos {
+  actual: string;
+  visitado: string;
+  sinVisitar: string;
+  leyendo: string;
+  leido: string;
+  nadaAbierto: string;
+  abiertoUno: string;
+  abiertoMuchos: string;
+  menuDialogo: string;
+  tipos: Record<string, string>;
+}
+
+let T: Textos = {
+  actual: 'actual',
+  visitado: 'visitado',
+  sinVisitar: 'sin visitar',
+  leyendo: 'leyendo',
+  leido: 'leído',
+  nadaAbierto: 'nada abierto',
+  abiertoUno: 'abierto',
+  abiertoMuchos: 'abiertos',
+  menuDialogo: 'Menú',
+  tipos: { proyecto: 'proyecto', publicacion: 'publicación', stack: 'stack' },
+};
+try {
+  T = { ...T, ...JSON.parse(nodoSidebar.dataset.textos ?? '{}') };
+} catch {
+  /* se queda con los del español */
+}
+
+// Los documentos abiertos guardan hrefs, que llevan el prefijo del idioma: cada
+// idioma tiene su propia lista para que uno no muestre las rutas del otro. El
+// español conserva la clave de siempre.
+const IDIOMA = nodoSidebar.dataset.lang ?? 'es';
 const CLAVE_VISITADAS = 'jbsh:visitadas';
-const CLAVE_ABIERTOS = 'jbsh:abiertos';
+const CLAVE_ABIERTOS = IDIOMA === 'es' ? 'jbsh:abiertos' : `jbsh:abiertos:${IDIOMA}`;
 const TOPE_ABIERTOS = 8;
 
 function cargarVisitadas(): Set<string> {
@@ -126,7 +163,7 @@ function renderWorkspaces(actual: string, detalle: boolean) {
     if (glifo) glifo.textContent = esActual ? '◉' : visitada ? '●' : '○';
 
     const estado = a.querySelector('.sr-only');
-    if (estado) estado.textContent = esActual ? 'actual' : visitada ? 'visitado' : 'sin visitar';
+    if (estado) estado.textContent = esActual ? T.actual : visitada ? T.visitado : T.sinVisitar;
   });
 }
 
@@ -166,14 +203,8 @@ function colocarIndicador(animar: boolean) {
 
 // ── Abiertos ──────────────────────────────────────────────────────────────
 
-const ETIQUETA_TIPO: Record<string, string> = {
-  proyecto: 'proyecto',
-  publicacion: 'publicación',
-  stack: 'stack',
-};
-
 function etiquetaDe(tipo: string): string {
-  return ETIQUETA_TIPO[tipo] ?? tipo;
+  return T.tipos[tipo] ?? tipo;
 }
 
 /** El segmento de la statusline que cuenta los documentos abiertos. Nunca se
@@ -181,7 +212,7 @@ function etiquetaDe(tipo: string): string {
  * puede desincronizarse de ella. */
 function actualizarStatusAbiertos(n: number) {
   if (!stAbiertos) return;
-  stAbiertos.textContent = `${n} ${n === 1 ? 'abierto' : 'abiertos'}`;
+  stAbiertos.textContent = `${n} ${n === 1 ? T.abiertoUno : T.abiertoMuchos}`;
 }
 
 /** Reconstruye la lista visible desde los datos: crea cada fila de cero, así
@@ -198,7 +229,7 @@ function renderAbiertos(lista: Abierto[]) {
   if (!lista.length) {
     const li = document.createElement('li');
     li.className = 'ab-vacio';
-    li.textContent = 'nada abierto';
+    li.textContent = T.nadaAbierto;
     nodoAbiertos.append(li);
     actualizarStatusAbiertos(0);
     return;
@@ -228,7 +259,7 @@ function renderAbiertos(lista: Abierto[]) {
 
     const sub = document.createElement('span');
     sub.className = 'ab-sub';
-    sub.textContent = `${esActual ? 'leyendo' : 'leído'} · ${etiquetaDe(item.tipo)}`;
+    sub.textContent = `${esActual ? T.leyendo : T.leido} · ${etiquetaDe(item.tipo)}`;
 
     a.append(linea1, sub);
     li.append(a);
@@ -308,7 +339,7 @@ function abrir() {
   // fijo en la plantilla, sin role, es un aria-prohibited-attr de axe.
   nodoSidebar.setAttribute('role', 'dialog');
   nodoSidebar.setAttribute('aria-modal', 'true');
-  nodoSidebar.setAttribute('aria-label', 'Menú');
+  nodoSidebar.setAttribute('aria-label', T.menuDialogo);
   for (const el of elementosDeFondo()) el.setAttribute('inert', '');
   botonCerrar.focus();
 }

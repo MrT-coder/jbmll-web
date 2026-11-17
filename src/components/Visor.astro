@@ -8,17 +8,28 @@
 // foco, el cierre con Escape y la devolución del foco a quien lo abrió.
 // Reimplementar cualquiera de los tres a mano es exactamente cómo se cuelan
 // los bugs de accesibilidad que el elemento ya resuelve.
+import type { Idioma } from '../lib/content';
+import { TEXTOS_COMPONENTES } from '../i18n/componentes';
+import { TEXTOS_CLIENTE } from '../i18n/cliente';
+
+interface Props {
+  lang?: Idioma;
+}
+const { lang = 'es' } = Astro.props;
+const t = TEXTOS_COMPONENTES[lang].visor;
+// El script del visor no hace fetch: sus textos viajan en el propio elemento.
+const textos = JSON.stringify(TEXTOS_CLIENTE[lang].visor);
 ---
 
-<dialog id="visor" class="visor" aria-labelledby="visor-titulo">
+<dialog id="visor" class="visor" aria-labelledby="visor-titulo" data-textos={textos}>
   <div class="visor-barra">
     <p id="visor-titulo" class="visor-titulo"></p>
-    <button type="button" id="visor-cerrar" class="visor-cerrar" aria-label="Cerrar el visor">
+    <button type="button" id="visor-cerrar" class="visor-cerrar" aria-label={t.cerrar}>
       <span aria-hidden="true">✕</span>
     </button>
   </div>
   <div id="visor-cuerpo" class="visor-cuerpo"></div>
-  <p class="visor-pie"><kbd>Esc</kbd> cerrar</p>
+  <p class="visor-pie"><kbd>Esc</kbd> {t.pie}</p>
 </dialog>
 
 <script>

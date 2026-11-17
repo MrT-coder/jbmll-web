@@ -4,6 +4,7 @@ desc: Plataforma full-stack que el personal no técnico administra sin tocar có
 estado: produccion
 fecha: 2025-01
 destacado: true
+demo: https://hartfirmadeabogados.com/
 st:
   - PHP
   - Laravel
@@ -24,6 +25,11 @@ kw:
   - CI/CD
   - endurecimiento
   - SSR
+cv:
+  - Diseñé y construí un sitio corporativo y un CMS autogestionable con Laravel, Filament, Inertia.js, React y TypeScript, en producción.
+  - Implementé control de acceso basado en roles con políticas por modelo.
+  - Endurecí el formulario de contacto con Turnstile, límite de peticiones, CSRF, CORS restringido y cabeceras CSP, HSTS y Permissions-Policy.
+  - Configuré un pipeline de CI/CD en GitHub Actions con 148 pruebas como condición de fusión que publica una imagen de contenedor.
 ---
 
 Diseñé y construí una plataforma corporativa full-stack con un panel

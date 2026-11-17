@@ -9,6 +9,22 @@ perfil:
   ubicacion: Salcedo, Cotopaxi, Ecuador
   disponibilidad: Disponible para remoto
 
+  # Para el CV (PDF): el párrafo de «Perfil profesional».
+  resumen: >-
+    Ingeniero de Software backend especializado en Java y Spring Boot, con
+    experiencia construyendo sistemas escalables, APIs REST y módulos
+    potenciados con IA sobre PostgreSQL y servicios en la nube. Integro LLMs en
+    backends de producción con Spring AI y trabajo con un flujo guiado por
+    especificaciones (SDD) y pruebas (TDD) con enfoque human-in-the-loop.
+    También entrego productos full-stack de extremo a extremo, desde la
+    arquitectura y el CI/CD hasta el despliegue con contenedores. Cómodo con
+    equipos remotos, code reviews y documentación técnica clara.
+  idiomas:
+    - idioma: Español
+      nivel: Nativo
+    - idioma: Inglés
+      nivel: Intermedio (B1)
+
   correo: juniorbmorales@gmail.com
 
   # En formato E.164 y sin separadores: es lo que espera wa.me y lo que evita

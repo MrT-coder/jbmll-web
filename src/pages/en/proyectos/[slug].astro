@@ -1,0 +1,8 @@
+---
+import Proyecto from '../../../vistas/Proyecto.astro';
+import { rutasDeProyecto } from '../../../lib/rutas-estaticas';
+
+export const getStaticPaths = () => rutasDeProyecto('en');
+---
+
+<Proyecto {...Astro.props} />

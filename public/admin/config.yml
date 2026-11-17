@@ -63,7 +63,14 @@ collections:
           pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
           hint: 'AAAA o AAAA-MM. Vacío significa "hasta hoy".',
         }
-      - { name: proyecto, label: Proyecto relacionado, widget: string, required: false }
+      - {
+          name: proyectos,
+          label: Proyectos relacionados,
+          hint: 'Los nombres de archivo de los proyectos (sin .md). Si hay alguno, el stack de este puesto es el de ellos.',
+          widget: list,
+          required: false,
+          default: [],
+        }
       - { name: st, label: Stack, widget: list, required: false, default: [] }
       - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
 
@@ -102,6 +109,14 @@ collections:
         }
       - { name: st, label: Stack, widget: list, min: 1 }
       - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
+      - {
+          name: cv,
+          label: Viñetas para el CV,
+          hint: 'Dos o tres líneas cortas. Sin viñetas, el proyecto no aparece en el CV descargable.',
+          widget: list,
+          required: false,
+          default: [],
+        }
       - { name: repo, label: Repositorio, widget: string, type: url, required: false }
       - { name: demo, label: Demo, widget: string, type: url, required: false }
       - { name: destacado, label: Destacado, widget: boolean, default: false }
@@ -174,6 +189,192 @@ collections:
           hint: 'AAAA o AAAA-MM',
         }
       - { name: registro, label: Número de registro, widget: string, required: false }
+      - {
+          name: archivo,
+          label: Archivo (PDF o imagen del título),
+          widget: file,
+          required: false,
+          accept: '.pdf,.png,.jpg,.jpeg,.webp,.avif',
+        }
+
+  # --- La misma colección, en inglés ------------------------------------------
+  # El inglés de cada entrada vive en una subcarpeta `en/` con el MISMO nombre de
+  # archivo que el español (src/content/<colección>/en/<slug>.md). Esa
+  # coincidencia es el vínculo: getEntry-by-id en src/lib/content.ts (deIdioma)
+  # superpone el inglés sobre el español y, si falta, muestra el español. Por
+  # eso el nombre del archivo —el slug— tiene que ser idéntico en los dos.
+  # Las claves técnicas (stack, fechas, estado) se repiten tal cual.
+  - name: experiencia_en
+    label: Experience (inglés)
+    label_singular: Experiencia (en)
+    folder: src/content/experiencia/en
+    create: true
+    delete: true
+    extension: md
+    format: yaml-frontmatter
+    # Slug editable en la creación: pasa a ser el nombre del archivo tal cual
+    # se escribe, sin que el CMS lo derive de un título (ninguno de los
+    # campos de esta colección hace de título único).
+    slug: '{{fields._slug}}'
+    fields:
+      - { name: puesto, label: Puesto, widget: string }
+      - { name: organizacion, label: Organización, widget: string }
+      - { name: ubicacion, label: Ubicación, widget: string }
+      - {
+          name: modalidad,
+          label: Modalidad,
+          widget: select,
+          options: [presencial, remoto, híbrido],
+          required: false,
+        }
+      - {
+          name: inicio,
+          label: Inicio,
+          widget: string,
+          pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+          hint: 'AAAA o AAAA-MM',
+        }
+      - {
+          name: fin,
+          label: Fin,
+          widget: string,
+          required: false,
+          pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+          hint: 'AAAA o AAAA-MM. Vacío significa "hasta hoy".',
+        }
+      - {
+          name: proyectos,
+          label: Proyectos relacionados,
+          hint: 'Los nombres de archivo de los proyectos (sin .md). Si hay alguno, el stack de este puesto es el de ellos.',
+          widget: list,
+          required: false,
+          default: [],
+        }
+      - { name: st, label: Stack, widget: list, required: false, default: [] }
+      - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
+
+  - name: proyectos_en
+    label: Projects (inglés)
+    label_singular: Proyecto (en)
+    folder: src/content/proyectos/en
+    create: true
+    delete: true
+    extension: md
+    format: yaml-frontmatter
+    slug: '{{fields._slug}}'
+    fields:
+      - { name: titulo, label: Título, widget: string }
+      - { name: desc, label: Descripción, widget: text }
+      - {
+          name: estado,
+          label: Estado,
+          widget: select,
+          options: [produccion, construyendo, prueba-de-concepto, archivado, cancelado],
+        }
+      - {
+          name: contexto,
+          label: Contexto,
+          widget: select,
+          options: [tesis, laboral, personal, academico],
+          required: false,
+        }
+      - { name: organizacion, label: Organización, widget: string, required: false }
+      - {
+          name: fecha,
+          label: Fecha,
+          widget: string,
+          pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+          hint: 'AAAA o AAAA-MM',
+        }
+      - { name: st, label: Stack, widget: list, min: 1 }
+      - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
+      - {
+          name: cv,
+          label: Viñetas para el CV,
+          hint: 'Dos o tres líneas cortas. Sin viñetas, el proyecto no aparece en el CV descargable.',
+          widget: list,
+          required: false,
+          default: [],
+        }
+      - { name: repo, label: Repositorio, widget: string, type: url, required: false }
+      - { name: demo, label: Demo, widget: string, type: url, required: false }
+      - { name: destacado, label: Destacado, widget: boolean, default: false }
+      - { name: borrador, label: Borrador, widget: boolean, default: false }
+      # La prosa del proyecto: va fuera del frontmatter, en el cuerpo del
+      # Markdown, y es lo que la página de detalle renderiza. No es una clave
+      # del esquema de Zod, así que scripts/verify.mjs la excluye al comparar
+      # campos. Sin este campo, el panel editaba los datos pero no el texto.
+      - { name: body, label: Contenido, widget: markdown, required: false }
+
+  - name: publicaciones_en
+    label: Publications (inglés)
+    label_singular: Publicación (en)
+    folder: src/content/publicaciones/en
+    create: true
+    delete: true
+    extension: md
+    format: yaml-frontmatter
+    slug: '{{fields._slug}}'
+    fields:
+      - { name: titulo, label: Título, widget: string }
+      - { name: autores, label: Autores, widget: list, min: 1 }
+      - { name: anio, label: Año, widget: number, value_type: int }
+      - {
+          name: tipo,
+          label: Tipo,
+          widget: select,
+          options: [journal, conference, preprint, capitulo],
+        }
+      - { name: venue, label: Venue, widget: string }
+      - { name: serie, label: Serie, widget: string, required: false }
+      - { name: editorial, label: Editorial, widget: string, required: false }
+      - { name: paginas, label: Páginas, widget: string, required: false }
+      - { name: doi, label: DOI, widget: string, required: false }
+      - { name: url, label: URL, widget: string, type: url, required: false }
+      - { name: proyecto, label: Proyecto relacionado, widget: string, required: false }
+      - { name: kw, label: Palabras clave, widget: list, required: false, default: [] }
+      - { name: borrador, label: Borrador, widget: boolean, default: false }
+      # Igual que en proyectos, la prosa vive en el cuerpo del Markdown. Acá
+      # además decide algo: una publicación sin cuerpo no genera página propia
+      # —solo su fila con el DOI—, y eso lo comprueba el verificador.
+      - { name: body, label: Contenido, widget: markdown, required: false }
+
+  - name: educacion_en
+    label: Education (inglés)
+    label_singular: Educación (en)
+    folder: src/content/educacion/en
+    create: true
+    delete: true
+    extension: md
+    format: yaml-frontmatter
+    slug: '{{fields._slug}}'
+    fields:
+      - { name: titulo, label: Título, widget: string }
+      - { name: institucion, label: Institución, widget: string }
+      - { name: ubicacion, label: Ubicación, widget: string }
+      - {
+          name: inicio,
+          label: Inicio,
+          widget: string,
+          pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+          hint: 'AAAA o AAAA-MM',
+        }
+      - {
+          name: fin,
+          label: Fin,
+          widget: string,
+          required: false,
+          pattern: ['^\d{4}(-(0[1-9]|1[0-2]))?$', 'Formato AAAA o AAAA-MM, por ejemplo 2025-09'],
+          hint: 'AAAA o AAAA-MM',
+        }
+      - { name: registro, label: Número de registro, widget: string, required: false }
+      - {
+          name: archivo,
+          label: Archivo (PDF o imagen del título),
+          widget: file,
+          required: false,
+          accept: '.pdf,.png,.jpg,.jpeg,.webp,.avif',
+        }
 
   # --- Páginas: colección de archivos, sin creación (son exactamente dos) --
   # Sveltia no tiene una opción `create` para colecciones de archivos: la
@@ -196,6 +397,25 @@ collections:
       - name: contacto
         label: Contacto
         file: src/content/paginas/contacto.md
+        fields:
+          - { name: titulo, label: Título, widget: string }
+          - { name: desc, label: Descripción, widget: text }
+          - { name: body, label: Contenido, widget: markdown }
+
+  - name: paginas_en
+    label: Páginas (inglés)
+    label_singular: Página (en)
+    files:
+      - name: sobre-mi
+        label: Sobre mí (inglés)
+        file: src/content/paginas/en/sobre-mi.md
+        fields:
+          - { name: titulo, label: Título, widget: string }
+          - { name: desc, label: Descripción, widget: text }
+          - { name: body, label: Contenido, widget: markdown }
+      - name: contacto
+        label: Contacto (inglés)
+        file: src/content/paginas/en/contacto.md
         fields:
           - { name: titulo, label: Título, widget: string }
           - { name: desc, label: Descripción, widget: text }
@@ -225,6 +445,14 @@ collections:
               - { name: id, label: ID, widget: string }
               - { name: nombre, label: Nombre, widget: string }
               - { name: emisor, label: Emisor, widget: string, required: false }
+              - {
+                  name: nombre_en,
+                  label: Nombre en inglés,
+                  hint: 'Solo si cambia al traducirse. Vacío = el mismo nombre.',
+                  widget: string,
+                  required: false,
+                }
+              - { name: emisor_en, label: Emisor en inglés, widget: string, required: false }
               - {
                   name: fecha,
                   label: Fecha,
@@ -279,6 +507,22 @@ singletons:
           - { name: titular, label: Titular, widget: string }
           - { name: ubicacion, label: Ubicación, widget: string }
           - { name: disponibilidad, label: Disponibilidad, widget: string }
+          - {
+              name: resumen,
+              label: Perfil profesional (CV),
+              hint: 'El párrafo de «Perfil profesional» del CV en PDF.',
+              widget: text,
+              required: false,
+            }
+          - name: idiomas
+            label: Idiomas
+            label_singular: Idioma
+            widget: list
+            required: false
+            default: []
+            fields:
+              - { name: idioma, label: Idioma, widget: string }
+              - { name: nivel, label: Nivel, widget: string }
           - { name: correo, label: Correo, widget: string, type: email }
           - {
               name: telefono,
@@ -327,3 +571,36 @@ singletons:
                   widget: string,
                   required: false,
                 }
+  # Lo que cambia del perfil al inglés (ver `perfilEn` en src/content.config.ts).
+  # Contacto, foto y enlaces son el mismo dato que en «Perfil» y no se repiten.
+  - name: perfilEn
+    label: Perfil (inglés)
+    file: src/content/perfil.en.yaml
+    format: yaml
+    fields:
+      - name: perfil
+        label: Perfil (inglés)
+        widget: object
+        fields:
+          - { name: titular, label: Titular, widget: string, required: false }
+          - { name: ubicacion, label: Ubicación, widget: string, required: false }
+          - { name: disponibilidad, label: Disponibilidad, widget: string, required: false }
+          - { name: resumen, label: Perfil profesional (CV), widget: text, required: false }
+          - name: idiomas
+            label: Idiomas
+            label_singular: Idioma
+            widget: list
+            required: false
+            default: []
+            fields:
+              - { name: idioma, label: Idioma, widget: string }
+              - { name: nivel, label: Nivel, widget: string }
+          - { name: foto_alt, label: Texto alternativo de la foto, widget: string, required: false }
+          - { name: distribuidor_etiqueta, label: Etiqueta del distribuidor, widget: string, required: false }
+          - {
+              name: distribuidor_divulgacion,
+              label: Marca de afiliado,
+              hint: 'Máximo 24 caracteres.',
+              widget: string,
+              required: false,
+            }

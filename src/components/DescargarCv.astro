@@ -1,0 +1,19 @@
+---
+import { getPerfil, type Idioma } from '../lib/content';
+import { rutaDeCv } from '../lib/cv-nombre';
+import { ETIQUETAS_CV } from '../i18n/cv';
+
+// El enlace de descarga del CV. Es un <a href> a un PDF que se genera en el
+// build (src/pages/cv/[archivo].pdf.ts) y nada más: la CSP del sitio no
+// permite scripts en línea, y un enlace no los necesita. `lang` decide qué
+// PDF se descarga: quien lee la página en inglés se lleva el CV en inglés.
+interface Props {
+  lang?: Idioma;
+}
+const { lang = 'es' } = Astro.props;
+const perfil = await getPerfil(lang);
+---
+
+<p class="out note">
+  # cv: <a class="go" href={rutaDeCv(perfil.nombre, lang)} download>{ETIQUETAS_CV[lang].descargar}</a>
+</p>

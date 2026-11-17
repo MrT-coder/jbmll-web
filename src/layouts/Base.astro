@@ -1,6 +1,7 @@
 ---
 import '../styles/tokens.css';
 import '../styles/reader.css';
+import { idiomaDeRuta, rutaAlternativa } from '../i18n/rutas';
 
 interface Props {
   title: string;
@@ -16,11 +17,22 @@ const { title, description, indexable = true } = Astro.props;
 // pero Cloudflare Pages redirige esas URL a /proyectos y a /, que son las que
 // lista el sitemap. La canónica declara la URL final, no la que redirige.
 const ruta = Astro.url.pathname.replace(/(?:\/index)?\.html$/, '') || '/';
-const canonical = new URL(ruta, Astro.site);
+// La portada en inglés es /en, sin barra: con build.format 'file' Astro la emite
+// como en.html y Cloudflare la sirve ahí, igual que el sitemap la lista.
+const rutaCanonica = ruta;
+const canonical = new URL(rutaCanonica, Astro.site);
+
+// El idioma lo dice la URL, no una prop: una página que se olvidara de pasarlo
+// saldría en español dentro de /en/ sin que nada lo notara.
+const lang = idiomaDeRuta(ruta);
+const otro = lang === 'es' ? 'en' : 'es';
+// Todas las páginas indexables existen en los dos idiomas (mismos slugs), así
+// que cada una declara a su par. x-default es el español, el idioma de la raíz.
+const alterna = new URL(rutaAlternativa(rutaCanonica, lang), Astro.site);
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang={lang}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -29,6 +41,15 @@ const canonical = new URL(ruta, Astro.site);
     <meta name="description" content={description} />
     <meta name="author" content="Josue Bladimir Morales Llanganate" />
     {indexable ? <link rel="canonical" href={canonical} /> : <meta name="robots" content="noindex" />}
+    {
+      indexable && (
+        <>
+          <link rel="alternate" hreflang={lang} href={canonical} />
+          <link rel="alternate" hreflang={otro} href={alterna} />
+          <link rel="alternate" hreflang="x-default" href={lang === 'es' ? canonical : alterna} />
+        </>
+      )
+    }
 
     <meta name="theme-color" content="#06080F" />
     <!-- El favicon es el prompt solo, no el logo completo: a 16 px el logo se
@@ -52,7 +73,8 @@ const canonical = new URL(ruta, Astro.site);
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     {indexable && <meta property="og:url" content={canonical} />}
-    <meta property="og:locale" content="es_EC" />
+    <meta property="og:locale" content={lang === 'es' ? 'es_EC' : 'en_US'} />
+    {indexable && <meta property="og:locale:alternate" content={lang === 'es' ? 'en_US' : 'es_EC'} />}
     <meta name="twitter:card" content="summary" />
   </head>
 

@@ -31,6 +31,11 @@ kw:
   - sistema de créditos
 demo: https://busere.com
 borrador: false
+cv:
+  - Construí una plataforma de evaluación psicológica donde cada psicólogo crea sus pruebas, las aplica por enlace y descarga el informe en PDF.
+  - Desarrollé la API en Java 25 y Spring Boot 4 como monolito modular con Spring Modulith y arquitectura hexagonal, con fronteras verificadas por pruebas.
+  - Cifré las respuestas de los evaluados con AES-256-GCM y rotación de claves, y las purgué tras la descarga del informe.
+  - Implementé autenticación propia con cookie HttpOnly, CSRF y Argon2, e informes PDF con Thymeleaf y Chromium sin interfaz.
 ---
 
 Construí BUSERE, una plataforma donde cada psicólogo diseña sus propias pruebas psicológicas y las usa con sus evaluados. El sistema no trae pruebas precargadas: el psicólogo arma la suya por secciones, cada una con sus ítems, escala, puntaje y categorías. Después envía un enlace al evaluado, que la responde sin crear cuenta, y descarga el informe en PDF. Las pruebas son privadas de su autor. El sitio del producto está en [busere.com](https://busere.com).
