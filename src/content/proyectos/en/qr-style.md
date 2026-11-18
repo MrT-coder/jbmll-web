@@ -25,6 +25,8 @@ I built a free service that turns a person's logo into a QR code that phones can
 
 ![QR Style interface in dark mode: logo upload, link field and the selector for the three QR styles](/media/qr-style-interfaz-en.png "The interface: logo, link and style in three steps.")
 
+You can try it at [qrstyle.jbmllnube.com](https://qrstyle.jbmllnube.com/).
+
 ## Three QR styles
 
 A generic QR looks like nothing. I implemented three ways of blending the logo in. "Woven" uses the whole logo as the background and modulates only the center of each module. "Classic" draws round dots in the logo's color, circular finder patterns and the logo on a center plate. "Inside the logo" draws a small QR in a clear area of the logo, with strokes that follow its ridges, and leaves the rest of the image untouched. Letting the user choose the style is a product decision: each logo looks better with a different one.
