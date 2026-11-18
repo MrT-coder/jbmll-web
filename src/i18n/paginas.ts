@@ -50,7 +50,7 @@ export const TEXTOS_PAGINAS: Record<Idioma, TextosPaginas> = {
   es: {
     inicio: {
       descripcion:
-        'Desarrollador backend Java. Proyectos, publicaciones y notas, en una terminal que se navega con comandos o con clic.',
+        'Software Engineer, IA aplicada a salud. Proyectos, publicaciones y notas, en una terminal que se navega con comandos o con clic.',
       autor: 'autor',
       rol: 'rol',
       ubicacion: 'ubicación',
@@ -109,7 +109,7 @@ export const TEXTOS_PAGINAS: Record<Idioma, TextosPaginas> = {
   en: {
     inicio: {
       descripcion:
-        'Java backend developer. Projects, publications and notes, in a terminal you can navigate with commands or by clicking.',
+        'Software Engineer, Applied AI for Health. Projects, publications and notes, in a terminal you can navigate with commands or by clicking.',
       autor: 'author',
       rol: 'role',
       ubicacion: 'location',

@@ -15,7 +15,10 @@ const T = TEXTOS_PAGINAS[lang].inicio;
 const indice = await getIndice(lang);
 const perfil = await getPerfil(lang);
 const experiencia = await getExperiencia(lang);
-const meses = mesesDeExperiencia(experiencia.map((x) => x.data));
+const periodos = experiencia.map((x) => ({ inicio: x.data.inicio, fin: x.data.fin }));
+// Valor del build: lo que ven quienes no ejecutan JavaScript. El script del
+// final lo recalcula con la fecha de quien visita la página.
+const meses = mesesDeExperiencia(periodos);
 
 const INFO = [
   [T.autor, perfil.nombre],
@@ -43,10 +46,33 @@ const INFO = [
         INFO.map(([k, v]) => (
           <>
             <dt>{k}</dt>
-            <dd>{v}</dd>
+            {k === T.experiencia ? (
+              <dd data-experiencia={JSON.stringify(periodos)} data-lang={lang}>
+                {v}
+              </dd>
+            ) : (
+              <dd>{v}</dd>
+            )}
           </>
         ))
       }
     </dl>
   </Terminal>
 </Base>
+
+<script>
+  import { mesesDeExperiencia, type Periodo } from '../lib/experiencia';
+  import { TEXTOS_PAGINAS } from '../i18n/paginas';
+
+  // Recalcula con la fecha de quien visita: el HTML estático solo sabe la del build.
+  const el = document.querySelector<HTMLElement>('[data-experiencia]');
+  if (el) {
+    try {
+      const periodos: Periodo[] = JSON.parse(el.dataset.experiencia ?? '[]');
+      const lang = el.dataset.lang === 'en' ? 'en' : 'es';
+      el.textContent = TEXTOS_PAGINAS[lang].inicio.experienciaValor(mesesDeExperiencia(periodos));
+    } catch {
+      // Se queda el valor del build.
+    }
+  }
+</script>
