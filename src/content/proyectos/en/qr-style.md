@@ -23,7 +23,7 @@ borrador: false
 
 I built a free service that turns a person's logo into a QR code that phones can scan and that still looks like the logo. The user picks one of three styles, and the image never leaves their device.
 
-![QR Style interface in dark mode: logo upload, link field and the selector for the three QR styles](/media/qr-style-interfaz.png "The interface: logo, link and style in three steps.")
+![QR Style interface in dark mode: logo upload, link field and the selector for the three QR styles](/media/qr-style-interfaz-en.png "The interface: logo, link and style in three steps.")
 
 ## Three QR styles
 
