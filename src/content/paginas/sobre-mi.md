@@ -1,6 +1,6 @@
 ---
 titulo: Sobre mí
-desc: Desarrollador backend Java. Experiencia, formación y el stack calculado desde los datos.
+desc: Software Engineer, IA aplicada a salud. Experiencia, formación y el stack calculado desde los datos.
 ---
 
 Construyo sistemas backend en **Java** y **Spring Boot**: APIs REST, arquitecturas

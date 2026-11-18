@@ -12,6 +12,8 @@ export interface TextosPaginas {
     ubicacion: string;
     stack: string;
     stackValor: (n: number) => string;
+    experiencia: string;
+    experienciaValor: (meses: number) => string;
   };
   sobreMi: {
     descripcion: (titular: string) => string;
@@ -48,12 +50,22 @@ export const TEXTOS_PAGINAS: Record<Idioma, TextosPaginas> = {
   es: {
     inicio: {
       descripcion:
-        'Desarrollador backend Java. Proyectos, publicaciones y notas, en una terminal que se navega con comandos o con clic.',
+        'Software Engineer, IA aplicada a salud. Proyectos, publicaciones y notas, en una terminal que se navega con comandos o con clic.',
       autor: 'autor',
       rol: 'rol',
       ubicacion: 'ubicación',
       stack: 'stack',
       stackValor: (n) => `${n} tecnologías, contadas desde los datos`,
+      experiencia: 'experiencia',
+      experienciaValor: (meses) => {
+        const a = Math.floor(meses / 12);
+        const m = meses % 12;
+        const partes = [
+          a ? `${a} ${a === 1 ? 'año' : 'años'}` : '',
+          m ? `${m} ${m === 1 ? 'mes' : 'meses'}` : '',
+        ].filter(Boolean);
+        return `${partes.join(' y ')}, sumados desde mis puestos`;
+      },
     },
     sobreMi: {
       descripcion: (titular) =>
@@ -97,12 +109,22 @@ export const TEXTOS_PAGINAS: Record<Idioma, TextosPaginas> = {
   en: {
     inicio: {
       descripcion:
-        'Java backend developer. Projects, publications and notes, in a terminal you can navigate with commands or by clicking.',
+        'Software Engineer, Applied AI for Health. Projects, publications and notes, in a terminal you can navigate with commands or by clicking.',
       autor: 'author',
       rol: 'role',
       ubicacion: 'location',
       stack: 'stack',
       stackValor: (n) => `${n} technologies, counted from the data`,
+      experiencia: 'experience',
+      experienciaValor: (meses) => {
+        const a = Math.floor(meses / 12);
+        const m = meses % 12;
+        const partes = [
+          a ? `${a} ${a === 1 ? 'year' : 'years'}` : '',
+          m ? `${m} ${m === 1 ? 'month' : 'months'}` : '',
+        ].filter(Boolean);
+        return `${partes.join(' and ')}, summed from my positions`;
+      },
     },
     sobreMi: {
       descripcion: (titular) =>
