@@ -1,6 +1,6 @@
 ---
 titulo: About me
-desc: Java backend developer. Experience, education and the stack computed from the data.
+desc: Software Engineer, Applied AI for Health. Experience, education and the stack computed from the data.
 ---
 
 I build backend systems in **Java** and **Spring Boot**: REST APIs, microservice

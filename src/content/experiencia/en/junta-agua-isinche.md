@@ -2,8 +2,8 @@
 puesto: Full-Stack Developer
 organizacion: Junta Administradora de Agua Potable Isinche de Tovares Infantes
 ubicacion: Pujilí, Ecuador
-inicio: '2023'
-fin: '2024'
+inicio: 2023-01
+fin: 2024-01
 st:
   - PHP
   - Laravel
