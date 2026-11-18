@@ -296,7 +296,7 @@ function inicioDe(perfil: PerfilConContacto, lang: Idioma): { titulo: string; le
   const quien = `<strong>${perfil.nombre}</strong> (<span class="sig">${perfil.marca}</span>)`;
   return {
     titulo: `${perfil.nombre} — ${perfil.marca}`,
-    lead: lang === 'en' ? `I am ${quien}, a backend developer.` : `Soy ${quien}, desarrollador backend.`,
+    lead: lang === 'en' ? `I am ${quien}, a software engineer focused on applied AI for health.` : `Soy ${quien}, Software Engineer enfocado en IA aplicada a salud.`,
   };
 }
 

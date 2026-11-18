@@ -1,7 +1,7 @@
 # Lo que cambia del perfil al inglés. Contacto, foto y enlaces son el mismo dato
 # que en perfil.yaml y no se repiten aquí. Un campo en blanco cae al español.
 perfil:
-  titular: Java Backend Developer
+  titular: Software Engineer, Applied AI for Health
   ubicacion: Salcedo, Cotopaxi, Ecuador
   disponibilidad: Available for remote work
   resumen: >-
