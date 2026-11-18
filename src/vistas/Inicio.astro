@@ -1,7 +1,8 @@
 ---
 import Base from '../layouts/Base.astro';
 import Terminal from '../components/Terminal.astro';
-import { getIndice, getPerfil, type Idioma } from '../lib/content';
+import { getExperiencia, getIndice, getPerfil, type Idioma } from '../lib/content';
+import { mesesDeExperiencia } from '../lib/experiencia';
 import { renderSecciones } from '../lib/render';
 import { TEXTOS_PAGINAS } from '../i18n/paginas';
 
@@ -13,12 +14,15 @@ const T = TEXTOS_PAGINAS[lang].inicio;
 
 const indice = await getIndice(lang);
 const perfil = await getPerfil(lang);
+const experiencia = await getExperiencia(lang);
+const meses = mesesDeExperiencia(experiencia.map((x) => x.data));
 
 const INFO = [
   [T.autor, perfil.nombre],
   [T.rol, perfil.titular],
   [T.ubicacion, perfil.ubicacion],
   [T.stack, T.stackValor(indice.stack.length)],
+  [T.experiencia, T.experienciaValor(meses)],
 ];
 ---
 

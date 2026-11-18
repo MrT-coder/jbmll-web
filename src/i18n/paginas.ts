@@ -12,6 +12,8 @@ export interface TextosPaginas {
     ubicacion: string;
     stack: string;
     stackValor: (n: number) => string;
+    experiencia: string;
+    experienciaValor: (meses: number) => string;
   };
   sobreMi: {
     descripcion: (titular: string) => string;
@@ -54,6 +56,16 @@ export const TEXTOS_PAGINAS: Record<Idioma, TextosPaginas> = {
       ubicacion: 'ubicación',
       stack: 'stack',
       stackValor: (n) => `${n} tecnologías, contadas desde los datos`,
+      experiencia: 'experiencia',
+      experienciaValor: (meses) => {
+        const a = Math.floor(meses / 12);
+        const m = meses % 12;
+        const partes = [
+          a ? `${a} ${a === 1 ? 'año' : 'años'}` : '',
+          m ? `${m} ${m === 1 ? 'mes' : 'meses'}` : '',
+        ].filter(Boolean);
+        return `${partes.join(' y ')}, sumados desde mis puestos`;
+      },
     },
     sobreMi: {
       descripcion: (titular) =>
@@ -103,6 +115,16 @@ export const TEXTOS_PAGINAS: Record<Idioma, TextosPaginas> = {
       ubicacion: 'location',
       stack: 'stack',
       stackValor: (n) => `${n} technologies, counted from the data`,
+      experiencia: 'experience',
+      experienciaValor: (meses) => {
+        const a = Math.floor(meses / 12);
+        const m = meses % 12;
+        const partes = [
+          a ? `${a} ${a === 1 ? 'year' : 'years'}` : '',
+          m ? `${m} ${m === 1 ? 'month' : 'months'}` : '',
+        ].filter(Boolean);
+        return `${partes.join(' and ')}, summed from my positions`;
+      },
     },
     sobreMi: {
       descripcion: (titular) =>
