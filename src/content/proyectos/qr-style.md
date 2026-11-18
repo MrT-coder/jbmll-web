@@ -25,6 +25,8 @@ Construí un servicio gratuito que convierte el logo de una persona en un códig
 
 ![Interfaz de QR Style en modo oscuro: carga del logo, campo del enlace y selector de los tres estilos de QR](/media/qr-style-interfaz.png "La interfaz: logo, enlace y estilo en tres pasos.")
 
+Puedes probarlo en [qrstyle.jbmllnube.com](https://qrstyle.jbmllnube.com/).
+
 ## Tres estilos de QR
 
 Un QR genérico no se parece a nada. Implementé tres formas de integrar el logo. «Tejido» usa el logo completo como fondo y modula solo el centro de cada módulo. «Clásico» dibuja puntos redondos del color del logo, buscadores circulares y el logo sobre una placa central. «Dentro del logo» dibuja un QR pequeño en una zona despejada del logo, con trazos que siguen sus crestas, y deja el resto de la imagen intacta. Que el usuario elija el estilo es una decisión del producto: cada logo se ve mejor con uno distinto.
