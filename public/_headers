@@ -28,7 +28,11 @@
   # marco interno, así que sin él la política lo bloquea y el visor cae a su
   # enlace de emergencia. No se vio en local porque astro preview no aplica
   # este archivo; se vio en producción.
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  # Web Analytics de Cloudflare (RUM con inyección automática): el beacon se
+  # carga desde static.cloudflareinsights.com y reporta a cloudflareinsights.com.
+  # Son los dos únicos orígenes ajenos concedidos en el sitio público; si se
+  # desactiva el RUM en el panel de Cloudflare, se pueden quitar de la línea.
+  Content-Security-Policy: default-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; object-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
 
   # Sin preload: la lista de HSTS del navegador es prácticamente irreversible y
   # se entra ahí a propósito, no de paso.
