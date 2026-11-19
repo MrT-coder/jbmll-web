@@ -22,6 +22,8 @@ I built a terminal app where every running Claude Code agent is a character at i
 
 ![BitAgentsHub banner: a green pixel-art office with agents at their desks and a cat in a corner](/media/bitagentshub-oficina.webp "BitAgentsHub: an office in the terminal, one desk per agent.")
 
+The code is public at [github.com/MrT-coder/bitagentshub](https://github.com/MrT-coder/bitagentshub).
+
 ## A background process that owns the terminals
 
 The pseudo terminals are not owned by the office window but by a separate process. So quitting the office, losing an SSH connection or rebuilding the executable does not end the running agents. It listens only on a pipe (a socket outside Windows) that only the same user can open, and exits by itself when no office is attached and no program runs.

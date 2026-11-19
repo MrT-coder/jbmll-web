@@ -22,6 +22,8 @@ Construí una aplicación de terminal en la que cada agente de Claude Code en ej
 
 ![Banner de BitAgentsHub: una oficina en pixel art verde con agentes frente a sus escritorios y un gato en una esquina](/media/bitagentshub-oficina.webp "BitAgentsHub: una oficina en la terminal, un escritorio por agente.")
 
+El código es público en [github.com/MrT-coder/bitagentshub](https://github.com/MrT-coder/bitagentshub).
+
 ## Un proceso en segundo plano dueño de las terminales
 
 Las pseudoterminales no las posee la ventana de la oficina sino un proceso aparte. Así, cerrar la oficina, perder una conexión SSH o recompilar el ejecutable no mata a los agentes que corren. Escucha solo en una tubería (un socket fuera de Windows) que únicamente abre el mismo usuario, y se apaga solo cuando no queda ninguna oficina conectada ni programa en marcha.
